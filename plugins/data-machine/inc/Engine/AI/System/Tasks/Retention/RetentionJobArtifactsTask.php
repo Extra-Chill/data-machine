@@ -12,8 +12,8 @@ class RetentionJobArtifactsTask extends RetentionTask {
 
 	public static function getTaskMeta(): array {
 		return array(
-			'label'           => 'Retention: scoped job artifacts',
-			'description'     => 'Deletes scoped job artifact files older than their configured retention window.',
+			'label'           => 'Retention: job artifacts',
+			'description'     => 'Deletes job artifact files (tool traces, transcripts, scoped artifacts) older than their retention window, in bounded resumable batches.',
 			'setting_key'     => 'retention_job_artifacts_enabled',
 			'default_enabled' => true,
 			'supports_run'    => true,

@@ -54,6 +54,9 @@ class RetentionCleanup {
 	/** Maximum sweep queries per run; leftover orphans are picked up by the next run. */
 	private const BATCH_WORKLIST_SWEEP_MAX_CHUNKS = 20;
 
+	/** Option holding the job-ID cursor for resumable job artifact cleanup. */
+	public const JOB_ARTIFACTS_CURSOR_OPTION = 'datamachine_job_artifacts_cleanup_cursor';
+
 	public static function completedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ), 30 );
 	}
@@ -1897,15 +1900,42 @@ class RetentionCleanup {
 		return ( new FileCleanup() )->count_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, self::jobArtifactsMaxAgeDays() );
 	}
 
+	/**
+	 * Delete expired job artifacts in one bounded, resumable batch.
+	 *
+	 * Covers every artifact JobArtifacts writes (tool traces and transcripts
+	 * included) plus legacy unscoped files already on disk. Each run visits at
+	 * most jobArtifactsCleanupBatchSize() job directories within
+	 * jobArtifactsCleanupMaxRuntimeSeconds(), then stores a job-ID cursor so the
+	 * next run resumes where this one stopped. A completed sweep wraps the
+	 * cursor back to 0.
+	 */
 	public static function cleanupJobArtifacts(): array {
 		$retention_days = self::jobArtifactsMaxAgeDays();
-		$deleted        = ( new FileCleanup() )->cleanup_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, $retention_days );
+		$batch_size     = self::jobArtifactsCleanupBatchSize();
+		$max_runtime    = self::jobArtifactsCleanupMaxRuntimeSeconds();
+		$cursor         = max( 0, (int) get_option( self::JOB_ARTIFACTS_CURSOR_OPTION, 0 ) );
+		$batch          = ( new FileCleanup() )->cleanup_job_artifacts_batch(
+			JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
+			$retention_days,
+			$batch_size,
+			$cursor,
+			microtime( true ) + $max_runtime
+		);
 
-		if ( $deleted > 0 ) {
+		update_option( self::JOB_ARTIFACTS_CURSOR_OPTION, (int) $batch['next_cursor'], false );
+
+		$deleted = (int) $batch['deleted'];
+		if ( $deleted > 0 || (int) $batch['dirs_removed'] > 0 ) {
 			self::log(
-				'Scheduled cleanup: deleted old scoped job artifacts',
+				'Scheduled cleanup: deleted old job artifacts',
 				array(
 					'artifacts_deleted' => $deleted,
+					'dirs_scanned'      => (int) $batch['dirs_scanned'],
+					'dirs_removed'      => (int) $batch['dirs_removed'],
+					'cursor'            => $cursor,
+					'next_cursor'       => (int) $batch['next_cursor'],
+					'sweep_complete'    => (bool) $batch['complete'],
 					'retention_scope'   => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 					'max_age_days'      => $retention_days,
 				)
@@ -1913,10 +1943,35 @@ class RetentionCleanup {
 		}
 
 		return array(
-			'deleted'         => (int) $deleted,
+			'deleted'         => $deleted,
+			'dirs_scanned'    => (int) $batch['dirs_scanned'],
+			'dirs_removed'    => (int) $batch['dirs_removed'],
+			'cursor'          => $cursor,
+			'next_cursor'     => (int) $batch['next_cursor'],
+			'sweep_complete'  => (bool) $batch['complete'],
+			'batch_size'      => $batch_size,
 			'retention_scope' => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 			'max_age_days'    => $retention_days,
 		);
+	}
+
+	/**
+	 * Maximum job artifact directories visited per cleanup run.
+	 *
+	 * Daily runs must comfortably outpace artifact generation (busy installs
+	 * write several thousand job directories per day) while staying bounded.
+	 */
+	public static function jobArtifactsCleanupBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_job_artifacts_cleanup_batch_size', 100000 );
+		return $size > 0 ? $size : 100000;
+	}
+
+	/**
+	 * Maximum wall-clock seconds a single job artifact cleanup run may spend.
+	 */
+	public static function jobArtifactsCleanupMaxRuntimeSeconds(): int {
+		$seconds = (int) apply_filters( 'datamachine_job_artifacts_cleanup_max_runtime_seconds', 60 );
+		return $seconds > 0 ? $seconds : 60;
 	}
 
 	public static function countChatSessions(): int {

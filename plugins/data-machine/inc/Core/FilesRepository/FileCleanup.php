@@ -11,6 +11,8 @@
 
 namespace DataMachine\Core\FilesRepository;
 
+use DataMachine\Core\JobArtifactSurfaces;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -240,68 +242,307 @@ class FileCleanup {
 	}
 
 	/**
-	 * Count old artifact files for a retention scope.
+	 * Count old job artifact files eligible under a retention scope.
+	 *
+	 * For the default retention scope every artifact file is covered: unscoped
+	 * (legacy) artifacts and artifacts with an unregistered scope age out on the
+	 * default window, and artifacts carrying another registered scope age out on
+	 * that scope's own window. For any other scope only artifacts explicitly
+	 * stamped with that scope match.
+	 *
+	 * This walks every job directory and is intended for reporting. Scheduled
+	 * cleanup uses cleanup_job_artifacts_batch() so a run stays bounded.
 	 *
 	 * @param string $retention_scope Retention scope to match.
 	 * @param int    $retention_days  Files older than this many days are eligible.
 	 * @return int Eligible artifact file count.
 	 */
 	public function count_old_job_artifacts( string $retention_scope, int $retention_days ): int {
-		return $this->walk_old_job_artifacts( $retention_scope, $retention_days, false );
+		return $this->walk_all_job_artifact_dirs( $retention_scope, $retention_days, false );
 	}
 
 	/**
-	 * Clean up old artifact files for a retention scope.
+	 * Clean up old job artifact files for a retention scope (unbounded walk).
+	 *
+	 * Prefer cleanup_job_artifacts_batch() for scheduled work on large installs.
 	 *
 	 * @param string $retention_scope Retention scope to match.
 	 * @param int    $retention_days  Files older than this many days are eligible.
 	 * @return int Deleted artifact file count.
 	 */
 	public function cleanup_old_job_artifacts( string $retention_scope, int $retention_days ): int {
-		return $this->walk_old_job_artifacts( $retention_scope, $retention_days, true );
+		return $this->walk_all_job_artifact_dirs( $retention_scope, $retention_days, true );
 	}
 
-	private function walk_old_job_artifacts( string $retention_scope, int $retention_days, bool $delete ): int {
-		$upload_dir      = wp_upload_dir();
-		$base            = trailingslashit( $upload_dir['basedir'] ) . 'datamachine-artifacts/jobs';
-		$cutoff_time     = time() - ( $retention_days * DAY_IN_SECONDS );
-		$retention_scope = sanitize_key( $retention_scope );
-		$count           = 0;
+	/**
+	 * Clean up old job artifacts in one bounded, resumable batch.
+	 *
+	 * Job artifact directories are named by numeric job ID. A batch visits at
+	 * most $max_dirs directories with an ID greater than $cursor, in ascending
+	 * ID order, and stops early once $deadline (a microtime(true) timestamp)
+	 * passes. Directory selection is a single streaming readdir() pass with a
+	 * bounded heap, so memory stays proportional to $max_dirs rather than to the
+	 * total number of job directories. Directories left empty are removed.
+	 *
+	 * Callers persist `next_cursor` and pass it back on the next run. When the
+	 * walk reaches the end of the directory list, `complete` is true and
+	 * `next_cursor` wraps to 0 so the following run starts a fresh sweep.
+	 *
+	 * @param string $retention_scope Retention scope to match.
+	 * @param int    $retention_days  Files older than this many days are eligible.
+	 * @param int    $max_dirs        Maximum job directories to visit.
+	 * @param int    $cursor          Resume after this job ID (0 = start).
+	 * @param float  $deadline        Optional wall-clock deadline; 0 disables it.
+	 * @return array{deleted:int, dirs_scanned:int, dirs_removed:int, cursor:int, next_cursor:int, complete:bool}
+	 */
+	public function cleanup_job_artifacts_batch( string $retention_scope, int $retention_days, int $max_dirs, int $cursor = 0, float $deadline = 0.0 ): array {
+		$cursor   = max( 0, $cursor );
+		$max_dirs = max( 1, $max_dirs );
+		$result   = array(
+			'deleted'      => 0,
+			'dirs_scanned' => 0,
+			'dirs_removed' => 0,
+			'cursor'       => $cursor,
+			'next_cursor'  => 0,
+			'complete'     => true,
+		);
 
-		if ( '' === $retention_scope || ! is_dir( $base ) ) {
+		$base    = $this->job_artifacts_base_dir();
+		$matcher = $this->job_artifact_matcher( $retention_scope, $retention_days );
+		if ( null === $matcher || ! is_dir( $base ) ) {
+			return $result;
+		}
+
+		$job_ids  = $this->select_job_artifact_ids( $base, $cursor, $max_dirs );
+		$selected = count( $job_ids );
+		$last_id  = $cursor;
+
+		foreach ( $job_ids as $job_id ) {
+			if ( $result['dirs_scanned'] > 0 && $deadline > 0 && microtime( true ) >= $deadline ) {
+				break;
+			}
+
+			$outcome = $this->process_job_artifact_dir( $base . '/' . $job_id, $matcher, true );
+			++$result['dirs_scanned'];
+			$result['deleted'] += $outcome['matched'];
+			if ( $outcome['removed_dir'] ) {
+				++$result['dirs_removed'];
+			}
+			$last_id = $job_id;
+		}
+
+		$reached_end           = $selected < $max_dirs && $result['dirs_scanned'] === $selected;
+		$result['complete']    = $reached_end;
+		$result['next_cursor'] = $reached_end ? 0 : $last_id;
+
+		return $result;
+	}
+
+	private function job_artifacts_base_dir(): string {
+		$upload_dir = wp_upload_dir();
+		return trailingslashit( $upload_dir['basedir'] ) . 'datamachine-artifacts/jobs';
+	}
+
+	private function walk_all_job_artifact_dirs( string $retention_scope, int $retention_days, bool $delete ): int {
+		$base    = $this->job_artifacts_base_dir();
+		$matcher = $this->job_artifact_matcher( $retention_scope, $retention_days );
+		$count   = 0;
+
+		if ( null === $matcher || ! is_dir( $base ) ) {
 			return 0;
 		}
 
-		$job_dirs = glob( trailingslashit( $base ) . '*', GLOB_ONLYDIR );
-		if ( false === $job_dirs ) {
+		$handle = opendir( $base );
+		if ( false === $handle ) {
 			return 0;
 		}
 
-		foreach ( $job_dirs as $job_dir ) {
-			$files = glob( trailingslashit( $job_dir ) . '*.json' );
-			if ( false === $files ) {
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- Streaming readdir loop.
+		while ( false !== ( $entry = readdir( $handle ) ) ) {
+			if ( '.' === $entry || '..' === $entry || ! is_dir( $base . '/' . $entry ) ) {
 				continue;
 			}
 
-			foreach ( $files as $file ) {
-				if ( ! is_file( $file ) || filemtime( $file ) >= $cutoff_time || ! $this->artifact_matches_retention_scope( $file, $retention_scope ) ) {
-					continue;
-				}
-
-				if ( ! $delete || wp_delete_file( $file ) ) {
-					++$count;
-				}
-			}
-
-			if ( $delete && empty( glob( trailingslashit( $job_dir ) . '*' ) ) ) {
-				$this->remove_directory( $job_dir );
-			}
+			$count += $this->process_job_artifact_dir( $base . '/' . $entry, $matcher, $delete )['matched'];
 		}
+		closedir( $handle );
 
 		return $count;
 	}
 
-	private function artifact_matches_retention_scope( string $file_path, string $retention_scope ): bool {
+	/**
+	 * Select the smallest $limit numeric job directory IDs greater than $cursor.
+	 *
+	 * @return int[] Ascending job IDs.
+	 */
+	private function select_job_artifact_ids( string $base, int $cursor, int $limit ): array {
+		$handle = opendir( $base );
+		if ( false === $handle ) {
+			return array();
+		}
+
+		$heap = new \SplMaxHeap();
+		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- Streaming readdir loop.
+		while ( false !== ( $entry = readdir( $handle ) ) ) {
+			if ( '' === $entry || ! ctype_digit( $entry ) ) {
+				continue;
+			}
+
+			$job_id = (int) $entry;
+			if ( $job_id <= $cursor ) {
+				continue;
+			}
+
+			if ( $heap->count() < $limit ) {
+				$heap->insert( $job_id );
+			} elseif ( $job_id < $heap->top() ) {
+				$heap->extract();
+				$heap->insert( $job_id );
+			}
+		}
+		closedir( $handle );
+
+		$ids = iterator_to_array( $heap, false );
+		sort( $ids, SORT_NUMERIC );
+		return $ids;
+	}
+
+	/**
+	 * Delete (or count) eligible artifact files in one job directory.
+	 *
+	 * @param string   $job_dir Job artifact directory.
+	 * @param callable $matcher Receives (file path, mtime) and returns eligibility.
+	 * @param bool     $delete  Whether to delete eligible files.
+	 * @return array{matched:int, removed_dir:bool}
+	 */
+	private function process_job_artifact_dir( string $job_dir, callable $matcher, bool $delete ): array {
+		$outcome = array(
+			'matched'     => 0,
+			'removed_dir' => false,
+		);
+
+		if ( ! is_dir( $job_dir ) ) {
+			return $outcome;
+		}
+
+		$files = glob( trailingslashit( $job_dir ) . '*.json' );
+		foreach ( false === $files ? array() : $files as $file ) {
+			if ( ! is_file( $file ) ) {
+				continue;
+			}
+
+			$mtime = filemtime( $file );
+			if ( false === $mtime || ! $matcher( $file, $mtime ) ) {
+				continue;
+			}
+
+			if ( ! $delete || wp_delete_file( $file ) ) {
+				++$outcome['matched'];
+			}
+		}
+
+		if ( ! $delete ) {
+			return $outcome;
+		}
+
+		// Orphaned temp files from interrupted atomic writes age out with the job.
+		$temp_files = glob( trailingslashit( $job_dir ) . '.tmp-artifact-*' );
+		foreach ( false === $temp_files ? array() : $temp_files as $temp_file ) {
+			$mtime = is_file( $temp_file ) ? filemtime( $temp_file ) : false;
+			if ( false !== $mtime && $matcher( null, $mtime ) ) {
+				wp_delete_file( $temp_file );
+			}
+		}
+
+		// Only remove a directory that is empty and not freshly created, so an
+		// in-flight artifact write is never pulled out from under its writer.
+		$dir_mtime = filemtime( $job_dir );
+		$is_stale  = $outcome['matched'] > 0 || ( false !== $dir_mtime && $matcher( null, $dir_mtime ) );
+		if ( $is_stale && $this->is_empty_directory( $job_dir ) ) {
+			$outcome['removed_dir'] = $this->remove_directory( $job_dir );
+		}
+
+		return $outcome;
+	}
+
+	private function is_empty_directory( string $directory ): bool {
+		$entries = scandir( $directory );
+		return false !== $entries && array() === array_diff( $entries, array( '.', '..' ) );
+	}
+
+	/**
+	 * Build the eligibility matcher for a retention scope.
+	 *
+	 * The matcher receives a file path (or null for age-only checks such as
+	 * temp files and directories) plus its mtime.
+	 *
+	 * @return callable|null Null when the scope is invalid.
+	 */
+	private function job_artifact_matcher( string $retention_scope, int $retention_days ): ?callable {
+		$retention_scope = sanitize_key( $retention_scope );
+		if ( '' === $retention_scope ) {
+			return null;
+		}
+
+		$now            = time();
+		$default_cutoff = $now - ( max( 1, $retention_days ) * DAY_IN_SECONDS );
+
+		if ( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE !== $retention_scope ) {
+			return function ( ?string $file, int $mtime ) use ( $retention_scope, $default_cutoff ): bool {
+				if ( $mtime >= $default_cutoff ) {
+					return false;
+				}
+
+				return null === $file || $retention_scope === $this->artifact_retention_scope( $file, $retention_scope );
+			};
+		}
+
+		// Default policy: covers every artifact. Registered non-default scopes
+		// keep their own windows; everything else uses the default window.
+		$scope_cutoffs = array();
+		foreach ( JobArtifactSurfaces::retentionPolicies() as $scope => $policy ) {
+			if ( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE === $scope ) {
+				continue;
+			}
+
+			$scope_cutoffs[ (string) $scope ] = $now - ( max( 1, (int) ( $policy['max_age_days'] ?? $retention_days ) ) * DAY_IN_SECONDS );
+		}
+
+		$all_cutoffs   = array_merge( array( $default_cutoff ), array_values( $scope_cutoffs ) );
+		$oldest_cutoff = min( $all_cutoffs );
+		$newest_cutoff = max( $all_cutoffs );
+
+		return function ( ?string $file, int $mtime ) use ( $default_cutoff, $scope_cutoffs, $oldest_cutoff, $newest_cutoff ): bool {
+			if ( null === $file ) {
+				return $mtime < $default_cutoff;
+			}
+
+			// Newer than every window: keep without reading the file.
+			if ( $mtime >= $newest_cutoff ) {
+				return false;
+			}
+
+			// Older than every window: eligible whatever its scope, no read needed.
+			if ( $mtime < $oldest_cutoff ) {
+				return true;
+			}
+
+			$scope = $this->artifact_retention_scope( $file, JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE );
+			if ( null === $scope ) {
+				return false;
+			}
+
+			return $mtime < ( $scope_cutoffs[ $scope ] ?? $default_cutoff );
+		};
+	}
+
+	/**
+	 * Read an artifact's declared retention scope.
+	 *
+	 * @return string|null Sanitized scope ('' when the artifact declares none or
+	 *                     is not a JSON object), or null when unreadable.
+	 */
+	private function artifact_retention_scope( string $file_path, string $retention_scope ): ?string {
 		FilesystemHelper::make_group_writable( $file_path, FilesystemHelper::SHARED_FILE_PERMISSIONS );
 		if ( ! is_readable( $file_path ) ) {
 			do_action(
@@ -313,24 +554,19 @@ class FileCleanup {
 					'retention_scope' => $retention_scope,
 				)
 			);
-			return false;
+			return null;
 		}
 
 		$contents = file_get_contents( $file_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( ! is_string( $contents ) || '' === $contents ) {
-			return false;
+			return '';
 		}
 
 		$payload = json_decode( $contents, true );
-		if ( ! is_array( $payload ) ) {
-			return false;
+		if ( ! is_array( $payload ) || ! isset( $payload['retention_scope'] ) ) {
+			return '';
 		}
 
-		$scope = isset( $payload['retention_scope'] ) ? sanitize_key( (string) $payload['retention_scope'] ) : '';
-		if ( $retention_scope === $scope ) {
-			return true;
-		}
-
-		return false;
+		return sanitize_key( (string) $payload['retention_scope'] );
 	}
 }
