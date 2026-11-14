@@ -145,7 +145,8 @@ class PacketStoreCleanup {
 	 * @param int                 $cutoff           Unix timestamp age floor.
 	 * @param array<string,mixed> $protected_hashes Protected hashes as keys.
 	 * @param bool                $dry_run          Whether to skip deletion.
-	 * @param array               $result           Running result (by reference).
+	 * @param array{examined:int,deleted:int,eligible:int,kept_referenced:int,kept_fresh:int,failed:int,bytes_deleted:int,bytes_kept:int,removed_dirs:int,cursor:string,complete:bool,cutoff:int} $result Running result (by reference).
+	 * @param-out array{examined:int,deleted:int,eligible:int,kept_referenced:int,kept_fresh:int,failed:int,bytes_deleted:int,bytes_kept:int,removed_dirs:int,cursor:string,complete:bool,cutoff:int} $result
 	 */
 	private function evaluate_file( string $path, string $hash, int $cutoff, array $protected_hashes, bool $dry_run, array &$result ): void {
 		$mtime = @filemtime( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- File may vanish between scandir and stat.
@@ -202,7 +203,8 @@ class PacketStoreCleanup {
 	 *
 	 * @param string $dir     Prefix directory.
 	 * @param bool   $dry_run Whether to skip removal.
-	 * @param array  $result  Running result (by reference).
+	 * @param array{examined:int,deleted:int,eligible:int,kept_referenced:int,kept_fresh:int,failed:int,bytes_deleted:int,bytes_kept:int,removed_dirs:int,cursor:string,complete:bool,cutoff:int} $result Running result (by reference).
+	 * @param-out array{examined:int,deleted:int,eligible:int,kept_referenced:int,kept_fresh:int,failed:int,bytes_deleted:int,bytes_kept:int,removed_dirs:int,cursor:string,complete:bool,cutoff:int} $result
 	 */
 	private static function maybe_remove_empty_dir( string $dir, bool $dry_run, array &$result ): void {
 		if ( $dry_run || ! is_dir( $dir ) ) {
@@ -237,7 +239,7 @@ class PacketStoreCleanup {
 			if ( 1 !== preg_match( $pattern, $entry ) ) {
 				continue;
 			}
-			if ( $dirs !== is_dir( $dir . '/' . $entry ) ) {
+			if ( is_dir( $dir . '/' . $entry ) !== $dirs ) {
 				continue;
 			}
 			$matched[] = $entry;

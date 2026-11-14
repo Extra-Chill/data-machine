@@ -1851,8 +1851,9 @@ class RetentionCleanup {
 				ARRAY_A
 			);
 			// phpcs:enable
-			if ( ! is_array( $rows ) || '' !== (string) $wpdb->last_error ) {
-				return self::packetStoreReferenceScanFailed( 'jobs_query_failed', (string) $wpdb->last_error );
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'jobs_query_failed', self::lastDbError() );
+				return null;
 			}
 			if ( empty( $rows ) ) {
 				break;
@@ -1869,7 +1870,8 @@ class RetentionCleanup {
 					if ( is_file( $data_file ) ) {
 						$contents = file_get_contents( $data_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file read.
 						if ( false === $contents ) {
-							return self::packetStoreReferenceScanFailed( 'job_data_unreadable', $data_file );
+							self::packetStoreReferenceScanFailed( 'job_data_unreadable', $data_file );
+							return null;
 						}
 						$hashes += self::extractPacketHashes( $contents );
 					}
@@ -1878,7 +1880,8 @@ class RetentionCleanup {
 
 			$rows_read += count( $rows );
 			if ( $rows_read > $max_rows ) {
-				return self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
 			}
 		}
 
@@ -1897,8 +1900,9 @@ class RetentionCleanup {
 				),
 				ARRAY_A
 			);
-			if ( ! is_array( $rows ) || '' !== (string) $wpdb->last_error ) {
-				return self::packetStoreReferenceScanFailed( 'batch_items_query_failed', (string) $wpdb->last_error );
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'batch_items_query_failed', self::lastDbError() );
+				return null;
 			}
 			if ( empty( $rows ) ) {
 				break;
@@ -1912,7 +1916,8 @@ class RetentionCleanup {
 
 			$rows_read += count( $rows );
 			if ( $rows_read > $max_rows ) {
-				return self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
 			}
 		}
 
@@ -2018,8 +2023,17 @@ class RetentionCleanup {
 		$stats = get_option( self::PACKET_STORE_STATS_OPTION, array() );
 		$stats = is_array( $stats ) ? $stats : array();
 
+		$last_pass = null;
+		if ( is_array( $stats['last_pass'] ?? null ) ) {
+			$last_pass = array(
+				'completed_at' => (int) ( $stats['last_pass']['completed_at'] ?? 0 ),
+				'files'        => (int) ( $stats['last_pass']['files'] ?? 0 ),
+				'bytes'        => (int) ( $stats['last_pass']['bytes'] ?? 0 ),
+			);
+		}
+
 		return array(
-			'last_pass'  => is_array( $stats['last_pass'] ?? null ) ? $stats['last_pass'] : null,
+			'last_pass'  => $last_pass,
 			'pass_files' => (int) ( $stats['pass_files'] ?? 0 ),
 			'pass_bytes' => (int) ( $stats['pass_bytes'] ?? 0 ),
 			'cursor'     => (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' ),
@@ -2057,13 +2071,24 @@ class RetentionCleanup {
 	}
 
 	/**
+	 * Current wpdb error string, read fresh on every call so static analysis
+	 * does not narrow it across consecutive queries.
+	 *
+	 * @return string Last database error, or '' when the last query succeeded.
+	 * @phpstan-impure
+	 */
+	private static function lastDbError(): string {
+		global $wpdb;
+		return (string) $wpdb->last_error;
+	}
+
+	/**
 	 * Log a failed reference scan and signal fail-closed.
 	 *
 	 * @param string $reason Machine reason.
 	 * @param string $detail Detail for operators.
-	 * @return null Always null.
 	 */
-	private static function packetStoreReferenceScanFailed( string $reason, string $detail ): ?array {
+	private static function packetStoreReferenceScanFailed( string $reason, string $detail ): void {
 		do_action(
 			'datamachine_log',
 			'warning',
@@ -2073,8 +2098,6 @@ class RetentionCleanup {
 				'detail' => $detail,
 			)
 		);
-
-		return null;
 	}
 
 	public static function countStaleClaims(): int {
