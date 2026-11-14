@@ -48,6 +48,10 @@ abstract class EventUpsertTestCase extends WP_UnitTestCase {
 			EventDatesTable::create_table();
 		}
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		// A fresh install points the privacy policy at post ID 3. Test databases
+		// recycle IDs, so an event can land on ID 3 and core then requires
+		// manage_privacy_options (super admin on multisite) to edit it.
+		update_option( 'wp_page_for_privacy_policy', 0 );
 		$ability_registry = \WP_Abilities_Registry::get_instance();
 		if ( ! $ability_registry->is_registered( 'datamachine/upsert-post' ) ) {
 			$category_registry = \WP_Ability_Categories_Registry::get_instance();
