@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.85.0] - 2026-11-14
+
+### Added
+- add PatronManager (Salesforce PatronTicket) extractor
+
 ## [0.84.3] - 2026-11-14
 
 ### Changed
