@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.0] - 2026-11-14
+
+### Added
+- extract venue gig lists under month headings
+
 ## [0.85.0] - 2026-11-14
 
 ### Added
