@@ -125,4 +125,51 @@ class EventUpsertLineupRetentionTest extends EventUpsertTestCase {
 		$this->assertSame( array( 'Original Artist' ), wp_get_post_terms( $post_id, 'artist', array( 'fields' => 'names' ) ) );
 		$this->assertSame( array( 'Original Festival' ), wp_get_post_terms( $post_id, 'festival', array( 'fields' => 'names' ) ) );
 	}
+	/** A festival-day bill tags every artist even without an artist selection (#3934). */
+	public function test_lineup_string_tags_every_artist_without_selection(): void {
+		$parameters              = $this->event_parameters();
+		$parameters['performer'] = "Fitz and the Tantrums | Plain White T's | Vundabar, Beach Weather | Hotel Fiction | Dani Rucker | Rohna";
+		$result                  = $this->invoke_upsert( $parameters, array() );
+
+		$this->assertTrue( $result['success'], wp_json_encode( $result ) );
+		$this->assertEqualsCanonicalizing(
+			array( 'Fitz and the Tantrums', "Plain White T's", 'Vundabar', 'Beach Weather', 'Hotel Fiction', 'Dani Rucker', 'Rohna' ),
+			array_map( 'html_entity_decode', wp_get_post_terms( $result['data']['post_id'], 'artist', array( 'fields' => 'names' ) ) )
+		);
+	}
+
+	/** An explicit skip selection still tags the payload lineup (#3934). */
+	public function test_skip_selection_still_tags_lineup(): void {
+		$parameters              = $this->event_parameters();
+		$parameters['performer'] = 'Deerhoof, Sol, Iron Lung, J.R.C.G.';
+		$result                  = $this->invoke_upsert( $parameters, array( 'taxonomy_artist_selection' => 'skip' ) );
+
+		$this->assertEqualsCanonicalizing( array( 'Deerhoof', 'Sol', 'Iron Lung', 'J.R.C.G.' ), wp_get_post_terms( $result['data']['post_id'], 'artist', array( 'fields' => 'names' ) ) );
+	}
+
+	/** A pre-selected artist is merged with the payload lineup, not replacing it. */
+	public function test_explicit_selection_is_merged_with_lineup(): void {
+		$selected                = wp_insert_term( 'Pipeline Artist', 'artist' );
+		$parameters              = $this->event_parameters();
+		$parameters['performer'] = 'Lineup One | Lineup Two';
+		$result                  = $this->invoke_upsert( $parameters, array( 'taxonomy_artist_selection' => (string) $selected['term_id'] ) );
+
+		$this->assertEqualsCanonicalizing( array( 'Pipeline Artist', 'Lineup One', 'Lineup Two' ), wp_get_post_terms( $result['data']['post_id'], 'artist', array( 'fields' => 'names' ) ) );
+	}
+
+	/** Updates without an artist selection keep previously retained artists. */
+	public function test_update_without_selection_keeps_retained_artists(): void {
+		$parameters = $this->event_parameters();
+		$created    = $this->invoke_upsert( $parameters, array() );
+		$post_id    = $created['data']['post_id'];
+		wp_set_object_terms( $post_id, 'Manual Artist', 'artist', true );
+
+		$parameters['event_id']    = $post_id;
+		$parameters['performer']   = 'New Artist | Second New Artist';
+		$parameters['description'] = 'Updated festival description';
+		$result                    = $this->invoke_upsert( $parameters, array() );
+
+		$this->assertSame( 'updated', $result['data']['action'] );
+		$this->assertEqualsCanonicalizing( array( 'Original Artist', 'Manual Artist', 'New Artist', 'Second New Artist' ), wp_get_post_terms( $post_id, 'artist', array( 'fields' => 'names' ) ) );
+	}
 }

@@ -705,9 +705,25 @@ class EventUpsert extends UpsertHandler {
 			$parameters['artist'] = $this->taxonomy_assigner->mergeLineup( array_values( array_filter( $parameters['artist'], static fn( $artist ) => '' !== $artist ) ), $engine_data_array['lineup'] ?? null );
 			$artist_selection     = $handler_config_for_tax['taxonomy_artist_selection'] ?? 'skip';
 			if ( ! is_numeric( $artist_selection ) && ! in_array( $artist_selection, array( 'skip', 'ai_decides' ), true ) ) {
-				$handler_config_for_tax['taxonomy_artist_selection'] = $this->taxonomy_assigner->normalizeArtists( array( $artist_selection ) )[0];
+				$artist_selection = $this->taxonomy_assigner->normalizeArtists( array( $artist_selection ) )[0];
 			}
+			// Every billed performer is an artist of the event, so the lineup
+			// is assigned below regardless of the flow's artist selection
+			// (#3934); the generic pass must not replace it.
+			$handler_config_for_tax['taxonomy_artist_selection'] = 'skip';
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
+			$artist_result = $this->taxonomy_assigner->assignArtists( $post_id, $parameters['artist'], $artist_selection, $this->taxonomy_handler );
+			if ( is_array( $artist_result ) && empty( $artist_result['success'] ) ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Event upsert artist assignment failed',
+					array(
+						'post_id' => $post_id,
+						'error'   => $artist_result['error'] ?? '',
+					)
+				);
+			}
 
 			foreach ( $retained_terms as $taxonomy => $term_ids ) {
 				if ( empty( $term_ids ) ) {
