@@ -255,6 +255,38 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Read account-level insights: followers plus reach, views, and engagement totals.
+	 *
+	 * ## OPTIONS
+	 * [--days=<days>] : Window length in days, ending now (1-30). Default 28.
+	 * [--format=<format>] : Output format (table or json).
+	 *
+	 * ## EXAMPLES
+	 *     wp datamachine-socials instagram account_insights
+	 *     wp datamachine-socials instagram account_insights --days=7 --format=json
+	 */
+	public function account_insights( $args, $assoc_args ) {
+		$ability = wp_get_ability( 'datamachine/instagram-account-insights' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-account-insights ability not registered.' );
+		}
+		$result = $ability->execute( array( 'days' => (int) ( $assoc_args['days'] ?? 28 ) ) );
+		if ( is_wp_error( $result ) || ! $result['success'] ) {
+			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
+		}
+		$data = $result['data'];
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+		WP_CLI::success( sprintf( '@%s, last %d days', $data['username'], $data['window']['days'] ) );
+		WP_CLI::log( sprintf( 'followers: %s', null === $data['followers_count'] ? 'n/a' : (string) $data['followers_count'] ) );
+		foreach ( $data['totals'] as $name => $value ) {
+			WP_CLI::log( sprintf( '%s: %s', $name, null === $value ? 'n/a' : (string) $value ) );
+		}
+	}
+
+	/**
 	 * Get comments on an Instagram post.
 	 *
 	 * ## OPTIONS
