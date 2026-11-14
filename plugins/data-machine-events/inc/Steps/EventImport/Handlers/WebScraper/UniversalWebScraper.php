@@ -97,6 +97,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PlainGigListExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MonthHeadingGigListExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoundsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
@@ -221,6 +222,8 @@ class UniversalWebScraper extends EventImportHandler {
 			new MicrodataExtractor(),
 			// Most generic heuristic: only after every platform extractor declines.
 			new PlainGigListExtractor(),
+			// Plain "M/D title time" lines under month headings: last resort before HTML fallback.
+			new MonthHeadingGigListExtractor(),
 		);
 	}
 
