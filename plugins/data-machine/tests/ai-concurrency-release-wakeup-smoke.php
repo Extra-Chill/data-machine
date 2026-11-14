@@ -296,7 +296,18 @@ namespace {
 	assert_wake_smoke( 'replacement runs immediately instead of on backoff', null !== $replacement && $now === (int) $replacement['timestamp'] );
 	assert_wake_smoke( 'predecessor is canceled after replacement exists', array( 12 ) === $GLOBALS['wake_canceled'] );
 	assert_wake_smoke( 'replacement reuses the same continuation group', AIConcurrencyBackpressure::continuationGroup( $resume_args1 ) === (string) ( $replacement['group'] ?? '' ) );
-	assert_wake_smoke( 'exactly one pending continuation remains for the woken generation', 1 === count( wake_filter_actions( array( 'hook' => AIConcurrencyBackpressure::RESUME_HOOK, 'group' => AIConcurrencyBackpressure::continuationGroup( $resume_args1 ), 'status' => 'pending' ) ) ) );
+	assert_wake_smoke( 'exactly one pending continuation remains for the woken generation', 1 === count( wake_filter_actions( array( 'hook' => AIConcurrencyBackpressure::RESUME_HOOK, 'args' => $resume_args1, 'status' => 'pending' ) ) ) );
+	assert_wake_smoke( 'all waiters share the single stable resume group', 'data-machine-ai-resume' === AIConcurrencyBackpressure::continuationGroup( $resume_args1 ) && AIConcurrencyBackpressure::continuationGroup( $resume_args1 ) === AIConcurrencyBackpressure::continuationGroup( $resume_args2 ) );
+
+	echo "Case 1b: legacy per-generation group waiter is woken into the stable group\n";
+	wake_reset_actions();
+	$GLOBALS['wake_schedule_calls'] = 0;
+	$GLOBALS['wake_canceled']       = array();
+	wake_add_action( 15, $resume_args1, $now + 300, 'pending', AIConcurrencyBackpressure::RESUME_HOOK, 'data-machine-ai-resume-501-8-316de1bf64ffc8e6' );
+	$legacy_wake        = AIConcurrencyBackpressure::wakeEarliestDeferred( $now );
+	$legacy_replacement = wake_find_action( $legacy_wake['action_id'] );
+	assert_wake_smoke( 'legacy-group waiter is still woken', $legacy_wake['woke'] && 15 === $legacy_wake['previous_action_id'] && array( 15 ) === $GLOBALS['wake_canceled'] );
+	assert_wake_smoke( 'legacy-group replacement moves into the stable group', null !== $legacy_replacement && AIConcurrencyBackpressure::RESUME_GROUP === (string) ( $legacy_replacement['group'] ?? '' ) );
 	assert_wake_smoke( 'due-now waiters are never selected as wake targets', 503 !== $wake['job_id'] );
 
 	echo "Case 2: wake-up is a no-op without a future waiter\n";
