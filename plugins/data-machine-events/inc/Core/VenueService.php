@@ -33,6 +33,7 @@ class VenueService {
 		'freshtix.com',
 		'tixr.com',
 		'seated.com',
+		'my.salesforce-sites.com',
 		'stubhub.com',
 		'vividseats.com',
 	);
