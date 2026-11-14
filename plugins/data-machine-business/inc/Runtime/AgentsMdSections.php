@@ -61,6 +61,7 @@ Data Machine Business owns analytics, revenue, performance, and media-maintenanc
 - Stripe Payment Links (human approval required): `{$wp} datamachine stripe payment-link stage --name=<name> --amount=<n> [--interval=month]`
 - Web performance diagnostics: `{$wp} datamachine analytics pagespeed <action>`
 - Media diagnostics and cleanup: `{$wp} datamachine media <action>`
+- Read-only Hetzner infrastructure (servers, backup freshness, volumes, metrics): `{$wp} datamachine hetzner <subcommand>`
 
 **Safety**
 Media deletion actions default to dry runs. Pass `--apply` to execute a deletion.

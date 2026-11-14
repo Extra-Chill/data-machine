@@ -44,6 +44,7 @@ final class CommandRegistry {
 			'datamachine analytics pagespeed'  => PageSpeedCommand::class,
 			'datamachine media'                => MediaHygieneCommand::class,
 			'datamachine cloudflare turnstile' => Commands\CloudflareTurnstileCommand::class,
+			'datamachine hetzner'              => Commands\HetznerCommand::class,
 		);
 	}
 }
