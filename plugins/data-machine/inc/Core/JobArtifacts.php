@@ -636,7 +636,7 @@ class JobArtifacts {
 		}
 
 		$upload_dir = wp_upload_dir();
-		$base_root  = (string) ( $upload_dir['basedir'] ?? '' );
+		$base_root  = (string) $upload_dir['basedir'];
 		if ( '' === trim( $base_root ) ) {
 			return '';
 		}

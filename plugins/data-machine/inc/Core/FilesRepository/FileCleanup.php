@@ -384,7 +384,7 @@ class FileCleanup {
 		$heap = new \SplMaxHeap();
 		// phpcs:ignore Generic.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition -- Streaming readdir loop.
 		while ( false !== ( $entry = readdir( $handle ) ) ) {
-			if ( '' === $entry || ! ctype_digit( $entry ) ) {
+			if ( ! ctype_digit( $entry ) ) {
 				continue;
 			}
 
