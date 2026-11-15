@@ -127,6 +127,11 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-tool-guard.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-date-context-directive.php';
 \DataMachineEvents\Core\EventDateContextDirective::register();
 
+// Tell event-upsert AI steps on single-venue flows that location is settled,
+// so venues in neighbouring towns are not rejected as off-market (#3956).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/pinned-venue-context-directive.php';
+\DataMachineEvents\Core\PinnedVenueContextDirective::register();
+
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {
 	require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php';
