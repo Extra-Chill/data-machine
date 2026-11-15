@@ -595,6 +595,12 @@ class Venue_Taxonomy {
 	 *    Catches: "Saturn - Birmingham" = "Saturn Birmingham",
 	 *             "Reggie's Rock Club" = "Reggies Rock Club",
 	 *             "RADIO/EAST" = "Radio East"
+	 * 4b. Core/variant name matching in the same city (#3965), run only when
+	 *    no exact, article-toggle, or normalized candidate exists. When the
+	 *    incoming side has no street address, listing-style name variants
+	 *    count: "Iron Horse Music Hall" = "The Iron Horse", "Paradise Rock
+	 *    Club" = "Paradise Rock Club presented by Citizens", "Rockwell" =
+	 *    "Rockwell - MA". Several same-city variants are ambiguous.
 	 * 5. Fuzzy name matching (edit distance ≤ 1–2, scaled for name length),
 	 *    run only when no exact, article-toggle, or normalized candidate
 	 *    exists, qualified by supplied geographic evidence (#921)
@@ -1009,7 +1015,7 @@ class Venue_Taxonomy {
 			'term'                 => $term,
 			'term_id'              => $term ? (int) $term->term_id : null,
 			'match_status'         => $match_status,
-			'matched_via'          => $term ? 'name' : '',
+			'matched_via'          => $term ? (string) ( $name_match['matched_via'] ?? 'name' ) : '',
 			'conflicting_term_ids' => $name_match['conflicting_term_ids'],
 			'venue_name'           => $venue_name,
 		);
@@ -1121,7 +1127,7 @@ class Venue_Taxonomy {
 		}
 
 		if ( ! $had_candidates ) {
-			$core_match = self::resolve_core_name_tier( $venue_name, $venues, $venue_data );
+			$core_match = self::resolve_core_name_tier( $venue_name, $venues, $venue_data, $normalized_by_term );
 			if ( $core_match['term'] || $core_match['ambiguous'] ) {
 				return $core_match;
 			}
@@ -1155,12 +1161,22 @@ class Venue_Taxonomy {
 	 * evidence (same non-empty city or street). One compatible candidate is a
 	 * match; several are ambiguous.
 	 *
-	 * @param string               $venue_name Venue name as supplied.
-	 * @param \WP_Term[]           $venues     All venue terms.
-	 * @param array<string, mixed> $venue_data Incoming venue metadata.
-	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[]}
+	 * Address-less listings (#3965): multi-venue listing pages give only a
+	 * venue name plus "City, ST", and their names are routinely variants of
+	 * the venue's own name ("Iron Horse Music Hall" for "The Iron Horse",
+	 * "Paradise Rock Club" for "Paradise Rock Club presented by Citizens").
+	 * When the incoming side carries no street address, venue_names_are_variants()
+	 * also qualifies a candidate. The same positive-city requirement and the
+	 * same ambiguity rule apply, so a variant never crosses cities and two
+	 * same-city variants never get a guess.
+	 *
+	 * @param string               $venue_name         Venue name as supplied.
+	 * @param \WP_Term[]           $venues             All venue terms.
+	 * @param array<string, mixed> $venue_data         Incoming venue metadata.
+	 * @param array<int, string>   $normalized_by_term Normalized venue names keyed by term ID.
+	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[], matched_via?: string}
 	 */
-	private static function resolve_core_name_tier( string $venue_name, array $venues, array $venue_data ): array {
+	private static function resolve_core_name_tier( string $venue_name, array $venues, array $venue_data, array $normalized_by_term = array() ): array {
 		$no_match = array(
 			'term'                 => null,
 			'ambiguous'            => false,
@@ -1168,16 +1184,47 @@ class Venue_Taxonomy {
 			'conflicting_term_ids' => array(),
 		);
 
-		$incoming = self::core_venue_name( $venue_name, (string) ( $venue_data['state'] ?? '' ) );
+		$incoming_state = (string) ( $venue_data['state'] ?? '' );
+		$incoming       = self::core_venue_name( $venue_name, $incoming_state );
 		if ( strlen( $incoming ) < self::FUZZY_NAME_MIN_LENGTH ) {
 			return $no_match;
 		}
 
-		$compatible = array();
+		// Name variants are only trusted when no street address can speak for
+		// the venue; an addressed listing keeps the stricter rules above.
+		$incoming_address = self::is_unverified_field( $venue_data, 'address' ) ? '' : (string) ( $venue_data['address'] ?? '' );
+		$allow_variants   = ! self::address_has_street_component( $incoming_address )
+			&& '' !== trim( (string) ( $venue_data['city'] ?? '' ) );
+		$incoming_tokens  = $allow_variants ? array_filter( explode( ' ', self::normalize_venue_name_for_matching( $venue_name ) ) ) : array();
+
+		$compatible  = array();
+		$via_variant = array();
 		foreach ( $venues as $venue ) {
-			$state = (string) get_term_meta( (int) $venue->term_id, self::$meta_fields['state'], true );
-			if ( self::core_venue_name( $venue->name, $state ) !== $incoming
-				&& ! \DataMachineEvents\Utilities\EventIdentifierGenerator::hasLeadingVenueName( $venue_name, $venue->name ) ) {
+			$state      = (string) get_term_meta( (int) $venue->term_id, self::$meta_fields['state'], true );
+			$core_match = self::core_venue_name( $venue->name, $state ) === $incoming
+				|| \DataMachineEvents\Utilities\EventIdentifierGenerator::hasLeadingVenueName( $venue_name, $venue->name );
+			$is_variant = false;
+			if ( ! $core_match && $allow_variants ) {
+				// Cheap shared-word prefilter before the regex-heavy comparison:
+				// the venue taxonomy holds tens of thousands of terms.
+				$existing_normalized = $normalized_by_term[ (int) $venue->term_id ] ?? self::normalize_venue_name_for_matching( $venue->name );
+				$shares_word         = false;
+				foreach ( $incoming_tokens as $token ) {
+					if ( strlen( $token ) >= 3 && str_contains( ' ' . $existing_normalized . ' ', ' ' . $token . ' ' ) ) {
+						$shares_word = true;
+						break;
+					}
+				}
+				$is_variant = $shares_word && self::venue_names_are_variants(
+					$venue_name,
+					$venue->name,
+					$incoming_state,
+					$state,
+					(string) $venue_data['city'],
+					(string) get_term_meta( (int) $venue->term_id, self::$meta_fields['city'], true )
+				);
+			}
+			if ( ! $core_match && ! $is_variant ) {
 				continue;
 			}
 			if ( self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
@@ -1185,14 +1232,18 @@ class Venue_Taxonomy {
 			}
 			if ( self::has_positive_location_evidence( (int) $venue->term_id, $venue_data ) ) {
 				$compatible[] = $venue;
+				if ( $is_variant ) {
+					$via_variant[ (int) $venue->term_id ] = true;
+				}
 			}
 		}
 
 		if ( 1 === count( $compatible ) ) {
+			$variant = isset( $via_variant[ (int) $compatible[0]->term_id ] );
 			do_action(
 				'datamachine_log',
 				'info',
-				'Venue matched via core name match',
+				$variant ? 'Venue matched via same-city name variant' : 'Venue matched via core name match',
 				array(
 					'input_name'   => $venue_name,
 					'matched_name' => $compatible[0]->name,
@@ -1201,11 +1252,96 @@ class Venue_Taxonomy {
 			);
 
 			$no_match['term'] = $compatible[0];
+			if ( $variant ) {
+				$no_match['matched_via'] = 'name_variant';
+			}
 			return $no_match;
 		}
 
 		$no_match['ambiguous'] = count( $compatible ) > 1;
 		return $no_match;
+	}
+
+	/**
+	 * Listing-style venue identity key (#3965).
+	 *
+	 * Builds on core_venue_name() (accents, punctuation, apostrophes, a
+	 * leading article, a matching "-XX" state suffix, a trailing "club") and
+	 * additionally drops sponsor suffixes ("presented by Citizens"), a
+	 * trailing parenthetical, a trailing "-<city>" when it is the venue's own
+	 * city ("Roadrunner-Boston"), a trailing "music hall", and a standalone
+	 * "at" ("Crystal Ballroom at Somerville Theatre").
+	 *
+	 * @param string $name  Venue name.
+	 * @param string $state Venue state (code or name); '' disables the state strip.
+	 * @param string $city  Venue city; '' disables the city-suffix strip.
+	 * @return string Variant key, normalized for matching.
+	 */
+	public static function venue_variant_key( string $name, string $state = '', string $city = '' ): string {
+		$text = html_entity_decode( $name, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+		$text = (string) preg_replace( '/\s+(?:presented|powered|sponsored|hosted)\s+by\s+.*$/iu', '', $text );
+		$text = (string) preg_replace( '/\s*\([^)]*\)\s*$/u', '', $text );
+		$city = trim( $city );
+		if ( '' !== $city ) {
+			$text = (string) preg_replace( '/\s*[-\x{2013}\x{2014}]\s*' . preg_quote( $city, '/' ) . '$/iu', '', $text );
+		}
+		$core = self::core_venue_name( $text, $state );
+		$core = trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/(?<=\s)at(?=\s)/', ' ', $core ) ) );
+		$bare = trim( (string) preg_replace( '/\s+music\s+hall$/', '', $core ) );
+
+		return '' !== $bare ? $bare : $core;
+	}
+
+	/**
+	 * Whether two venue names are listing-style variants of one venue (#3965).
+	 *
+	 * True when the variant keys are equal, when the shorter key (at least two
+	 * words) is the leading part of the longer one ("Paradise Rock Club" /
+	 * "Paradise Rock Club Boston"), or when a comma-separated part of one name
+	 * equals the other name ("John F. Swope Theater, Capitol Center for the
+	 * Arts" / "Capitol Center for the Arts"). Single-word prefixes never count,
+	 * so "The Basement" and "The Basement East" stay distinct.
+	 *
+	 * This is a name-only comparison: callers must also require the same city.
+	 *
+	 * @param string $name_a  First venue name.
+	 * @param string $name_b  Second venue name.
+	 * @param string $state_a State of the first venue ('' when unknown).
+	 * @param string $state_b State of the second venue ('' when unknown).
+	 * @param string $city_a  City of the first venue ('' when unknown).
+	 * @param string $city_b  City of the second venue ('' when unknown).
+	 * @return bool
+	 */
+	public static function venue_names_are_variants( string $name_a, string $name_b, string $state_a = '', string $state_b = '', string $city_a = '', string $city_b = '' ): bool {
+		$key_a = self::venue_variant_key( $name_a, $state_a, $city_a );
+		$key_b = self::venue_variant_key( $name_b, $state_b, $city_b );
+		if ( strlen( $key_a ) < self::FUZZY_NAME_MIN_LENGTH || strlen( $key_b ) < self::FUZZY_NAME_MIN_LENGTH ) {
+			return false;
+		}
+		if ( $key_a === $key_b ) {
+			return true;
+		}
+
+		$shorter = strlen( $key_a ) <= strlen( $key_b ) ? $key_a : $key_b;
+		$longer  = strlen( $key_a ) <= strlen( $key_b ) ? $key_b : $key_a;
+		if ( str_contains( $shorter, ' ' ) && str_starts_with( $longer, $shorter . ' ' ) ) {
+			return true;
+		}
+
+		foreach ( array( array( $name_a, $state_a, $key_b, $city_a ), array( $name_b, $state_b, $key_a, $city_b ) ) as $pair ) {
+			$parts = explode( ',', html_entity_decode( $pair[0], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			if ( count( $parts ) < 2 ) {
+				continue;
+			}
+			foreach ( $parts as $part ) {
+				$part_key = self::venue_variant_key( $part, $pair[1], $pair[3] );
+				if ( str_contains( $part_key, ' ' ) && $part_key === $pair[2] ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	/**
