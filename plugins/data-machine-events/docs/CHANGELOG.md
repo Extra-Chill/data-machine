@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.1] - 2026-11-15
+
+### Fixed
+- tell AI steps a pinned venue's location is settled
+
 ## [0.86.0] - 2026-11-14
 
 ### Added
