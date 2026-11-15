@@ -144,8 +144,9 @@ namespace {
 	$GLOBALS['dm_filters']['datamachine_as_actions_hook_max_rows']          = array();
 	$GLOBALS['dm_filters']['datamachine_as_live_job_evidence_max_age_days'] = 2;
 
-	$wpdb->pdo->exec( 'CREATE TABLE wp_actionscheduler_actions (action_id INTEGER PRIMARY KEY, hook TEXT, status TEXT, scheduled_date_gmt TEXT, last_attempt_gmt TEXT, args TEXT, extended_args TEXT NULL)' );
+	$wpdb->pdo->exec( 'CREATE TABLE wp_actionscheduler_actions (action_id INTEGER PRIMARY KEY, hook TEXT, status TEXT, scheduled_date_gmt TEXT, last_attempt_gmt TEXT, args TEXT, extended_args TEXT NULL, group_id INTEGER NOT NULL DEFAULT 0)' );
 	$wpdb->pdo->exec( 'CREATE TABLE wp_actionscheduler_logs (log_id INTEGER PRIMARY KEY AUTOINCREMENT, action_id INTEGER)' );
+	$wpdb->pdo->exec( 'CREATE TABLE wp_actionscheduler_groups (group_id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT)' );
 	$wpdb->pdo->exec( 'CREATE TABLE wp_datamachine_jobs (job_id INTEGER PRIMARY KEY, status TEXT)' );
 
 	$jobs = array(

@@ -272,6 +272,35 @@ class RetentionCleanup {
 	}
 
 	/**
+	 * Group rows deleted per orphaned AI-resume group purge batch.
+	 *
+	 * Action Scheduler never deletes `actionscheduler_groups` rows. Before
+	 * #3943 every AI resume continuation got its own group, so installs carry
+	 * up to millions of orphan `data-machine-ai-resume-*` rows. Each batch
+	 * selects at most this many orphans and deletes them by primary key.
+	 *
+	 * @return int Batch size (clamped to 100..50000).
+	 */
+	public static function orphanResumeGroupBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_retention_orphan_group_batch_size', 10000 );
+		return min( 50000, max( 100, $size ) );
+	}
+
+	/**
+	 * Maximum orphan-group purge batches per retention pass.
+	 *
+	 * Bounds a single pass (default 50 x 10k = 500k rows); a pass that hits
+	 * the cap while still deleting enqueues a catch-up run, so a large
+	 * backlog drains over consecutive runs.
+	 *
+	 * @return int Maximum batches (always >= 1).
+	 */
+	public static function orphanResumeGroupMaxBatches(): int {
+		$batches = (int) apply_filters( 'datamachine_retention_orphan_group_max_batches', 50 );
+		return $batches > 0 ? $batches : 50;
+	}
+
+	/**
 	 * Whether to run OPTIMIZE TABLE after a meaningful cleanup pass.
 	 *
 	 * InnoDB does not return space freed by DELETE to the OS; only a table
@@ -333,6 +362,7 @@ class RetentionCleanup {
 			'actionscheduler_actions'     => $wpdb->prefix . 'actionscheduler_actions',
 			'actionscheduler_logs'        => $wpdb->prefix . 'actionscheduler_logs',
 			'actionscheduler_claims'      => $wpdb->prefix . 'actionscheduler_claims',
+			'actionscheduler_groups'      => $wpdb->prefix . 'actionscheduler_groups',
 		);
 	}
 
@@ -1069,7 +1099,7 @@ class RetentionCleanup {
 	 * would be deleted from each table (actions vs logs) under the combined
 	 * per-hook + global retention windows.
 	 *
-	 * @return array{actions: int, logs: int, total: int}
+	 * @return array{actions: int, logs: int, groups: int, total: int}
 	 */
 	public static function countActionSchedulerBreakdown(): array {
 		global $wpdb;
@@ -1139,11 +1169,105 @@ class RetentionCleanup {
 			}
 		}
 
+		$groups_count = self::countOrphanResumeGroups();
+
 		return array(
 			'actions' => $actions_count,
 			'logs'    => $logs_count,
-			'total'   => $actions_count + $logs_count,
+			'groups'  => $groups_count,
+			'total'   => $actions_count + $logs_count + $groups_count,
 		);
+	}
+
+	/**
+	 * Count legacy per-generation AI-resume groups no action references.
+	 */
+	public static function countOrphanResumeGroups(): int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i g LEFT JOIN %i a ON a.group_id = g.group_id WHERE g.slug LIKE %s AND a.action_id IS NULL',
+				$wpdb->prefix . 'actionscheduler_groups',
+				$wpdb->prefix . 'actionscheduler_actions',
+				self::orphanResumeGroupSlugPattern()
+			)
+		);
+	}
+
+	/**
+	 * Purge orphaned legacy AI-resume groups in bounded batches (#3943).
+	 *
+	 * Only `data-machine-ai-resume-<job>-<generation>-<hash>` slugs are
+	 * eligible (the stable `data-machine-ai-resume` group has no trailing
+	 * dash and never matches). A group is deleted only when no action row of
+	 * any status references it; the DELETE re-checks that condition so a
+	 * group gaining an action between select and delete is kept.
+	 *
+	 * @param float $deadline Wall-clock deadline shared with the action pass.
+	 *                        The first batch always runs so the backlog
+	 *                        drains even when action cleanup used the budget.
+	 * @return array{deleted:int,batches:int,hit_limit:bool}
+	 */
+	public static function cleanupOrphanResumeGroups( float $deadline = 0.0 ): array {
+		global $wpdb;
+
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$batch_size    = self::orphanResumeGroupBatchSize();
+		$max_batches   = self::orphanResumeGroupMaxBatches();
+		$deleted       = 0;
+		$batches       = 0;
+		$hit_limit     = false;
+
+		while ( true ) {
+			if ( $batches >= $max_batches || ( $batches > 0 && $deadline > 0 && microtime( true ) >= $deadline ) ) {
+				$hit_limit = true;
+				break;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$group_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					'SELECT g.group_id FROM %i g LEFT JOIN %i a ON a.group_id = g.group_id WHERE g.slug LIKE %s AND a.action_id IS NULL LIMIT %d',
+					$groups_table,
+					$actions_table,
+					self::orphanResumeGroupSlugPattern(),
+					$batch_size
+				)
+			);
+			$group_ids = array_values( array_filter( array_map( 'intval', (array) $group_ids ) ) );
+			if ( empty( $group_ids ) ) {
+				break;
+			}
+
+			++$batches;
+			$placeholders = implode( ', ', array_fill( 0, count( $group_ids ), '%d' ) );
+			$params       = array_merge( array( $groups_table ), $group_ids, array( $actions_table, $groups_table ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$affected = $wpdb->query(
+				$wpdb->prepare( "DELETE FROM %i WHERE group_id IN ({$placeholders}) AND NOT EXISTS ( SELECT 1 FROM %i a WHERE a.group_id = %i.group_id )", $params ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+			);
+			$affected = false !== $affected ? (int) $affected : 0;
+			$deleted += $affected;
+
+			if ( $affected <= 0 || count( $group_ids ) < $batch_size ) {
+				break;
+			}
+		}
+
+		return array(
+			'deleted'   => $deleted,
+			'batches'   => $batches,
+			'hit_limit' => $hit_limit,
+		);
+	}
+
+	/** LIKE pattern matching only legacy per-generation AI-resume group slugs. */
+	private static function orphanResumeGroupSlugPattern(): string {
+		// Equivalent to $wpdb->esc_like(): escape LIKE wildcards in the prefix.
+		return addcslashes( AIConcurrencyBackpressure::LEGACY_RESUME_GROUP_PREFIX, '_%\\' ) . '%';
 	}
 
 	public static function cleanupActionSchedulerActions(): array {
@@ -1155,6 +1279,7 @@ class RetentionCleanup {
 		$max_runtime     = self::actionSchedulerMaxRuntimeSeconds();
 		$actions_table   = $wpdb->prefix . 'actionscheduler_actions';
 		$logs_table      = $wpdb->prefix . 'actionscheduler_logs';
+		$groups_table    = $wpdb->prefix . 'actionscheduler_groups';
 		$started_at      = microtime( true );
 		$deadline        = $started_at + $max_runtime;
 		$iterations_used = 0;
@@ -1202,7 +1327,13 @@ class RetentionCleanup {
 		$logs_deleted    += $ceiling['logs_deleted'];
 		$retained        += $ceiling['retained_for_live_jobs'];
 
-		$total_deleted = $logs_deleted + $actions_deleted;
+		// Action Scheduler never deletes group rows. Drain the legacy
+		// per-generation AI-resume groups (#3943) once their actions are gone.
+		$groups         = self::cleanupOrphanResumeGroups( $deadline );
+		$groups_deleted = $groups['deleted'];
+		$hit_limit      = $hit_limit || $groups['hit_limit'];
+
+		$total_deleted = $logs_deleted + $actions_deleted + $groups_deleted;
 
 		// InnoDB never returns DELETE-freed space to the OS; only a table
 		// rebuild does. Optionally OPTIMIZE the tables when a pass deleted
@@ -1211,17 +1342,19 @@ class RetentionCleanup {
 			array(
 				$actions_table => $actions_deleted,
 				$logs_table    => $logs_deleted,
+				$groups_table  => $groups_deleted,
 			)
 		);
 
 		if ( $total_deleted > 0 || $hit_limit || $retained > 0 ) {
 			self::log(
-				'Scheduled cleanup: deleted old Action Scheduler actions and logs',
+				'Scheduled cleanup: deleted old Action Scheduler actions, logs, and orphan resume groups',
 				array(
 					'actions_deleted'         => $actions_deleted,
 					'logs_deleted'            => $logs_deleted,
 					'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 					'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+					'groups_deleted'          => $groups_deleted,
 					'retained_for_live_jobs'  => $retained,
 					'max_age_days'            => $max_age_days,
 					'batch_size'              => $batch_size,
@@ -1244,6 +1377,7 @@ class RetentionCleanup {
 			'logs_deleted'            => $logs_deleted,
 			'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 			'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+			'groups_deleted'          => $groups_deleted,
 			'retained_for_live_jobs'  => $retained,
 			'max_age_days'            => $max_age_days,
 			'batch_size'              => $batch_size,

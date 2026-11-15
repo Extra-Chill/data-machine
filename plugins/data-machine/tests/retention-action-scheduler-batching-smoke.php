@@ -210,6 +210,10 @@ namespace {
 			$sql  = $prepared['sql'];
 			$args = $prepared['args'];
 
+			if ( str_contains( $sql, 'g.slug LIKE' ) ) {
+				return 0; // No legacy AI-resume groups seeded; covered by retention-orphan-resume-groups-smoke.php.
+			}
+
 			if ( str_contains( $sql, 'information_schema.TABLES' ) ) {
 				$table = (string) end( $args );
 				return str_contains( $table, '_logs' ) ? count( $this->logs ) : count( $this->actions );
@@ -256,6 +260,9 @@ namespace {
 		}
 
 		public function get_col( $prepared ): array {
+			if ( str_contains( $prepared['sql'], 'g.slug LIKE' ) ) {
+				return array();
+			}
 			$sql    = $prepared['sql'];
 			$args   = $prepared['args'];
 			$hook   = $this->extract_hook( $sql, $args );

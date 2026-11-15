@@ -14,9 +14,27 @@ defined( 'ABSPATH' ) || exit;
 class AIConcurrencyBackpressure {
 	public const RESUME_HOOK = 'datamachine_resume_ai_step';
 
-	private const RESUME_GROUP_PREFIX = 'data-machine-ai-resume-';
-	private const OWNERSHIP_KEY       = 'ai_concurrency_resume_ownership';
-	private const SCHEDULE_ATTEMPTS   = 3;
+	/**
+	 * Stable Action Scheduler group shared by every resume continuation.
+	 *
+	 * Job/step/generation identity lives in the action args (and in the
+	 * OWNERSHIP_KEY engine-data projection), never in the group slug: Action
+	 * Scheduler never deletes group rows, so a per-generation group leaked one
+	 * permanent `actionscheduler_groups` row per resumed job (#3943).
+	 */
+	public const RESUME_GROUP = 'data-machine-ai-resume';
+
+	/**
+	 * Slug prefix of the retired per-job/generation resume groups.
+	 *
+	 * Pending actions scheduled before #3943 still live in these groups and
+	 * keep running (the hook consumes args, not the group). Retention purges
+	 * the group rows once no action references them.
+	 */
+	public const LEGACY_RESUME_GROUP_PREFIX = 'data-machine-ai-resume-';
+
+	private const OWNERSHIP_KEY     = 'ai_concurrency_resume_ownership';
+	private const SCHEDULE_ATTEMPTS = 3;
 
 	/**
 	 * Resolve the next durable contention state.
@@ -60,8 +78,19 @@ class AIConcurrencyBackpressure {
 	}
 
 	/**
-	 * Schedule one unique continuation, resolving a zero return only when the
-	 * scheduler can prove that an equivalent pending action won the race.
+	 * Schedule one unique continuation per job/step/generation.
+	 *
+	 * Uniqueness is keyed on the exact action args (job, step, operation
+	 * fence, resume generation) rather than on Action Scheduler's native
+	 * hook+group uniqueness, which would require a throwaway group per
+	 * generation. Concurrent schedulers for the same generation are already
+	 * excluded upstream: claimNextGeneration() atomically hands exactly one
+	 * caller the owner token, and only the owner schedules. The args lookup
+	 * here collapses owner retries and replays onto the existing action, and
+	 * beginGeneration() execution-fences any residual duplicate.
+	 *
+	 * The lookup is group-agnostic so continuations still pending in legacy
+	 * per-generation groups are found and reused.
 	 *
 	 * @return array{success:bool,action_id:int,action_status:string,reused:bool,attempts:int,retryable:bool,error_message:string}
 	 */
@@ -73,14 +102,23 @@ class AIConcurrencyBackpressure {
 		$group         = self::continuationGroup( $args );
 		$error_message = '';
 		for ( $attempt = 1; $attempt <= self::SCHEDULE_ATTEMPTS; ++$attempt ) {
-			$scheduled = as_schedule_single_action(
-				$timestamp,
-				self::RESUME_HOOK,
-				$args,
-				$group,
-				true
-			);
-			$action_id = (int) $scheduled;
+			$active = self::activeContinuation( $args );
+			if ( $active['action_id'] > 0 ) {
+				return self::reusedContinuation( $active, $attempt, $error_message );
+			}
+
+			$action_id = 0;
+			try {
+				$action_id = (int) as_schedule_single_action(
+					$timestamp,
+					self::RESUME_HOOK,
+					$args,
+					$group,
+					false
+				);
+			} catch ( \Throwable $schedule_error ) {
+				$error_message = $schedule_error->getMessage();
+			}
 			if ( $action_id > 0 ) {
 				return array(
 					'success'       => true,
@@ -98,17 +136,9 @@ class AIConcurrencyBackpressure {
 				$error_message = $wpdb->last_error;
 			}
 
-			$active = self::activeContinuation( $args, $group );
+			$active = self::activeContinuation( $args );
 			if ( $active['action_id'] > 0 ) {
-				return array(
-					'success'       => true,
-					'action_id'     => $active['action_id'],
-					'action_status' => $active['status'],
-					'reused'        => true,
-					'attempts'      => $attempt,
-					'retryable'     => false,
-					'error_message' => $error_message,
-				);
+				return self::reusedContinuation( $active, $attempt, $error_message );
 			}
 
 			if ( $attempt < self::SCHEDULE_ATTEMPTS ) {
@@ -122,14 +152,15 @@ class AIConcurrencyBackpressure {
 		);
 	}
 
-	/** Resolve the Action Scheduler uniqueness scope for one job/step. */
-	public static function continuationGroup( array $args ): string {
-		$job_id       = max( 0, (int) ( $args['job_id'] ?? 0 ) );
-		$flow_step_id = (string) ( $args['flow_step_id'] ?? '' );
-		$generation   = max( 0, (int) ( $args['ai_resume_generation'] ?? 0 ) );
-		$scope        = $job_id . ':' . $flow_step_id . ':' . $generation;
-
-		return self::RESUME_GROUP_PREFIX . $job_id . '-' . $generation . '-' . substr( hash( 'sha256', $scope ), 0, 16 );
+	/**
+	 * Resolve the Action Scheduler group for a resume continuation.
+	 *
+	 * Always the single stable RESUME_GROUP; the args parameter is retained
+	 * for call-site compatibility. Identity is carried by the args.
+	 */
+	public static function continuationGroup( array $args = array() ): string {
+		unset( $args );
+		return self::RESUME_GROUP;
 	}
 
 	/**
@@ -296,7 +327,8 @@ class AIConcurrencyBackpressure {
 	 * cancel the predecessor, then repoint ownership) instead of mutating the
 	 * existing action's scheduled date, because the Action Scheduler store has
 	 * no scheduled-date update API. Uniqueness stays consistent: the
-	 * replacement reuses the exact same args and continuation group, ownership
+	 * replacement reuses the exact same args in the stable continuation group
+	 * (a predecessor in a legacy per-generation group moves over), ownership
 	 * is fenced by the previous action ID, and even a transient two-live-actions
 	 * window is execution-fenced by beginGeneration().
 	 *
@@ -567,14 +599,20 @@ class AIConcurrencyBackpressure {
 		);
 	}
 
-	/** @return array{action_id:int,status:string} */
-	private static function activeContinuation( array $args, string $group ): array {
+	/**
+	 * Find a pending or running continuation with these exact args.
+	 *
+	 * Deliberately not group-scoped: matches both the stable RESUME_GROUP and
+	 * legacy per-generation groups still holding in-flight actions.
+	 *
+	 * @return array{action_id:int,status:string}
+	 */
+	private static function activeContinuation( array $args ): array {
 		foreach ( array( 'pending', 'in-progress' ) as $status ) {
 			$action_ids = as_get_scheduled_actions(
 				array(
 					'hook'     => self::RESUME_HOOK,
 					'args'     => $args,
-					'group'    => $group,
 					'status'   => $status,
 					'per_page' => 1,
 				),
@@ -592,6 +630,22 @@ class AIConcurrencyBackpressure {
 		return array(
 			'action_id' => 0,
 			'status'    => '',
+		);
+	}
+
+	/**
+	 * @param array{action_id:int,status:string} $active
+	 * @return array{success:bool,action_id:int,action_status:string,reused:bool,attempts:int,retryable:bool,error_message:string}
+	 */
+	private static function reusedContinuation( array $active, int $attempt, string $error_message ): array {
+		return array(
+			'success'       => true,
+			'action_id'     => $active['action_id'],
+			'action_status' => $active['status'],
+			'reused'        => true,
+			'attempts'      => $attempt,
+			'retryable'     => false,
+			'error_message' => $error_message,
 		);
 	}
 

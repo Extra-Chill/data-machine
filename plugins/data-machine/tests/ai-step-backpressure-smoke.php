@@ -400,13 +400,34 @@ assert_ai_backpressure_smoke( 'concurrent duplicate reuses the winning action ID
 assert_ai_backpressure_smoke( 'concurrent duplicate executions produce one resume action', 2 === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
 
 $other_job = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 303, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 1 ) );
-assert_ai_backpressure_smoke( 'another job uses a separate uniqueness group', $other_job['success'] && 3 === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
+assert_ai_backpressure_smoke( 'another job schedules its own continuation', $other_job['success'] && ! $other_job['reused'] && 3 === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
+$resume_groups = array();
+foreach ( $GLOBALS['datamachine_ai_backpressure_actions'] as $scheduled_action ) {
+	if ( AIConcurrencyBackpressure::RESUME_HOOK === $scheduled_action->get_field( 'hook' ) ) {
+		$resume_groups[ (string) $scheduled_action->get_field( 'group' ) ] = true;
+	}
+}
+assert_ai_backpressure_smoke( 'resumes for different jobs share one stable Action Scheduler group (#3943)', array( 'data-machine-ai-resume' ) === array_keys( $resume_groups ) );
+
+$legacy_args                                      = array( 'job_id' => 306, 'flow_step_id' => 'ai-1', 'operation_generation' => 0, 'operation_claim_token' => '', 'ai_resume_generation' => 2 );
+$GLOBALS['datamachine_ai_backpressure_actions'][] = new DataMachineAIBackpressureSmokeAction(
+	array(
+		'action_id' => 906,
+		'hook'      => AIConcurrencyBackpressure::RESUME_HOOK,
+		'args'      => $legacy_args,
+		'group'     => 'data-machine-ai-resume-306-2-0123456789abcdef',
+		'status'    => 'pending',
+	)
+);
+$actions_before_legacy = count( $GLOBALS['datamachine_ai_backpressure_actions'] );
+$legacy_schedule       = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, $legacy_args );
+assert_ai_backpressure_smoke( 'in-flight continuation in a legacy per-generation group is reused, not duplicated', $legacy_schedule['success'] && $legacy_schedule['reused'] && 906 === $legacy_schedule['action_id'] && $actions_before_legacy === count( $GLOBALS['datamachine_ai_backpressure_actions'] ) );
 
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = true;
 $schedule_error                                        = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 302, 'flow_step_id' => 'ai-1' ) );
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = false;
 assert_ai_backpressure_smoke( 'zero without a matching pending action is a retryable scheduling failure', ! $schedule_error['success'] && 0 === $schedule_error['action_id'] && 3 === $schedule_error['attempts'] && $schedule_error['retryable'] );
-assert_ai_backpressure_smoke( 'scheduler call requests native uniqueness', 1 === preg_match( '/\$group,\s+true/', $backpressure_src ) );
+assert_ai_backpressure_smoke( 'scheduler call does not rely on per-group native uniqueness', 1 === preg_match( '/\$group,\s+false/', $backpressure_src ) && ! str_contains( $backpressure_src, 'substr( hash(' ) );
 
 $GLOBALS['datamachine_ai_backpressure_schedule_error'] = 1;
 $transient_schedule                                    = AIConcurrencyBackpressure::scheduleContinuation( $now + 60, array( 'job_id' => 304, 'flow_step_id' => 'ai-1' ) );
