@@ -14,6 +14,7 @@ namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Abilities\AuthAbilities;
+use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -106,9 +107,7 @@ class InstagramCommand {
 			'after'  => $assoc_args['after'] ?? '',
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		$data   = $result['data'];
 		$media  = $data['media'] ?? array();
@@ -124,7 +123,7 @@ class InstagramCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -192,15 +191,13 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		$data   = $result['data'];
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -239,18 +236,46 @@ class InstagramCommand {
 			WP_CLI::error( 'datamachine/instagram-insights ability not registered.' );
 		}
 		$result = $ability->execute( array( 'media_id' => $media_id ) );
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
-		$data = $result['data'];
+		$result = $this->require_success( $result );
+		$data   = $result['data'];
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 		WP_CLI::success( 'Insights for ' . $media_id );
 		foreach ( $data['metrics'] as $metric ) {
 			$value = $metric['values'][0]['value'] ?? $metric['total_value']['value'] ?? '';
 			WP_CLI::log( sprintf( '%s: %s', $metric['name'] ?? '', is_scalar( $value ) ? (string) $value : wp_json_encode( $value ) ) );
+		}
+	}
+
+	/**
+	 * Read account-level insights: followers plus reach, views, and engagement totals.
+	 *
+	 * ## OPTIONS
+	 * [--days=<days>] : Window length in days, ending now (1-30). Default 28.
+	 * [--format=<format>] : Output format (table or json).
+	 *
+	 * ## EXAMPLES
+	 *     wp datamachine-socials instagram account_insights
+	 *     wp datamachine-socials instagram account_insights --days=7 --format=json
+	 */
+	public function account_insights( $args, $assoc_args ) {
+		$ability = wp_get_ability( 'datamachine/instagram-account-insights' );
+		if ( ! $ability ) {
+			WP_CLI::error( 'datamachine/instagram-account-insights ability not registered.' );
+		}
+		$result = $ability->execute( array( 'days' => (int) ( $assoc_args['days'] ?? 28 ) ) );
+		$result = $this->require_success( $result );
+		$data   = $result['data'];
+		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			return;
+		}
+		WP_CLI::success( sprintf( '@%s, last %d days', $data['username'], $data['window']['days'] ) );
+		WP_CLI::log( sprintf( 'followers: %s', null === $data['followers_count'] ? 'n/a' : (string) $data['followers_count'] ) );
+		foreach ( $data['totals'] as $name => $value ) {
+			WP_CLI::log( sprintf( '%s: %s', $name, null === $value ? 'n/a' : (string) $value ) );
 		}
 	}
 
@@ -292,9 +317,7 @@ class InstagramCommand {
 			'limit'    => absint( $assoc_args['limit'] ?? 25 ),
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		$data     = $result['data'];
 		$comments = $data['comments'] ?? array();
@@ -306,7 +329,7 @@ class InstagramCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -358,9 +381,7 @@ class InstagramCommand {
 			)
 		);
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Instagram comment reply posted successfully!' );
 		WP_CLI::log( 'Comment ID: ' . ( $result['data']['comment_id'] ?? $comment_id ) );
@@ -375,15 +396,15 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram status
 	 */
 	public function status( $args, $assoc_args ) {
-		$args;
-		$assoc_args;
+		unset( $args );
+		unset( $assoc_args );
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'instagram' );
 
 		WP_CLI::log( 'Instagram Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider ) {
+		if ( ! $provider instanceof InstagramAuth ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}
@@ -391,22 +412,16 @@ class InstagramCommand {
 		$authenticated = $provider->is_authenticated();
 		WP_CLI::log( 'Authenticated: ' . ( $authenticated ? 'Yes' : 'No' ) );
 
-		if ( method_exists( $provider, 'is_configured' ) ) {
-			WP_CLI::log( 'Configured:    ' . ( $provider->is_configured() ? 'Yes' : 'No' ) );
+		WP_CLI::log( 'Configured:    ' . ( $provider->is_configured() ? 'Yes' : 'No' ) );
+
+		$username = $provider->get_username();
+		if ( $username ) {
+			WP_CLI::log( 'Username:      @' . $username );
 		}
 
-		if ( method_exists( $provider, 'get_username' ) ) {
-			$username = $provider->get_username();
-			if ( $username ) {
-				WP_CLI::log( 'Username:      @' . $username );
-			}
-		}
-
-		if ( method_exists( $provider, 'get_user_id' ) ) {
-			$user_id = $provider->get_user_id();
-			if ( $user_id ) {
-				WP_CLI::log( 'User ID:       ' . $user_id );
-			}
+		$user_id = $provider->get_user_id();
+		if ( $user_id ) {
+			WP_CLI::log( 'User ID:       ' . $user_id );
 		}
 
 		$details = $provider->get_account_details();
@@ -415,9 +430,7 @@ class InstagramCommand {
 			if ( ! empty( $details['page_id'] ) ) {
 				WP_CLI::log( 'Page ID:      ' . $details['page_id'] );
 
-				$live = method_exists( $provider, 'get_live_page_subscription_status' )
-					? $provider->get_live_page_subscription_status()
-					: null;
+				$live = $provider->get_live_page_subscription_status();
 
 				if ( null !== $live ) {
 					$subscribed = $live['subscribed'];
@@ -479,9 +492,7 @@ class InstagramCommand {
 			'caption'  => $caption,
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Caption updated successfully!' );
 		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
@@ -500,7 +511,7 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram delete 17891234567890
 	 */
 	public function delete( $args, $assoc_args ) {
-		$assoc_args;
+		unset( $assoc_args );
 		$media_id = $args[0];
 		$ability  = $this->get_delete_ability();
 
@@ -508,9 +519,7 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Post deleted successfully!' );
 		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
@@ -529,7 +538,7 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram archive 17891234567890
 	 */
 	public function archive( $args, $assoc_args ) {
-		$assoc_args;
+		unset( $assoc_args );
 		$media_id = $args[0];
 		$ability  = $this->get_update_ability();
 
@@ -538,9 +547,7 @@ class InstagramCommand {
 			'media_id' => $media_id,
 		) );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Post archived successfully!' );
 		WP_CLI::log( 'Media ID: ' . $result['data']['media_id'] );
@@ -647,9 +654,7 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Published to Instagram!' );
 		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
@@ -745,9 +750,7 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Reel published to Instagram!' );
 		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
@@ -777,7 +780,7 @@ class InstagramCommand {
 	 *     wp datamachine-socials instagram publish-story --video=https://example.com/clip.mp4
 	 */
 	public function publish_story( $args, $assoc_args ) {
-		$args; // unused positional args.
+		unset( $args ); // unused positional args.
 		$image_url = $assoc_args['image'] ?? '';
 		$video_url = $assoc_args['video'] ?? '';
 
@@ -807,9 +810,7 @@ class InstagramCommand {
 
 		$result = $publish_ability->execute( $input );
 
-		if ( is_wp_error( $result ) || ! $result['success'] ) {
-			WP_CLI::error( is_wp_error( $result ) ? $result->get_error_message() : $result['error'] );
-		}
+		$result = $this->require_success( $result );
 
 		WP_CLI::success( 'Story published to Instagram!' );
 		WP_CLI::log( 'Media ID:  ' . ( $result['media_id'] ?? '' ) );
@@ -846,14 +847,33 @@ class InstagramCommand {
 	}
 
 	/**
+	 * Halt on a failed ability result; return the successful result array.
+	 *
+	 * @param mixed $result Ability result.
+	 * @return array
+	 */
+	private function require_success( $result ): array {
+		if ( is_wp_error( $result ) ) {
+			WP_CLI::error( $result->get_error_message() );
+			return array();
+		}
+		if ( ! is_array( $result ) || empty( $result['success'] ) ) {
+			WP_CLI::error( is_array( $result ) && isset( $result['error'] ) ? (string) $result['error'] : 'Request failed.' );
+			return array();
+		}
+		return $result;
+	}
+
+	/**
 	 * Get the Instagram publish ability.
 	 *
-	 * @return \DataMachineSocials\Abilities\Instagram\InstagramPublishAbility
+	 * @return \WP_Ability
 	 */
 	private function get_publish_ability() {
 		$ability = wp_get_ability( 'datamachine/instagram-publish' );
-		if ( ! $ability ) {
+		if ( ! $ability instanceof \WP_Ability ) {
 			WP_CLI::error( 'datamachine/instagram-publish ability not registered.' );
+			exit( 1 ); // WP_CLI::error() already exited; this narrows the return type.
 		}
 
 		return $ability;
@@ -862,12 +882,13 @@ class InstagramCommand {
 	/**
 	 * Get the Instagram read ability.
 	 *
-	 * @return \DataMachineSocials\Abilities\Instagram\InstagramReadAbility
+	 * @return \WP_Ability
 	 */
 	private function get_ability() {
 		$ability = wp_get_ability( 'datamachine/instagram-read' );
-		if ( ! $ability ) {
+		if ( ! $ability instanceof \WP_Ability ) {
 			WP_CLI::error( 'datamachine/instagram-read ability not registered.' );
+			exit( 1 ); // WP_CLI::error() already exited; this narrows the return type.
 		}
 
 		return $ability;
@@ -876,12 +897,13 @@ class InstagramCommand {
 	/**
 	 * Get the Instagram update ability.
 	 *
-	 * @return \DataMachineSocials\Abilities\Instagram\InstagramUpdateAbility
+	 * @return \WP_Ability
 	 */
 	private function get_update_ability() {
 		$ability = wp_get_ability( 'datamachine/instagram-update' );
-		if ( ! $ability ) {
+		if ( ! $ability instanceof \WP_Ability ) {
 			WP_CLI::error( 'datamachine/instagram-update ability not registered.' );
+			exit( 1 ); // WP_CLI::error() already exited; this narrows the return type.
 		}
 
 		return $ability;
@@ -890,12 +912,13 @@ class InstagramCommand {
 	/**
 	 * Get the Instagram delete ability.
 	 *
-	 * @return \DataMachineSocials\Abilities\Instagram\InstagramDeleteAbility
+	 * @return \WP_Ability
 	 */
 	private function get_delete_ability() {
 		$ability = wp_get_ability( 'datamachine/instagram-delete' );
-		if ( ! $ability ) {
+		if ( ! $ability instanceof \WP_Ability ) {
 			WP_CLI::error( 'datamachine/instagram-delete ability not registered.' );
+			exit( 1 ); // WP_CLI::error() already exited; this narrows the return type.
 		}
 
 		return $ability;
@@ -904,12 +927,13 @@ class InstagramCommand {
 	/**
 	 * Get the Instagram comment reply ability.
 	 *
-	 * @return \DataMachineSocials\Abilities\Instagram\InstagramCommentReplyAbility
+	 * @return \WP_Ability
 	 */
 	private function get_comment_reply_ability() {
 		$ability = wp_get_ability( 'datamachine/instagram-comment-reply' );
-		if ( ! $ability ) {
+		if ( ! $ability instanceof \WP_Ability ) {
 			WP_CLI::error( 'datamachine/instagram-comment-reply ability not registered.' );
+			exit( 1 ); // WP_CLI::error() already exited; this narrows the return type.
 		}
 
 		return $ability;
