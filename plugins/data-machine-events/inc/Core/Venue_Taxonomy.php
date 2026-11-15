@@ -1258,8 +1258,8 @@ class Venue_Taxonomy {
 				'info',
 				'Venue name variants matched several same-city venues; not guessing',
 				array(
-					'input_name'  => $venue_name,
-					'candidates'  => array_map( static fn( $venue ) => (int) $venue->term_id, $compatible ),
+					'input_name' => $venue_name,
+					'candidates' => array_map( static fn( $venue ) => (int) $venue->term_id, $compatible ),
 				)
 			);
 			return $no_match;
