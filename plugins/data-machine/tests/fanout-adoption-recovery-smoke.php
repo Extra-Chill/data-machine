@@ -93,7 +93,7 @@ namespace DataMachine\Core {
 		public static function hydrate_packet_collections_with_status( mixed $value ): array { return array( 'success' => true, 'value' => $value ); }
 	}
 	class JobStatus { public static function isStatusFinal( string $status ): bool { return false; } }
-	class PacketEngineData {}
+	class PacketEngineData { public static function withoutSeed( array $engine ): array { return $engine; } }
 	class RunMetrics { public static function start( int $job_id, array $context ): void { unset( $job_id, $context ); } }
 	class EngineData {
 		public static array $engines = array();
