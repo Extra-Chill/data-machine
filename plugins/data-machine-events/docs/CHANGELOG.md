@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.3] - 2026-11-15
+
+### Fixed
+- match listing duplicates by headliner and venue identity
+
 ## [0.86.2] - 2026-11-15
 
 ### Fixed
