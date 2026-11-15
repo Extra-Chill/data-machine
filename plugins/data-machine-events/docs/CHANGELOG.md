@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.2] - 2026-11-15
+
+### Fixed
+- make AI directives implement DirectiveInterface so they run
+
 ## [0.86.1] - 2026-11-15
 
 ### Fixed
