@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.202.3] - 2026-11-15
+
+### Fixed
+- add bounded cleanup for the DataPacket store
+- purge tool-trace job artifacts in bounded batches
+
 ## [0.202.2] - 2026-11-15
 
 ### Fixed
