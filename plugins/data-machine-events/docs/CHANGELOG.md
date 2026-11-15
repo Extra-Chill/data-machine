@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.4] - 2026-11-15
+
+### Fixed
+- tag every lineup artist on event upsert
+
 ## [0.86.3] - 2026-11-15
 
 ### Fixed
