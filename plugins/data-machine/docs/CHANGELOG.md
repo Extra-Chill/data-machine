@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.203.1] - 2026-11-15
+
+### Fixed
+- stop the first packet's engine data leaking into batch children
+
 ## [0.203.0] - 2026-11-15
 
 ### Added
