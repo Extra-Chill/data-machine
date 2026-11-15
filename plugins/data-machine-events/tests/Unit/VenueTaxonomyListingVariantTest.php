@@ -85,17 +85,16 @@ class VenueTaxonomyListingVariantTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_two_same_city_variants_are_ambiguous(): void {
-		$this->venue( 'Paradise Rock Club presented by Citizens', 'Boston', 'MA' );
-		$this->venue( 'Paradise Rock Club (Boston)', 'Boston', 'MA' );
-		$before = count( $this->termIds() );
+	public function test_several_same_city_variants_do_not_guess_or_strand_the_event(): void {
+		$upstairs   = $this->venue( 'Middle East - Upstairs', 'Cambridge', 'MA' );
+		$downstairs = $this->venue( 'Middle East - Downstairs', 'Cambridge', 'MA' );
 
-		$result = Venue_Taxonomy::find_or_create_venue( 'Paradise Rock Club', array( 'city' => 'Boston', 'state' => 'MA' ) );
+		$result = Venue_Taxonomy::find_or_create_venue( 'Middle East', array( 'city' => 'Cambridge', 'state' => 'MA' ) );
 
-		$this->assertSame( 'ambiguous', $result['match_status'] );
-		$this->assertNull( $result['term_id'] );
-		$this->assertFalse( $result['was_created'] );
-		$this->assertCount( $before, $this->termIds() );
+		// Neither room is guessed, and the event still gets a venue term.
+		$this->assertNotSame( 'ambiguous', $result['match_status'] );
+		$this->assertNotNull( $result['term_id'] );
+		$this->assertNotContains( (int) $result['term_id'], array( $upstairs, $downstairs ) );
 	}
 
 	public function test_variant_in_other_city_is_not_matched(): void {

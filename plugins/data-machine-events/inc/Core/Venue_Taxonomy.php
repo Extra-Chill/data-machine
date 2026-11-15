@@ -1239,6 +1239,32 @@ class Venue_Taxonomy {
 			}
 		}
 
+		// Variants are advisory: core-name candidates keep their original
+		// semantics, and a variant only resolves when it is the single candidate.
+		// Several same-city variants (rooms of one venue, e.g. "Middle East -
+		// Upstairs" and "- Downstairs") fall through to term creation as before
+		// rather than reporting ambiguity, which would leave the event venue-less.
+		$core_compatible = array_values(
+			array_filter(
+				$compatible,
+				static fn( $venue ) => ! isset( $via_variant[ (int) $venue->term_id ] )
+			)
+		);
+		if ( $core_compatible ) {
+			$compatible = $core_compatible;
+		} elseif ( count( $compatible ) > 1 ) {
+			do_action(
+				'datamachine_log',
+				'info',
+				'Venue name variants matched several same-city venues; not guessing',
+				array(
+					'input_name'  => $venue_name,
+					'candidates'  => array_map( static fn( $venue ) => (int) $venue->term_id, $compatible ),
+				)
+			);
+			return $no_match;
+		}
+
 		if ( 1 === count( $compatible ) ) {
 			$variant = isset( $via_variant[ (int) $compatible[0]->term_id ] );
 			do_action(
