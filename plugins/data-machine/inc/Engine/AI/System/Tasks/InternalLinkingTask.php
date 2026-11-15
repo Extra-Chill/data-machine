@@ -162,6 +162,10 @@ class InternalLinkingTask extends SystemTask {
 				continue;
 			}
 
+			// Mark the inserted anchor in code, not via the prompt, so rendered
+			// HTML can tell it apart from a hand-written link.
+			$new_html = self::markInsertedLink( $new_html, $related_post['url'] );
+
 			$replacements[] = array(
 				'block_index' => $candidate['index'],
 				'new_content' => $new_html,
@@ -209,11 +213,7 @@ class InternalLinkingTask extends SystemTask {
 		}
 
 		$existing_meta = get_post_meta( $post_id, '_datamachine_internal_links', true );
-		$link_tracking = array(
-			'processed_at' => current_time( 'mysql' ),
-			'links'        => $inserted_links,
-			'job_id'       => $jobId,
-		);
+		$link_tracking = self::mergeLinkTracking( $existing_meta, $inserted_links, $jobId, current_time( 'mysql' ) );
 		update_post_meta( $post_id, '_datamachine_internal_links', $link_tracking );
 
 		$effects = array();
@@ -364,6 +364,64 @@ class InternalLinkingTask extends SystemTask {
 		);
 	}
 
+	/**
+	 * Stamp `data-dm-link="internal"` on every anchor in $html pointing at $url.
+	 *
+	 * @param string $html Paragraph HTML returned by the model.
+	 * @param string $url  Inserted link URL.
+	 * @return string
+	 */
+	public static function markInsertedLink( string $html, string $url ): string {
+		if ( ! class_exists( '\\WP_HTML_Tag_Processor' ) ) {
+			return $html;
+		}
+		$processor = new \WP_HTML_Tag_Processor( $html );
+		while ( $processor->next_tag( array( 'tag_name' => 'a' ) ) ) {
+			$href = $processor->get_attribute( 'href' );
+			if ( is_string( $href ) && html_entity_decode( $href, ENT_QUOTES ) === $url ) {
+				$processor->set_attribute( 'data-dm-link', 'internal' );
+			}
+		}
+		return $processor->get_updated_html();
+	}
+
+	/**
+	 * Merge newly inserted links into the post's link record.
+	 *
+	 * Each linking pass adds to the record instead of replacing it, so links
+	 * from earlier passes stay attributable. Entries are unique by URL; a
+	 * re-inserted URL keeps its first entry.
+	 *
+	 * @param mixed  $existing     Current `_datamachine_internal_links` value.
+	 * @param array  $new_links    Links inserted by this pass.
+	 * @param int    $job_id       Job ID of this pass.
+	 * @param string $processed_at Timestamp of this pass.
+	 * @return array{processed_at: string, links: array, job_id: int, job_ids: int[]}
+	 */
+	public static function mergeLinkTracking( $existing, array $new_links, int $job_id, string $processed_at ): array {
+		$existing = is_array( $existing ) ? $existing : array();
+		$links    = array();
+		foreach ( array_merge( (array) ( $existing['links'] ?? array() ), $new_links ) as $link ) {
+			$url = is_array( $link ) ? (string) ( $link['url'] ?? '' ) : '';
+			if ( '' !== $url && ! isset( $links[ $url ] ) ) {
+				$links[ $url ] = $link;
+			}
+		}
+
+		$job_ids = array_map( 'intval', (array) ( $existing['job_ids'] ?? array() ) );
+		if ( empty( $job_ids ) && ! empty( $existing['job_id'] ) ) {
+			$job_ids[] = (int) $existing['job_id'];
+		}
+		$job_ids[] = $job_id;
+
+		return array(
+			'processed_at' => $processed_at,
+			'links'        => array_values( $links ),
+			'job_id'       => $job_id,
+			'job_ids'      => array_values( array_unique( $job_ids ) ),
+		);
+	}
+
 	private function detectInsertedLink( string $html, string $url ): bool {
 		$escaped_url = preg_quote( $url, '/' );
 		return (bool) preg_match( '/<a\s[^>]*href=["\']' . $escaped_url . '["\'][^>]*>/', $html );
@@ -398,7 +456,7 @@ class InternalLinkingTask extends SystemTask {
 			'no_found_rows'  => true,
 		) );
 
-		$candidate_ids = array_slice( array_values( array_filter( array_map( 'absint', $query->posts ), static fn( int $candidate_id ): bool => $candidate_id !== $post_id ) ), 0, 50 );
+		$candidate_ids = array_slice( array_values( array_filter( array_map( static fn( $candidate ): int => $candidate instanceof \WP_Post ? (int) $candidate->ID : (int) $candidate, $query->posts ), static fn( int $candidate_id ): bool => $candidate_id !== $post_id ) ), 0, 50 );
 
 		if ( empty( $candidate_ids ) ) {
 			return array();
