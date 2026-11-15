@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.203.0] - 2026-11-15
+
+### Added
+- mark inserted links with data-dm-link and keep a cumulative link record
+
 ## [0.202.3] - 2026-11-15
 
 ### Fixed
