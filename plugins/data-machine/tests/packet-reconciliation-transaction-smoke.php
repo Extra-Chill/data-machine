@@ -24,7 +24,7 @@ namespace DataMachine\Core {
 		public static function isStatusSuccess( string $status ): bool { return 'completed' === $status; }
 		public static function failed( string $reason ): object { return new class( $reason ) { public function __construct( private string $reason ) {} public function toString(): string { return 'failed - ' . $this->reason; } }; }
 	}
-	class PacketEngineData { public static function sanitize( array $data, int $job_id ): array { unset( $job_id ); return $data; } }
+	class PacketEngineData { public static function sanitize( array $data, int $job_id ): array { unset( $job_id ); return $data; } public static function applySeed( array $engine, array $seed ): array { return array_replace_recursive( $engine, $seed ); } }
 	class RunMetrics { public static function recordStepResult( int $job_id, string $step, array $data ): void { unset( $job_id, $step, $data ); } }
 	class DataPacketStore {}
 }

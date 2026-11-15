@@ -369,7 +369,10 @@ class PipelineBatchScheduler {
 		// like CoreMemoryFilesDirective resolve the correct agent's
 		// MEMORY.md / SOUL.md instead of falling back to the user_id
 		// default-agent lookup.
-		$child_engine = $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) );
+		// The parent was seeded with the first packet's engine data; withoutSeed()
+		// takes it back out so that packet's item fields cannot leak into children
+		// whose own packets leave those keys unset.
+		$child_engine = PacketEngineData::withoutSeed( $this->stripBatchRuntimeState( \DataMachine\Core\EngineData::stripFlowRuntimeQueuePayloads( $engine_snapshot ) ) );
 		unset( $child_engine[ ProcessedItems::CLAIM_METADATA_KEY ], $child_engine[ ProcessedItems::CLAIMS_METADATA_KEY ] );
 		$child_engine['job'] = array(
 			'job_id'        => $child_job_id,
