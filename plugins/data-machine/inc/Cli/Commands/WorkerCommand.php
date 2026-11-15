@@ -618,6 +618,7 @@ class WorkerCommand extends BaseCommand {
 			'datamachine_recurring_retention_failed_jobs',
 			'datamachine_recurring_retention_files',
 			'datamachine_recurring_retention_logs',
+			'datamachine_recurring_retention_packet_store',
 			'datamachine_recurring_retention_processed_items',
 			'datamachine_recurring_retention_reclaim_space',
 			'datamachine_recurring_retention_stale_claims',

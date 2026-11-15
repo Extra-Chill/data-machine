@@ -18,7 +18,9 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FileCleanup;
+use DataMachine\Core\FilesRepository\PacketStoreCleanup;
 use DataMachine\Core\JobArtifactSurfaces;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Jobs\SchedulerEvidence;
@@ -39,6 +41,19 @@ class RetentionCleanup {
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
 	public const TASK_RECLAIM_SPACE   = 'retention_reclaim_space';
+	public const TASK_PACKET_STORE    = 'retention_packet_store';
+
+	/** Option holding the packet-store sweep resume cursor. */
+	public const PACKET_STORE_CURSOR_OPTION = 'datamachine_packet_store_cleanup_cursor';
+
+	/** Option holding running/last-full-pass packet-store size statistics. */
+	public const PACKET_STORE_STATS_OPTION = 'datamachine_packet_store_cleanup_stats';
+
+	/** Default safety margin (days) added on top of the longest job retention. */
+	private const PACKET_STORE_MARGIN_DAYS = 7;
+
+	/** Rows read per reference-scan query. */
+	private const PACKET_STORE_REFERENCE_PAGE = 200;
 
 	/**
 	 * Most action IDs a single retention window will exclude from re-selection.
@@ -1865,6 +1880,361 @@ class RetentionCleanup {
 		}
 
 		return $optimized;
+	}
+
+	/**
+	 * Age floor, in days, before an unreferenced packet-store file may be deleted.
+	 *
+	 * The DataPacket store is content-addressed and deduplicated, so a file can
+	 * be shared by many jobs. Retention deletes a packet only when (a) no live
+	 * job or pending batch worklist references its hash (see
+	 * liveReferencedPacketHashes()) AND (b) its mtime — refreshed on every
+	 * dedupe hit by DataPacketStore::store() — is older than this floor.
+	 *
+	 * The default is the longest whole-row job retention window plus a
+	 * margin, so by the time a packet ages out every terminal job that could
+	 * have referenced it has already been purged. The filter can widen the
+	 * floor freely but can never lower it to or below the longest job
+	 * retention window (see packetStoreMinimumAgeDays()).
+	 *
+	 * @return int Age floor in days.
+	 */
+	public static function packetStoreMaxAgeDays(): int {
+		$default = max( self::completedJobsMaxAgeDays(), self::failedJobsMaxAgeDays() ) + self::PACKET_STORE_MARGIN_DAYS;
+		$days    = (int) apply_filters( 'datamachine_packet_store_max_age_days', $default );
+
+		return max( $days, self::packetStoreMinimumAgeDays() );
+	}
+
+	/**
+	 * Hard lower bound for the packet-store age floor.
+	 *
+	 * Strictly longer than every whole-row job retention window, so the age
+	 * floor alone already outlives any terminal job row.
+	 *
+	 * @return int Minimum age floor in days.
+	 */
+	public static function packetStoreMinimumAgeDays(): int {
+		return max( self::completedJobsMaxAgeDays(), self::failedJobsMaxAgeDays() ) + 1;
+	}
+
+	/**
+	 * Maximum packet files examined per sweep run.
+	 *
+	 * Bounds stat() work per run; the stored cursor resumes the next run where
+	 * this one stopped, so a large backlog drains across many runs.
+	 *
+	 * @return int Files per run (clamped to [100, 500000]).
+	 */
+	public static function packetStoreBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_packet_store_batch_size', 25000 );
+
+		return min( 500000, max( 100, $size ) );
+	}
+
+	/**
+	 * Most reference rows (live jobs + batch worklist items) one scan may read.
+	 *
+	 * Past this the scan gives up and the sweep deletes nothing that run:
+	 * an incomplete protected set must never be treated as complete.
+	 *
+	 * @return int Row cap (>= 1).
+	 */
+	public static function packetStoreReferenceScanMaxRows(): int {
+		$rows = (int) apply_filters( 'datamachine_packet_store_reference_scan_max_rows', 100000 );
+
+		return $rows > 0 ? $rows : 100000;
+	}
+
+	/**
+	 * Collect packet hashes still referenced by live work.
+	 *
+	 * Packet refs persist in three places while work can still consume them:
+	 *  - `engine_data` of non-terminal jobs (e.g. step_input_packets), plus
+	 *    failed jobs that still carry engine_data (manual retry can resume
+	 *    from it until the engine_data shed window clears it),
+	 *  - the per-job `data.json` of non-terminal jobs (FileStorage refs),
+	 *  - batch worklist payloads (BatchScheduler stores item packets by ref).
+	 *
+	 * Every 64-hex token in those blobs is treated as a reference. That
+	 * over-protects (checksums also match) but never under-protects, which is
+	 * the safe direction for a destructive sweep.
+	 *
+	 * Fails closed: returns null on any database error or when the scan would
+	 * exceed packetStoreReferenceScanMaxRows(), and the caller then deletes
+	 * nothing.
+	 *
+	 * @return array<string,true>|null Hash => true, or null when unavailable.
+	 */
+	public static function liveReferencedPacketHashes(): ?array {
+		global $wpdb;
+
+		$jobs_table  = $wpdb->prefix . Jobs::TABLE_NAME;
+		$items_table = $wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME;
+		$max_rows    = self::packetStoreReferenceScanMaxRows();
+		$page        = self::PACKET_STORE_REFERENCE_PAGE;
+		$finals      = JobStatus::FINAL_STATUSES;
+		$directory   = new DirectoryManager();
+		$hashes      = array();
+		$rows_read   = 0;
+
+		$status_placeholders = implode( ', ', array_fill( 0, count( $finals ), '%s' ) );
+		$last_job_id         = 0;
+		while ( true ) {
+			$params = array_merge( array( $jobs_table ), $finals, array( JobStatus::FAILED, $last_job_id, $page ) );
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Placeholders generated from a fixed list.
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( "SELECT job_id, pipeline_id, flow_id, engine_data FROM %i WHERE ( status NOT IN ({$status_placeholders}) OR ( status = %s AND engine_data IS NOT NULL AND engine_data != '' ) ) AND job_id > %d ORDER BY job_id ASC LIMIT %d", $params ),
+				ARRAY_A
+			);
+			// phpcs:enable
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'jobs_query_failed', self::lastDbError() );
+				return null;
+			}
+			if ( empty( $rows ) ) {
+				break;
+			}
+
+			foreach ( $rows as $row ) {
+				$last_job_id = (int) $row['job_id'];
+				$hashes     += self::extractPacketHashes( (string) ( $row['engine_data'] ?? '' ) );
+
+				$pipeline_id = (string) ( $row['pipeline_id'] ?? '' );
+				$flow_id     = (string) ( $row['flow_id'] ?? '' );
+				if ( '' !== $pipeline_id && '' !== $flow_id ) {
+					$data_file = $directory->get_job_directory( $pipeline_id, $flow_id, $last_job_id ) . '/data.json';
+					if ( is_file( $data_file ) ) {
+						$contents = file_get_contents( $data_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file read.
+						if ( false === $contents ) {
+							self::packetStoreReferenceScanFailed( 'job_data_unreadable', $data_file );
+							return null;
+						}
+						$hashes += self::extractPacketHashes( $contents );
+					}
+				}
+			}
+
+			$rows_read += count( $rows );
+			if ( $rows_read > $max_rows ) {
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
+			}
+		}
+
+		$last_batch = 0;
+		$last_index = -1;
+		while ( true ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT batch_job_id, item_index, payload FROM %i WHERE batch_job_id > %d OR ( batch_job_id = %d AND item_index > %d ) ORDER BY batch_job_id ASC, item_index ASC LIMIT %d',
+					$items_table,
+					$last_batch,
+					$last_batch,
+					$last_index,
+					$page
+				),
+				ARRAY_A
+			);
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'batch_items_query_failed', self::lastDbError() );
+				return null;
+			}
+			if ( empty( $rows ) ) {
+				break;
+			}
+
+			foreach ( $rows as $row ) {
+				$last_batch = (int) $row['batch_job_id'];
+				$last_index = (int) $row['item_index'];
+				$hashes    += self::extractPacketHashes( (string) ( $row['payload'] ?? '' ) );
+			}
+
+			$rows_read += count( $rows );
+			if ( $rows_read > $max_rows ) {
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
+			}
+		}
+
+		return $hashes;
+	}
+
+	/**
+	 * Extract every standalone lowercase 64-hex token from a blob.
+	 *
+	 * @param string $blob JSON or other text.
+	 * @return array<string,true> Hash => true.
+	 */
+	public static function extractPacketHashes( string $blob ): array {
+		if ( '' === $blob || ! preg_match_all( '/(?<![a-f0-9])[a-f0-9]{64}(?![a-f0-9])/', $blob, $matches ) ) {
+			return array();
+		}
+
+		return array_fill_keys( $matches[0], true );
+	}
+
+	/**
+	 * Run one bounded, resumable packet-store sweep.
+	 *
+	 * @return array<string,mixed> Result summary.
+	 */
+	public static function cleanupPacketStore(): array {
+		$max_age_days = self::packetStoreMaxAgeDays();
+		$batch_size   = self::packetStoreBatchSize();
+		$protected    = self::liveReferencedPacketHashes();
+
+		if ( null === $protected ) {
+			return array(
+				'deleted'      => 0,
+				'skipped'      => true,
+				'reason'       => 'reference_scan_unavailable',
+				'max_age_days' => $max_age_days,
+				'batch_size'   => $batch_size,
+			);
+		}
+
+		$cursor = (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' );
+		$result = ( new PacketStoreCleanup() )->sweep( $max_age_days, $protected, $batch_size, $cursor );
+
+		update_option( self::PACKET_STORE_CURSOR_OPTION, $result['cursor'], false );
+		self::recordPacketStoreStats( '' === $cursor, $result );
+
+		if ( $result['deleted'] > 0 || $result['failed'] > 0 ) {
+			self::log(
+				'Scheduled cleanup: deleted unreferenced DataPacket store files',
+				array(
+					'files_deleted'    => $result['deleted'],
+					'bytes_deleted'    => $result['bytes_deleted'],
+					'files_examined'   => $result['examined'],
+					'kept_referenced'  => $result['kept_referenced'],
+					'kept_fresh'       => $result['kept_fresh'],
+					'delete_failures'  => $result['failed'],
+					'removed_dirs'     => $result['removed_dirs'],
+					'pass_complete'    => $result['complete'],
+					'max_age_days'     => $max_age_days,
+					'batch_size'       => $batch_size,
+					'protected_hashes' => count( $protected ),
+				)
+			);
+		}
+
+		return array_merge(
+			$result,
+			array(
+				'skipped'          => false,
+				'max_age_days'     => $max_age_days,
+				'batch_size'       => $batch_size,
+				'protected_hashes' => count( $protected ),
+			)
+		);
+	}
+
+	/**
+	 * Count files the next sweep run would delete (dry run, same bounds).
+	 *
+	 * Walking the whole store is too expensive for a count, so this reports
+	 * eligibility within the next batch from the stored cursor.
+	 *
+	 * @return int Eligible files in the next batch.
+	 */
+	public static function countPacketStoreEligible(): int {
+		$protected = self::liveReferencedPacketHashes();
+		if ( null === $protected ) {
+			return 0;
+		}
+
+		$cursor = (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' );
+		$result = ( new PacketStoreCleanup() )->sweep( self::packetStoreMaxAgeDays(), $protected, self::packetStoreBatchSize(), $cursor, true );
+
+		return $result['eligible'];
+	}
+
+	/**
+	 * Packet-store size statistics recorded by completed sweep passes.
+	 *
+	 * @return array{last_pass:?array{completed_at:int,files:int,bytes:int},pass_files:int,pass_bytes:int,cursor:string}
+	 */
+	public static function packetStoreStats(): array {
+		$stats = get_option( self::PACKET_STORE_STATS_OPTION, array() );
+		$stats = is_array( $stats ) ? $stats : array();
+
+		$last_pass = null;
+		if ( is_array( $stats['last_pass'] ?? null ) ) {
+			$last_pass = array(
+				'completed_at' => (int) ( $stats['last_pass']['completed_at'] ?? 0 ),
+				'files'        => (int) ( $stats['last_pass']['files'] ?? 0 ),
+				'bytes'        => (int) ( $stats['last_pass']['bytes'] ?? 0 ),
+			);
+		}
+
+		return array(
+			'last_pass'  => $last_pass,
+			'pass_files' => (int) ( $stats['pass_files'] ?? 0 ),
+			'pass_bytes' => (int) ( $stats['pass_bytes'] ?? 0 ),
+			'cursor'     => (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' ),
+		);
+	}
+
+	/**
+	 * Accumulate retained file/byte totals across a pass for `retention show`.
+	 *
+	 * @param bool  $pass_started Whether this run began a fresh pass.
+	 * @param array $result       Sweep result.
+	 */
+	private static function recordPacketStoreStats( bool $pass_started, array $result ): void {
+		$stats = get_option( self::PACKET_STORE_STATS_OPTION, array() );
+		$stats = is_array( $stats ) ? $stats : array();
+		if ( $pass_started ) {
+			$stats['pass_files'] = 0;
+			$stats['pass_bytes'] = 0;
+		}
+
+		$stats['pass_files'] = (int) ( $stats['pass_files'] ?? 0 ) + $result['kept_referenced'] + $result['kept_fresh'] + $result['failed'];
+		$stats['pass_bytes'] = (int) ( $stats['pass_bytes'] ?? 0 ) + $result['bytes_kept'];
+
+		if ( $result['complete'] ) {
+			$stats['last_pass']  = array(
+				'completed_at' => time(),
+				'files'        => $stats['pass_files'],
+				'bytes'        => $stats['pass_bytes'],
+			);
+			$stats['pass_files'] = 0;
+			$stats['pass_bytes'] = 0;
+		}
+
+		update_option( self::PACKET_STORE_STATS_OPTION, $stats, false );
+	}
+
+	/**
+	 * Current wpdb error string, read fresh on every call so static analysis
+	 * does not narrow it across consecutive queries.
+	 *
+	 * @return string Last database error, or '' when the last query succeeded.
+	 * @phpstan-impure
+	 */
+	private static function lastDbError(): string {
+		global $wpdb;
+		return (string) $wpdb->last_error;
+	}
+
+	/**
+	 * Log a failed reference scan and signal fail-closed.
+	 *
+	 * @param string $reason Machine reason.
+	 * @param string $detail Detail for operators.
+	 */
+	private static function packetStoreReferenceScanFailed( string $reason, string $detail ): void {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'DataPacket store cleanup skipped: live reference scan unavailable',
+			array(
+				'reason' => $reason,
+				'detail' => $detail,
+			)
+		);
 	}
 
 	public static function countStaleClaims(): int {

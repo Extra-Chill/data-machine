@@ -448,6 +448,12 @@ class RetentionCommand extends BaseCommand {
 				'count'     => array( RetentionCleanup::class, 'countJobArtifacts' ),
 			),
 			array(
+				'label'     => 'DataPacket store',
+				'task_type' => RetentionCleanup::TASK_PACKET_STORE,
+				'threshold' => RetentionCleanup::packetStoreMaxAgeDays() . ' days + unreferenced (next ' . RetentionCleanup::packetStoreBatchSize() . ' files)',
+				'count'     => array( RetentionCleanup::class, 'countPacketStoreEligible' ),
+			),
+			array(
 				'label'     => 'Orphaned batch worklists',
 				'task_type' => RetentionCleanup::TASK_BATCH_WORKLISTS,
 				'threshold' => 'parent job deleted',
@@ -518,6 +524,10 @@ class RetentionCommand extends BaseCommand {
 				'retention' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
 				'filter'    => 'datamachine_job_artifacts_max_age_days',
 			),
+			'DataPacket store'     => array(
+				'retention' => RetentionCleanup::packetStoreMaxAgeDays() . ' days, unreferenced only',
+				'filter'    => 'datamachine_packet_store_max_age_days',
+			),
 		);
 	}
 
@@ -567,6 +577,21 @@ class RetentionCommand extends BaseCommand {
 			$sizes['Chat sessions']            = $chat_metrics;
 			$sizes['_unique']['Chat sessions'] = $chat_metrics;
 		}
+
+		// The packet store is files, not a table. Walking ~1M files on every
+		// `show` is too slow, so report totals recorded by the last complete
+		// cleanup pass (files and bytes retained).
+		$packet_stats              = RetentionCleanup::packetStoreStats();
+		$last_pass                 = $packet_stats['last_pass'];
+		$sizes['DataPacket store'] = null === $last_pass
+			? array(
+				'rows'    => 'pending first pass',
+				'size_mb' => 'N/A',
+			)
+			: array(
+				'rows'    => (int) $last_pass['files'],
+				'size_mb' => number_format( (int) $last_pass['bytes'] / 1024 / 1024, 1 ),
+			);
 
 		return $sizes;
 	}
