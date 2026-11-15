@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.202.2] - 2026-11-15
+
+### Fixed
+- stop creating a unique Action Scheduler group per resume
+
 ## [0.202.1] - 2026-11-12
 
 ### Fixed
