@@ -193,6 +193,13 @@ class EventDuplicateStrategy {
 			if ( $match ) {
 				return $match;
 			}
+
+			// Strategy 2b: same headliner at the same venue or a same-city
+			// venue-name variant (multi-venue listings, #3965).
+			$match = self::findByHeadlinerAndVenueIdentity( $title, $venue, $date_only, $startDate, $venue_term, $context );
+			if ( $match ) {
+				return $match;
+			}
 		}
 
 		// Strategy 3: Exact title + date (with venue confirmation).
@@ -542,6 +549,201 @@ class EventDuplicateStrategy {
 		$stripped = trim( (string) preg_replace( $pattern, '', $title ) );
 
 		return mb_strlen( $stripped ) < 3 ? $title : $stripped;
+	}
+
+	// -----------------------------------------------------------------------
+	// Strategy 2b: Headliner + date + venue identity (#3965)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Subtitles that name one set of several, never a tour name.
+	 */
+	private const SET_SUBTITLE_PATTERN = '/\b(?:(?:early|late|first|second|1st|2nd|evening|afternoon)\s+(?:show|set|performance)|matinee|(?:night|show|set|day)\s*#?\d+)\b/i';
+
+	/**
+	 * Match a same-day listing by headliner and venue identity.
+	 *
+	 * Multi-venue listing pages title a show "Headliner with Support at Venue"
+	 * and name the venue loosely ("Iron Horse Music Hall" for "The Iron
+	 * Horse"), while the venue's own feed adds tour names ("Hunxho - 2Night
+	 * Only Tour", "Street Dogs: Wreck The Halls") or a different opener list.
+	 * Neither the fuzzy title compare nor the venue-term-ID checks see those
+	 * as one show (#3965).
+	 *
+	 * A candidate qualifies only when:
+	 * - its headliner key (headlinerKey()) equals the incoming one exactly;
+	 * - it sits at the incoming venue term, or at a term whose name is a
+	 *   Venue_Taxonomy::venue_names_are_variants() variant of the incoming
+	 *   venue name in the same city (positive city evidence, no state or
+	 *   country conflict). A different venue is never a match, so "Open Mic
+	 *   at X" and "Open Mic at Y" stay apart;
+	 * - its start time is within the usual window (one hour for a generic,
+	 *   low-confidence headliner such as "Karaoke" or a one-word band), or it
+	 *   is the single cross-source match with no same-source candidate
+	 *   outside the window, mirroring Strategy 2. The cross-source fallback
+	 *   is not offered to a low-confidence headliner at a name-variant venue.
+	 * More than one in-window candidate is ambiguous and never matched.
+	 *
+	 * @param string        $title      Incoming title.
+	 * @param string        $venue      Incoming venue name.
+	 * @param string        $date_only  Date in YYYY-MM-DD.
+	 * @param string        $startDate  Incoming start datetime.
+	 * @param \WP_Term|null $venue_term Resolved incoming venue term.
+	 * @param array         $context    Incoming duplicate-check context.
+	 * @return array|null Duplicate result or null.
+	 */
+	private static function findByHeadlinerAndVenueIdentity( string $title, string $venue, string $date_only, string $startDate, ?\WP_Term $venue_term, array $context ): ?array {
+		$incoming_names = array_values( array_unique( array_filter( array( trim( $venue ), $venue_term ? (string) $venue_term->name : '' ) ) ) );
+		if ( empty( $incoming_names ) ) {
+			return null;
+		}
+
+		$location = $context;
+		if ( $venue_term ) {
+			foreach ( array( 'city', 'state', 'country' ) as $field ) {
+				$meta_value         = (string) get_term_meta( $venue_term->term_id, '_venue_' . $field, true );
+				$location[ $field ] = '' !== $meta_value ? $meta_value : ( $context[ $field ] ?? '' );
+			}
+		}
+		$incoming_state = (string) ( $location['state'] ?? '' );
+		$source         = (string) ( $context['source'] ?? '' );
+
+		$in_window           = array();
+		$cross_source        = array();
+		$same_source_outside = false;
+		foreach ( self::candidatePagesByDate( $date_only ) as $candidates ) {
+			foreach ( $candidates as $candidate ) {
+				$post_id = (int) $candidate->ID;
+				$terms   = wp_get_post_terms( $post_id, 'venue' );
+				if ( is_wp_error( $terms ) || empty( $terms ) ) {
+					continue;
+				}
+
+				$same_term = false;
+				$variant   = false;
+				foreach ( $terms as $term ) {
+					if ( $venue_term && (int) $term->term_id === (int) $venue_term->term_id ) {
+						$same_term = true;
+						break;
+					}
+					if ( ! $variant && self::isSameCityVenueVariant( $term, $incoming_names, $incoming_state, $location ) ) {
+						$variant = true;
+					}
+				}
+				if ( ! $same_term && ! $variant ) {
+					continue;
+				}
+
+				$venue_names = array_merge( $incoming_names, wp_list_pluck( $terms, 'name' ) );
+				$key         = self::headlinerKey( $title, $venue_names );
+				if ( '' === $key || self::headlinerKey( (string) $candidate->post_title, $venue_names ) !== $key ) {
+					continue;
+				}
+
+				$low_confidence    = EventIdentifierGenerator::isLowConfidenceTitle( $key );
+				$candidate_dates   = \DataMachineEvents\Core\EventDatesTable::get( $post_id );
+				$existing_datetime = $candidate_dates ? $candidate_dates->start_datetime : '';
+				$within            = $low_confidence
+					? self::isWithinStrictTimeWindow( $startDate, $existing_datetime, self::LOW_CONFIDENCE_TIME_WINDOW )
+					: self::isWithinTimeWindow( $startDate, $existing_datetime );
+				if ( $within ) {
+					$in_window[ $post_id ] = true;
+				} elseif ( $low_confidence && ! $same_term ) {
+					// A generic or one-word headliner at a name-variant venue
+					// needs the start time as positive evidence.
+					continue;
+				} elseif ( self::isCrossSourceCandidate( $post_id, $source ) ) {
+					$cross_source[ $post_id ] = true;
+				} else {
+					$same_source_outside = true;
+				}
+			}
+		}
+
+		if ( 1 === count( $in_window ) ) {
+			return self::duplicateResult( (int) array_key_first( $in_window ), 'headliner_venue_identity' );
+		}
+		if ( empty( $in_window ) && 1 === count( $cross_source ) && ! $same_source_outside ) {
+			return self::duplicateResult( (int) array_key_first( $cross_source ), 'headliner_venue_identity_cross_source' );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Whether a candidate venue term is a same-city name variant of the incoming venue.
+	 *
+	 * @param \WP_Term $term           Candidate venue term.
+	 * @param string[] $incoming_names Incoming venue name(s).
+	 * @param string   $incoming_state Incoming venue state.
+	 * @param array    $location       Incoming city/state/country.
+	 * @return bool
+	 */
+	private static function isSameCityVenueVariant( \WP_Term $term, array $incoming_names, string $incoming_state, array $location ): bool {
+		$stored_state = (string) get_term_meta( $term->term_id, '_venue_state', true );
+		$stored_city  = (string) get_term_meta( $term->term_id, '_venue_city', true );
+		$city         = (string) ( $location['city'] ?? '' );
+		foreach ( $incoming_names as $name ) {
+			if ( \DataMachineEvents\Core\Venue_Taxonomy::venue_names_are_variants( (string) $name, (string) $term->name, $incoming_state, $stored_state, $city, $stored_city ) ) {
+				return \DataMachineEvents\Core\Venue_Taxonomy::is_same_event_location( (int) $term->term_id, $location );
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Reduce an event title to its headliner for same-venue comparison (#3965).
+	 *
+	 * Removes, in order: a trailing "at <venue>" phrase for any of the given
+	 * venue names (stripVenuePhrase()), explicit support markers
+	 * (stripSupportClause()), a trailing parenthetical ("(2 Shows)"), a tour or
+	 * subtitle after ":" / " - " unless it names a set ("Late Show"), a bare
+	 * "with" support list (but not "An Evening with …"), and a co-bill list
+	 * after ",", "&", "and", "+" or "/". A trailing "at <venue>" is also
+	 * removed when <venue> is a Venue_Taxonomy::venue_names_are_variants()
+	 * variant of a given name. Accents are folded and the result is normalized
+	 * like computeTitleHash(). Only meaningful once the venue is confirmed.
+	 *
+	 * @param string   $title       Event title.
+	 * @param string[] $venue_names Venue names whose "at <venue>" phrase may be stripped.
+	 * @return string Headliner key, or '' when too short to trust.
+	 */
+	public static function headlinerKey( string $title, array $venue_names = array() ): string {
+		$text = remove_accents( html_entity_decode( $title, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+		foreach ( $venue_names as $venue_name ) {
+			$text = self::stripVenuePhrase( $text, remove_accents( html_entity_decode( (string) $venue_name, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+		}
+		// A trailing "at <venue>" whose venue is a listing-style variant of a
+		// known name ("at City Winery Boston" for "City Winery - Boston").
+		$offset = 0;
+		while ( preg_match( '/\s+(?:at|@)\s+/iu', $text, $at, PREG_OFFSET_CAPTURE, $offset ) ) {
+			$tail = substr( $text, $at[0][1] + strlen( $at[0][0] ) );
+			foreach ( $venue_names as $venue_name ) {
+				if ( '' !== trim( $tail ) && \DataMachineEvents\Core\Venue_Taxonomy::venue_names_are_variants( $tail, (string) $venue_name ) ) {
+					$text = substr( $text, 0, $at[0][1] );
+					break 2;
+				}
+			}
+			$offset = $at[0][1] + strlen( $at[0][0] );
+		}
+		$text = self::stripSupportClause( $text );
+		$text = trim( (string) preg_replace( '/\s*\([^)]*\)\s*$/u', '', $text ) );
+
+		$parts = preg_split( '/\s*:\s+|\s+[-\x{2013}\x{2014}|]\s+/u', $text, 2 );
+		if ( is_array( $parts ) && 2 === count( $parts ) && '' !== trim( $parts[0] ) && ! preg_match( self::SET_SUBTITLE_PATTERN, $parts[1] ) ) {
+			$text = $parts[0];
+		}
+
+		if ( ! preg_match( '/^(?:an?\s+)?(?:evening|night|afternoon|morning|conversation|celebration|tribute)\s+with\b/iu', $text ) ) {
+			$text = (string) preg_replace( '/\s+with\s+.*$/iu', '', $text );
+		}
+		$text = (string) preg_replace( '/\s*(?:,|\s(?:&|\+|\/|and)\s).*$/iu', '', $text );
+
+		$key = EventIdentifierGenerator::normalizeBasic( $text );
+		$key = trim( (string) preg_replace( '/\s+/', ' ', (string) preg_replace( '/[^a-z0-9\s]+/', '', $key ) ) );
+
+		return strlen( $key ) >= 3 ? $key : '';
 	}
 
 	// -----------------------------------------------------------------------
