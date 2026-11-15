@@ -122,15 +122,10 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/web-fetch-guard.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-tool-guard.php';
 \DataMachineEvents\Core\register_event_tool_guard();
 
-// Give event-upsert AI steps today's date and the shared year-inference rule so
-// year-less venue dates resolve instead of being deferred (issue #3882).
-require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-date-context-directive.php';
-\DataMachineEvents\Core\EventDateContextDirective::register();
-
-// Tell event-upsert AI steps on single-venue flows that location is settled,
-// so venues in neighbouring towns are not rejected as off-market (#3956).
-require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/pinned-venue-context-directive.php';
-\DataMachineEvents\Core\PinnedVenueContextDirective::register();
+// Event-upsert AI step directives: today's date for year-less venue dates
+// (#3882) and settled location for pinned-venue flows (#3956).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-ai-directives.php';
+\DataMachineEvents\Core\register_event_ai_directives();
 
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {

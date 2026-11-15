@@ -14,6 +14,8 @@
 
 namespace DataMachineEvents\Core;
 
+use DataMachine\Engine\AI\Directives\DirectiveInterface;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -21,24 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Supplies pinned-venue location context to event-upsert AI steps.
  */
-final class PinnedVenueContextDirective {
+final class PinnedVenueContextDirective implements DirectiveInterface {
 
-	/**
-	 * Register the directive with Data Machine for pipeline AI steps.
-	 */
-	public static function register(): void {
-		add_filter(
-			'datamachine_directives',
-			static function ( $directives ) {
-				$directives[] = array(
-					'class'    => self::class,
-					'priority' => 56,
-					'modes'    => array( 'pipeline' ),
-				);
-				return $directives;
-			}
-		);
-	}
 
 	/**
 	 * Directive outputs for the Data Machine directive system.
