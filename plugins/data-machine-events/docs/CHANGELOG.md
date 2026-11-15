@@ -2,6 +2,36 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.3] - 2026-11-15
+
+### Fixed
+- match listing duplicates by headliner and venue identity
+
+## [0.86.2] - 2026-11-15
+
+### Fixed
+- make AI directives implement DirectiveInterface so they run
+
+## [0.86.1] - 2026-11-15
+
+### Fixed
+- tell AI steps a pinned venue's location is settled
+
+## [0.86.0] - 2026-11-14
+
+### Added
+- extract venue gig lists under month headings
+
+## [0.85.0] - 2026-11-14
+
+### Added
+- add PatronManager (Salesforce PatronTicket) extractor
+
+## [0.84.3] - 2026-11-14
+
+### Changed
+- fix stale dates and privacy-page ID collision in upsert tests
+
 ## [0.84.2] - 2026-11-11
 
 ### Fixed

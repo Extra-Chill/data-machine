@@ -115,6 +115,7 @@ $expected_ids   = array(
 	'invoice',
 	'sendy',
 	'cloudflare',
+	'hetzner',
 );
 assert_provider_bootstrap( $expected_ids === $actual_ids, 'production provider order is explicit and deterministic' );
 

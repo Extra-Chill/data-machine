@@ -4,7 +4,7 @@
  * Plugin Name: Data Machine Events
  * Plugin URI: https://chubes.net
  * Description: WordPress events plugin with block-first architecture. Features AI-driven event creation via Data Machine integration, Event Details blocks for data storage, Calendar blocks for display, and venue taxonomy management.
- * Version: 0.84.2
+ * Version: 0.86.3
  * Author: Chris Huber
  * Author URI: https://chubes.net
  * License: GPL v2 or later
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 if ( file_exists( __DIR__ . '/vendor/autoload.php' ) ) {
 	require_once __DIR__ . '/vendor/autoload.php';
 }
-define( 'DATA_MACHINE_EVENTS_VERSION', '0.84.2' );
+define( 'DATA_MACHINE_EVENTS_VERSION', '0.86.3' );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_FILE', __FILE__ );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DATA_MACHINE_EVENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -122,10 +122,10 @@ require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/web-fetch-guard.php';
 require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-tool-guard.php';
 \DataMachineEvents\Core\register_event_tool_guard();
 
-// Give event-upsert AI steps today's date and the shared year-inference rule so
-// year-less venue dates resolve instead of being deferred (issue #3882).
-require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-date-context-directive.php';
-\DataMachineEvents\Core\EventDateContextDirective::register();
+// Event-upsert AI step directives: today's date for year-less venue dates
+// (#3882) and settled location for pinned-venue flows (#3956).
+require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Core/event-ai-directives.php';
+\DataMachineEvents\Core\register_event_ai_directives();
 
 	// Load REST API routes (modular)
 if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Api/Routes.php' ) ) {

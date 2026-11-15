@@ -235,6 +235,10 @@ class RetentionCommand extends BaseCommand {
 				'table'    => 'actionscheduler_logs',
 				'eligible' => $breakdown['logs'],
 			),
+			array(
+				'table'    => 'actionscheduler_groups (orphan ai-resume)',
+				'eligible' => $breakdown['groups'],
+			),
 		);
 
 		WP_CLI::log( '' );
@@ -268,6 +272,13 @@ class RetentionCommand extends BaseCommand {
 			)
 		);
 		WP_CLI::log( sprintf( 'Batch size:      %d rows/iteration', RetentionCleanup::actionSchedulerBatchSize() ) );
+		WP_CLI::log(
+			sprintf(
+				'Orphan groups:   %d rows/batch, %d batches/pass',
+				RetentionCleanup::orphanResumeGroupBatchSize(),
+				RetentionCleanup::orphanResumeGroupMaxBatches()
+			)
+		);
 		WP_CLI::log(
 			sprintf(
 				'Safety caps:     %d iterations / %ds wall-clock per pass',
@@ -407,7 +418,7 @@ class RetentionCommand extends BaseCommand {
 				'count'     => array( RetentionCleanup::class, 'countProcessedItems' ),
 			),
 			array(
-				'label'     => 'AS actions + logs',
+				'label'     => 'AS actions + logs + orphan resume groups',
 				'task_type' => RetentionCleanup::TASK_AS_ACTIONS,
 				'threshold' => RetentionCleanup::actionSchedulerMaxAgeDays() . ' days',
 				'count'     => array( RetentionCleanup::class, 'countActionSchedulerActions' ),
@@ -435,6 +446,12 @@ class RetentionCommand extends BaseCommand {
 				'task_type' => RetentionCleanup::TASK_JOB_ARTIFACTS,
 				'threshold' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
 				'count'     => array( RetentionCleanup::class, 'countJobArtifacts' ),
+			),
+			array(
+				'label'     => 'DataPacket store',
+				'task_type' => RetentionCleanup::TASK_PACKET_STORE,
+				'threshold' => RetentionCleanup::packetStoreMaxAgeDays() . ' days + unreferenced (next ' . RetentionCleanup::packetStoreBatchSize() . ' files)',
+				'count'     => array( RetentionCleanup::class, 'countPacketStoreEligible' ),
 			),
 			array(
 				'label'     => 'Orphaned batch worklists',
@@ -483,6 +500,10 @@ class RetentionCommand extends BaseCommand {
 					. ( empty( RetentionCleanup::actionSchedulerHookMaxAgeDays() ) ? '' : ' (+per-hook)' ),
 				'filter'    => 'datamachine_as_actions_max_age_days',
 			),
+			'AS resume groups'     => array(
+				'retention' => 'orphans only',
+				'filter'    => 'datamachine_retention_orphan_group_batch_size',
+			),
 			'Stale claims'         => array(
 				'retention' => round( apply_filters( 'datamachine_stale_claim_max_age', DAY_IN_SECONDS ) / 3600 ) . ' hours',
 				'filter'    => 'datamachine_stale_claim_max_age',
@@ -503,6 +524,10 @@ class RetentionCommand extends BaseCommand {
 				'retention' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
 				'filter'    => 'datamachine_job_artifacts_max_age_days',
 			),
+			'DataPacket store'     => array(
+				'retention' => RetentionCleanup::packetStoreMaxAgeDays() . ' days, unreferenced only',
+				'filter'    => 'datamachine_packet_store_max_age_days',
+			),
 		);
 	}
 
@@ -517,12 +542,13 @@ class RetentionCommand extends BaseCommand {
 		global $wpdb;
 
 		$tables      = array(
-			'Completed jobs'  => $wpdb->prefix . 'datamachine_jobs',
-			'Failed jobs'     => $wpdb->prefix . 'datamachine_jobs',
-			'Pipeline logs'   => $wpdb->prefix . 'datamachine_logs',
-			'Processed items' => $wpdb->prefix . 'datamachine_processed_items',
-			'AS actions'      => $wpdb->prefix . 'actionscheduler_actions',
-			'Stale claims'    => $wpdb->prefix . 'actionscheduler_claims',
+			'Completed jobs'   => $wpdb->prefix . 'datamachine_jobs',
+			'Failed jobs'      => $wpdb->prefix . 'datamachine_jobs',
+			'Pipeline logs'    => $wpdb->prefix . 'datamachine_logs',
+			'Processed items'  => $wpdb->prefix . 'datamachine_processed_items',
+			'AS actions'       => $wpdb->prefix . 'actionscheduler_actions',
+			'Stale claims'     => $wpdb->prefix . 'actionscheduler_claims',
+			'AS resume groups' => $wpdb->prefix . 'actionscheduler_groups',
 		);
 		$allocations = RetentionCleanup::ownedTableAllocations();
 		$table_data  = array();
@@ -551,6 +577,21 @@ class RetentionCommand extends BaseCommand {
 			$sizes['Chat sessions']            = $chat_metrics;
 			$sizes['_unique']['Chat sessions'] = $chat_metrics;
 		}
+
+		// The packet store is files, not a table. Walking ~1M files on every
+		// `show` is too slow, so report totals recorded by the last complete
+		// cleanup pass (files and bytes retained).
+		$packet_stats              = RetentionCleanup::packetStoreStats();
+		$last_pass                 = $packet_stats['last_pass'];
+		$sizes['DataPacket store'] = null === $last_pass
+			? array(
+				'rows'    => 'pending first pass',
+				'size_mb' => 'N/A',
+			)
+			: array(
+				'rows'    => (int) $last_pass['files'],
+				'size_mb' => number_format( (int) $last_pass['bytes'] / 1024 / 1024, 1 ),
+			);
 
 		return $sizes;
 	}

@@ -202,6 +202,15 @@ final class ProviderModules {
 				array( 'datamachine/cloudflare-turnstile-list-widgets', 'datamachine/cloudflare-turnstile-get-widget', 'datamachine/cloudflare-turnstile-update-widget-domains' ),
 				static fn() => new \DataMachineBusiness\Abilities\Cloudflare\CloudflareTurnstileAbilities()
 			),
+			new ProviderModule(
+				'hetzner',
+				$abilities,
+				array( 'datamachine/hetzner-list-servers', 'datamachine/hetzner-backup-status', 'datamachine/hetzner-list-volumes', 'datamachine/hetzner-server-metrics', 'health:hetzner_backups', 'wake-signal:hetzner_backups' ),
+				static function (): void {
+					new \DataMachineBusiness\Abilities\Hetzner\HetznerAbilities();
+					\DataMachineBusiness\Abilities\Hetzner\HetznerHealth::register();
+				}
+			),
 		);
 	}
 }

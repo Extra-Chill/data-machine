@@ -43,6 +43,7 @@ use DataMachine\Engine\AI\System\Tasks\Retention\RetentionProcessedItemsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionStaleClaimsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionBatchWorklistsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionReclaimSpaceTask;
+use DataMachine\Engine\AI\System\Tasks\Retention\RetentionPacketStoreTask;
 use DataMachine\Engine\AI\System\Tasks\SourceInventoryTask;
 use DataMachine\Engine\AI\System\Tasks\SystemTask;
 use DataMachine\Engine\AI\System\Tasks\WakeBriefingTask;
@@ -118,6 +119,7 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]   = RetentionJobArtifactsTask::class;
 		$tasks[ RetentionCleanup::TASK_BATCH_WORKLISTS ] = RetentionBatchWorklistsTask::class;
 		$tasks[ RetentionCleanup::TASK_RECLAIM_SPACE ]   = RetentionReclaimSpaceTask::class;
+		$tasks[ RetentionCleanup::TASK_PACKET_STORE ]    = RetentionPacketStoreTask::class;
 
 		return $tasks;
 	}
@@ -306,6 +308,18 @@ class SystemAgentServiceProvider {
 					'default_enabled' => true,
 					'label'           => 'Daily orphaned batch-worklist cleanup',
 				)
+			),
+			// The DataPacket store can hold ~1M files on busy installs. Each
+			// run examines a bounded batch and resumes from a stored cursor,
+			// so an hourly cadence drains a backlog without long passes.
+			RetentionCleanup::TASK_PACKET_STORE    => array(
+				'task_type'          => RetentionCleanup::TASK_PACKET_STORE,
+				'interval'           => 'hourly',
+				'enabled_setting'    => 'retention_packet_store_enabled',
+				'default_enabled'    => true,
+				'label'              => 'Hourly DataPacket store cleanup (bounded, resumable)',
+				'first_run_callback' => 'strtotime',
+				'first_run_arg'      => '+1 hour',
 			),
 			// Runs after the daily delete passes have freed pages. It only
 			// rebuilds tables crossing BOTH free-space thresholds (#3587).

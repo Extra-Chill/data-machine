@@ -2,6 +2,27 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.203.1] - 2026-11-15
+
+### Fixed
+- stop the first packet's engine data leaking into batch children
+
+## [0.203.0] - 2026-11-15
+
+### Added
+- mark inserted links with data-dm-link and keep a cumulative link record
+
+## [0.202.3] - 2026-11-15
+
+### Fixed
+- add bounded cleanup for the DataPacket store
+- purge tool-trace job artifacts in bounded batches
+
+## [0.202.2] - 2026-11-15
+
+### Fixed
+- stop creating a unique Action Scheduler group per resume
+
 ## [0.202.1] - 2026-11-12
 
 ### Fixed

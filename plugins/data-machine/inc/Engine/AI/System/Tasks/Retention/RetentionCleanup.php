@@ -18,7 +18,9 @@ use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\FilesRepository\DirectoryManager;
 use DataMachine\Core\FilesRepository\FileCleanup;
+use DataMachine\Core\FilesRepository\PacketStoreCleanup;
 use DataMachine\Core\JobArtifactSurfaces;
 use DataMachine\Core\JobStatus;
 use DataMachine\Core\Jobs\SchedulerEvidence;
@@ -39,6 +41,19 @@ class RetentionCleanup {
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
 	public const TASK_RECLAIM_SPACE   = 'retention_reclaim_space';
+	public const TASK_PACKET_STORE    = 'retention_packet_store';
+
+	/** Option holding the packet-store sweep resume cursor. */
+	public const PACKET_STORE_CURSOR_OPTION = 'datamachine_packet_store_cleanup_cursor';
+
+	/** Option holding running/last-full-pass packet-store size statistics. */
+	public const PACKET_STORE_STATS_OPTION = 'datamachine_packet_store_cleanup_stats';
+
+	/** Default safety margin (days) added on top of the longest job retention. */
+	private const PACKET_STORE_MARGIN_DAYS = 7;
+
+	/** Rows read per reference-scan query. */
+	private const PACKET_STORE_REFERENCE_PAGE = 200;
 
 	/**
 	 * Most action IDs a single retention window will exclude from re-selection.
@@ -53,6 +68,9 @@ class RetentionCleanup {
 
 	/** Maximum sweep queries per run; leftover orphans are picked up by the next run. */
 	private const BATCH_WORKLIST_SWEEP_MAX_CHUNKS = 20;
+
+	/** Option holding the job-ID cursor for resumable job artifact cleanup. */
+	public const JOB_ARTIFACTS_CURSOR_OPTION = 'datamachine_job_artifacts_cleanup_cursor';
 
 	public static function completedJobsMaxAgeDays(): int {
 		return self::positiveDays( apply_filters( 'datamachine_completed_jobs_max_age_days', 30 ), 30 );
@@ -272,6 +290,35 @@ class RetentionCleanup {
 	}
 
 	/**
+	 * Group rows deleted per orphaned AI-resume group purge batch.
+	 *
+	 * Action Scheduler never deletes `actionscheduler_groups` rows. Before
+	 * #3943 every AI resume continuation got its own group, so installs carry
+	 * up to millions of orphan `data-machine-ai-resume-*` rows. Each batch
+	 * selects at most this many orphans and deletes them by primary key.
+	 *
+	 * @return int Batch size (clamped to 100..50000).
+	 */
+	public static function orphanResumeGroupBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_retention_orphan_group_batch_size', 10000 );
+		return min( 50000, max( 100, $size ) );
+	}
+
+	/**
+	 * Maximum orphan-group purge batches per retention pass.
+	 *
+	 * Bounds a single pass (default 50 x 10k = 500k rows); a pass that hits
+	 * the cap while still deleting enqueues a catch-up run, so a large
+	 * backlog drains over consecutive runs.
+	 *
+	 * @return int Maximum batches (always >= 1).
+	 */
+	public static function orphanResumeGroupMaxBatches(): int {
+		$batches = (int) apply_filters( 'datamachine_retention_orphan_group_max_batches', 50 );
+		return $batches > 0 ? $batches : 50;
+	}
+
+	/**
 	 * Whether to run OPTIMIZE TABLE after a meaningful cleanup pass.
 	 *
 	 * InnoDB does not return space freed by DELETE to the OS; only a table
@@ -333,6 +380,7 @@ class RetentionCleanup {
 			'actionscheduler_actions'     => $wpdb->prefix . 'actionscheduler_actions',
 			'actionscheduler_logs'        => $wpdb->prefix . 'actionscheduler_logs',
 			'actionscheduler_claims'      => $wpdb->prefix . 'actionscheduler_claims',
+			'actionscheduler_groups'      => $wpdb->prefix . 'actionscheduler_groups',
 		);
 	}
 
@@ -1069,7 +1117,7 @@ class RetentionCleanup {
 	 * would be deleted from each table (actions vs logs) under the combined
 	 * per-hook + global retention windows.
 	 *
-	 * @return array{actions: int, logs: int, total: int}
+	 * @return array{actions: int, logs: int, groups: int, total: int}
 	 */
 	public static function countActionSchedulerBreakdown(): array {
 		global $wpdb;
@@ -1139,11 +1187,105 @@ class RetentionCleanup {
 			}
 		}
 
+		$groups_count = self::countOrphanResumeGroups();
+
 		return array(
 			'actions' => $actions_count,
 			'logs'    => $logs_count,
-			'total'   => $actions_count + $logs_count,
+			'groups'  => $groups_count,
+			'total'   => $actions_count + $logs_count + $groups_count,
 		);
+	}
+
+	/**
+	 * Count legacy per-generation AI-resume groups no action references.
+	 */
+	public static function countOrphanResumeGroups(): int {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM %i g LEFT JOIN %i a ON a.group_id = g.group_id WHERE g.slug LIKE %s AND a.action_id IS NULL',
+				$wpdb->prefix . 'actionscheduler_groups',
+				$wpdb->prefix . 'actionscheduler_actions',
+				self::orphanResumeGroupSlugPattern()
+			)
+		);
+	}
+
+	/**
+	 * Purge orphaned legacy AI-resume groups in bounded batches (#3943).
+	 *
+	 * Only `data-machine-ai-resume-<job>-<generation>-<hash>` slugs are
+	 * eligible (the stable `data-machine-ai-resume` group has no trailing
+	 * dash and never matches). A group is deleted only when no action row of
+	 * any status references it; the DELETE re-checks that condition so a
+	 * group gaining an action between select and delete is kept.
+	 *
+	 * @param float $deadline Wall-clock deadline shared with the action pass.
+	 *                        The first batch always runs so the backlog
+	 *                        drains even when action cleanup used the budget.
+	 * @return array{deleted:int,batches:int,hit_limit:bool}
+	 */
+	public static function cleanupOrphanResumeGroups( float $deadline = 0.0 ): array {
+		global $wpdb;
+
+		$groups_table  = $wpdb->prefix . 'actionscheduler_groups';
+		$actions_table = $wpdb->prefix . 'actionscheduler_actions';
+		$batch_size    = self::orphanResumeGroupBatchSize();
+		$max_batches   = self::orphanResumeGroupMaxBatches();
+		$deleted       = 0;
+		$batches       = 0;
+		$hit_limit     = false;
+
+		while ( true ) {
+			if ( $batches >= $max_batches || ( $batches > 0 && $deadline > 0 && microtime( true ) >= $deadline ) ) {
+				$hit_limit = true;
+				break;
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$group_ids = $wpdb->get_col(
+				$wpdb->prepare(
+					'SELECT g.group_id FROM %i g LEFT JOIN %i a ON a.group_id = g.group_id WHERE g.slug LIKE %s AND a.action_id IS NULL LIMIT %d',
+					$groups_table,
+					$actions_table,
+					self::orphanResumeGroupSlugPattern(),
+					$batch_size
+				)
+			);
+			$group_ids = array_values( array_filter( array_map( 'intval', (array) $group_ids ) ) );
+			if ( empty( $group_ids ) ) {
+				break;
+			}
+
+			++$batches;
+			$placeholders = implode( ', ', array_fill( 0, count( $group_ids ), '%d' ) );
+			$params       = array_merge( array( $groups_table ), $group_ids, array( $actions_table, $groups_table ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$affected = $wpdb->query(
+				$wpdb->prepare( "DELETE FROM %i WHERE group_id IN ({$placeholders}) AND NOT EXISTS ( SELECT 1 FROM %i a WHERE a.group_id = %i.group_id )", $params ) // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber
+			);
+			$affected = false !== $affected ? (int) $affected : 0;
+			$deleted += $affected;
+
+			if ( $affected <= 0 || count( $group_ids ) < $batch_size ) {
+				break;
+			}
+		}
+
+		return array(
+			'deleted'   => $deleted,
+			'batches'   => $batches,
+			'hit_limit' => $hit_limit,
+		);
+	}
+
+	/** LIKE pattern matching only legacy per-generation AI-resume group slugs. */
+	private static function orphanResumeGroupSlugPattern(): string {
+		// Equivalent to $wpdb->esc_like(): escape LIKE wildcards in the prefix.
+		return addcslashes( AIConcurrencyBackpressure::LEGACY_RESUME_GROUP_PREFIX, '_%\\' ) . '%';
 	}
 
 	public static function cleanupActionSchedulerActions(): array {
@@ -1155,6 +1297,7 @@ class RetentionCleanup {
 		$max_runtime     = self::actionSchedulerMaxRuntimeSeconds();
 		$actions_table   = $wpdb->prefix . 'actionscheduler_actions';
 		$logs_table      = $wpdb->prefix . 'actionscheduler_logs';
+		$groups_table    = $wpdb->prefix . 'actionscheduler_groups';
 		$started_at      = microtime( true );
 		$deadline        = $started_at + $max_runtime;
 		$iterations_used = 0;
@@ -1202,7 +1345,13 @@ class RetentionCleanup {
 		$logs_deleted    += $ceiling['logs_deleted'];
 		$retained        += $ceiling['retained_for_live_jobs'];
 
-		$total_deleted = $logs_deleted + $actions_deleted;
+		// Action Scheduler never deletes group rows. Drain the legacy
+		// per-generation AI-resume groups (#3943) once their actions are gone.
+		$groups         = self::cleanupOrphanResumeGroups( $deadline );
+		$groups_deleted = $groups['deleted'];
+		$hit_limit      = $hit_limit || $groups['hit_limit'];
+
+		$total_deleted = $logs_deleted + $actions_deleted + $groups_deleted;
 
 		// InnoDB never returns DELETE-freed space to the OS; only a table
 		// rebuild does. Optionally OPTIMIZE the tables when a pass deleted
@@ -1211,17 +1360,19 @@ class RetentionCleanup {
 			array(
 				$actions_table => $actions_deleted,
 				$logs_table    => $logs_deleted,
+				$groups_table  => $groups_deleted,
 			)
 		);
 
 		if ( $total_deleted > 0 || $hit_limit || $retained > 0 ) {
 			self::log(
-				'Scheduled cleanup: deleted old Action Scheduler actions and logs',
+				'Scheduled cleanup: deleted old Action Scheduler actions, logs, and orphan resume groups',
 				array(
 					'actions_deleted'         => $actions_deleted,
 					'logs_deleted'            => $logs_deleted,
 					'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 					'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+					'groups_deleted'          => $groups_deleted,
 					'retained_for_live_jobs'  => $retained,
 					'max_age_days'            => $max_age_days,
 					'batch_size'              => $batch_size,
@@ -1244,6 +1395,7 @@ class RetentionCleanup {
 			'logs_deleted'            => $logs_deleted,
 			'ceiling_actions_deleted' => $ceiling['actions_deleted'],
 			'ceiling_logs_deleted'    => $ceiling['logs_deleted'],
+			'groups_deleted'          => $groups_deleted,
 			'retained_for_live_jobs'  => $retained,
 			'max_age_days'            => $max_age_days,
 			'batch_size'              => $batch_size,
@@ -1730,6 +1882,361 @@ class RetentionCleanup {
 		return $optimized;
 	}
 
+	/**
+	 * Age floor, in days, before an unreferenced packet-store file may be deleted.
+	 *
+	 * The DataPacket store is content-addressed and deduplicated, so a file can
+	 * be shared by many jobs. Retention deletes a packet only when (a) no live
+	 * job or pending batch worklist references its hash (see
+	 * liveReferencedPacketHashes()) AND (b) its mtime — refreshed on every
+	 * dedupe hit by DataPacketStore::store() — is older than this floor.
+	 *
+	 * The default is the longest whole-row job retention window plus a
+	 * margin, so by the time a packet ages out every terminal job that could
+	 * have referenced it has already been purged. The filter can widen the
+	 * floor freely but can never lower it to or below the longest job
+	 * retention window (see packetStoreMinimumAgeDays()).
+	 *
+	 * @return int Age floor in days.
+	 */
+	public static function packetStoreMaxAgeDays(): int {
+		$default = max( self::completedJobsMaxAgeDays(), self::failedJobsMaxAgeDays() ) + self::PACKET_STORE_MARGIN_DAYS;
+		$days    = (int) apply_filters( 'datamachine_packet_store_max_age_days', $default );
+
+		return max( $days, self::packetStoreMinimumAgeDays() );
+	}
+
+	/**
+	 * Hard lower bound for the packet-store age floor.
+	 *
+	 * Strictly longer than every whole-row job retention window, so the age
+	 * floor alone already outlives any terminal job row.
+	 *
+	 * @return int Minimum age floor in days.
+	 */
+	public static function packetStoreMinimumAgeDays(): int {
+		return max( self::completedJobsMaxAgeDays(), self::failedJobsMaxAgeDays() ) + 1;
+	}
+
+	/**
+	 * Maximum packet files examined per sweep run.
+	 *
+	 * Bounds stat() work per run; the stored cursor resumes the next run where
+	 * this one stopped, so a large backlog drains across many runs.
+	 *
+	 * @return int Files per run (clamped to [100, 500000]).
+	 */
+	public static function packetStoreBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_packet_store_batch_size', 25000 );
+
+		return min( 500000, max( 100, $size ) );
+	}
+
+	/**
+	 * Most reference rows (live jobs + batch worklist items) one scan may read.
+	 *
+	 * Past this the scan gives up and the sweep deletes nothing that run:
+	 * an incomplete protected set must never be treated as complete.
+	 *
+	 * @return int Row cap (>= 1).
+	 */
+	public static function packetStoreReferenceScanMaxRows(): int {
+		$rows = (int) apply_filters( 'datamachine_packet_store_reference_scan_max_rows', 100000 );
+
+		return $rows > 0 ? $rows : 100000;
+	}
+
+	/**
+	 * Collect packet hashes still referenced by live work.
+	 *
+	 * Packet refs persist in three places while work can still consume them:
+	 *  - `engine_data` of non-terminal jobs (e.g. step_input_packets), plus
+	 *    failed jobs that still carry engine_data (manual retry can resume
+	 *    from it until the engine_data shed window clears it),
+	 *  - the per-job `data.json` of non-terminal jobs (FileStorage refs),
+	 *  - batch worklist payloads (BatchScheduler stores item packets by ref).
+	 *
+	 * Every 64-hex token in those blobs is treated as a reference. That
+	 * over-protects (checksums also match) but never under-protects, which is
+	 * the safe direction for a destructive sweep.
+	 *
+	 * Fails closed: returns null on any database error or when the scan would
+	 * exceed packetStoreReferenceScanMaxRows(), and the caller then deletes
+	 * nothing.
+	 *
+	 * @return array<string,true>|null Hash => true, or null when unavailable.
+	 */
+	public static function liveReferencedPacketHashes(): ?array {
+		global $wpdb;
+
+		$jobs_table  = $wpdb->prefix . Jobs::TABLE_NAME;
+		$items_table = $wpdb->prefix . \DataMachine\Core\Database\BatchItems\BatchItems::TABLE_NAME;
+		$max_rows    = self::packetStoreReferenceScanMaxRows();
+		$page        = self::PACKET_STORE_REFERENCE_PAGE;
+		$finals      = JobStatus::FINAL_STATUSES;
+		$directory   = new DirectoryManager();
+		$hashes      = array();
+		$rows_read   = 0;
+
+		$status_placeholders = implode( ', ', array_fill( 0, count( $finals ), '%s' ) );
+		$last_job_id         = 0;
+		while ( true ) {
+			$params = array_merge( array( $jobs_table ), $finals, array( JobStatus::FAILED, $last_job_id, $page ) );
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Placeholders generated from a fixed list.
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( "SELECT job_id, pipeline_id, flow_id, engine_data FROM %i WHERE ( status NOT IN ({$status_placeholders}) OR ( status = %s AND engine_data IS NOT NULL AND engine_data != '' ) ) AND job_id > %d ORDER BY job_id ASC LIMIT %d", $params ),
+				ARRAY_A
+			);
+			// phpcs:enable
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'jobs_query_failed', self::lastDbError() );
+				return null;
+			}
+			if ( empty( $rows ) ) {
+				break;
+			}
+
+			foreach ( $rows as $row ) {
+				$last_job_id = (int) $row['job_id'];
+				$hashes     += self::extractPacketHashes( (string) ( $row['engine_data'] ?? '' ) );
+
+				$pipeline_id = (string) ( $row['pipeline_id'] ?? '' );
+				$flow_id     = (string) ( $row['flow_id'] ?? '' );
+				if ( '' !== $pipeline_id && '' !== $flow_id ) {
+					$data_file = $directory->get_job_directory( $pipeline_id, $flow_id, $last_job_id ) . '/data.json';
+					if ( is_file( $data_file ) ) {
+						$contents = file_get_contents( $data_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file read.
+						if ( false === $contents ) {
+							self::packetStoreReferenceScanFailed( 'job_data_unreadable', $data_file );
+							return null;
+						}
+						$hashes += self::extractPacketHashes( $contents );
+					}
+				}
+			}
+
+			$rows_read += count( $rows );
+			if ( $rows_read > $max_rows ) {
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
+			}
+		}
+
+		$last_batch = 0;
+		$last_index = -1;
+		while ( true ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT batch_job_id, item_index, payload FROM %i WHERE batch_job_id > %d OR ( batch_job_id = %d AND item_index > %d ) ORDER BY batch_job_id ASC, item_index ASC LIMIT %d',
+					$items_table,
+					$last_batch,
+					$last_batch,
+					$last_index,
+					$page
+				),
+				ARRAY_A
+			);
+			if ( ! is_array( $rows ) || '' !== self::lastDbError() ) {
+				self::packetStoreReferenceScanFailed( 'batch_items_query_failed', self::lastDbError() );
+				return null;
+			}
+			if ( empty( $rows ) ) {
+				break;
+			}
+
+			foreach ( $rows as $row ) {
+				$last_batch = (int) $row['batch_job_id'];
+				$last_index = (int) $row['item_index'];
+				$hashes    += self::extractPacketHashes( (string) ( $row['payload'] ?? '' ) );
+			}
+
+			$rows_read += count( $rows );
+			if ( $rows_read > $max_rows ) {
+				self::packetStoreReferenceScanFailed( 'reference_scan_cap_exceeded', (string) $max_rows );
+				return null;
+			}
+		}
+
+		return $hashes;
+	}
+
+	/**
+	 * Extract every standalone lowercase 64-hex token from a blob.
+	 *
+	 * @param string $blob JSON or other text.
+	 * @return array<string,true> Hash => true.
+	 */
+	public static function extractPacketHashes( string $blob ): array {
+		if ( '' === $blob || ! preg_match_all( '/(?<![a-f0-9])[a-f0-9]{64}(?![a-f0-9])/', $blob, $matches ) ) {
+			return array();
+		}
+
+		return array_fill_keys( $matches[0], true );
+	}
+
+	/**
+	 * Run one bounded, resumable packet-store sweep.
+	 *
+	 * @return array<string,mixed> Result summary.
+	 */
+	public static function cleanupPacketStore(): array {
+		$max_age_days = self::packetStoreMaxAgeDays();
+		$batch_size   = self::packetStoreBatchSize();
+		$protected    = self::liveReferencedPacketHashes();
+
+		if ( null === $protected ) {
+			return array(
+				'deleted'      => 0,
+				'skipped'      => true,
+				'reason'       => 'reference_scan_unavailable',
+				'max_age_days' => $max_age_days,
+				'batch_size'   => $batch_size,
+			);
+		}
+
+		$cursor = (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' );
+		$result = ( new PacketStoreCleanup() )->sweep( $max_age_days, $protected, $batch_size, $cursor );
+
+		update_option( self::PACKET_STORE_CURSOR_OPTION, $result['cursor'], false );
+		self::recordPacketStoreStats( '' === $cursor, $result );
+
+		if ( $result['deleted'] > 0 || $result['failed'] > 0 ) {
+			self::log(
+				'Scheduled cleanup: deleted unreferenced DataPacket store files',
+				array(
+					'files_deleted'    => $result['deleted'],
+					'bytes_deleted'    => $result['bytes_deleted'],
+					'files_examined'   => $result['examined'],
+					'kept_referenced'  => $result['kept_referenced'],
+					'kept_fresh'       => $result['kept_fresh'],
+					'delete_failures'  => $result['failed'],
+					'removed_dirs'     => $result['removed_dirs'],
+					'pass_complete'    => $result['complete'],
+					'max_age_days'     => $max_age_days,
+					'batch_size'       => $batch_size,
+					'protected_hashes' => count( $protected ),
+				)
+			);
+		}
+
+		return array_merge(
+			$result,
+			array(
+				'skipped'          => false,
+				'max_age_days'     => $max_age_days,
+				'batch_size'       => $batch_size,
+				'protected_hashes' => count( $protected ),
+			)
+		);
+	}
+
+	/**
+	 * Count files the next sweep run would delete (dry run, same bounds).
+	 *
+	 * Walking the whole store is too expensive for a count, so this reports
+	 * eligibility within the next batch from the stored cursor.
+	 *
+	 * @return int Eligible files in the next batch.
+	 */
+	public static function countPacketStoreEligible(): int {
+		$protected = self::liveReferencedPacketHashes();
+		if ( null === $protected ) {
+			return 0;
+		}
+
+		$cursor = (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' );
+		$result = ( new PacketStoreCleanup() )->sweep( self::packetStoreMaxAgeDays(), $protected, self::packetStoreBatchSize(), $cursor, true );
+
+		return $result['eligible'];
+	}
+
+	/**
+	 * Packet-store size statistics recorded by completed sweep passes.
+	 *
+	 * @return array{last_pass:?array{completed_at:int,files:int,bytes:int},pass_files:int,pass_bytes:int,cursor:string}
+	 */
+	public static function packetStoreStats(): array {
+		$stats = get_option( self::PACKET_STORE_STATS_OPTION, array() );
+		$stats = is_array( $stats ) ? $stats : array();
+
+		$last_pass = null;
+		if ( is_array( $stats['last_pass'] ?? null ) ) {
+			$last_pass = array(
+				'completed_at' => (int) ( $stats['last_pass']['completed_at'] ?? 0 ),
+				'files'        => (int) ( $stats['last_pass']['files'] ?? 0 ),
+				'bytes'        => (int) ( $stats['last_pass']['bytes'] ?? 0 ),
+			);
+		}
+
+		return array(
+			'last_pass'  => $last_pass,
+			'pass_files' => (int) ( $stats['pass_files'] ?? 0 ),
+			'pass_bytes' => (int) ( $stats['pass_bytes'] ?? 0 ),
+			'cursor'     => (string) get_option( self::PACKET_STORE_CURSOR_OPTION, '' ),
+		);
+	}
+
+	/**
+	 * Accumulate retained file/byte totals across a pass for `retention show`.
+	 *
+	 * @param bool  $pass_started Whether this run began a fresh pass.
+	 * @param array $result       Sweep result.
+	 */
+	private static function recordPacketStoreStats( bool $pass_started, array $result ): void {
+		$stats = get_option( self::PACKET_STORE_STATS_OPTION, array() );
+		$stats = is_array( $stats ) ? $stats : array();
+		if ( $pass_started ) {
+			$stats['pass_files'] = 0;
+			$stats['pass_bytes'] = 0;
+		}
+
+		$stats['pass_files'] = (int) ( $stats['pass_files'] ?? 0 ) + $result['kept_referenced'] + $result['kept_fresh'] + $result['failed'];
+		$stats['pass_bytes'] = (int) ( $stats['pass_bytes'] ?? 0 ) + $result['bytes_kept'];
+
+		if ( $result['complete'] ) {
+			$stats['last_pass']  = array(
+				'completed_at' => time(),
+				'files'        => $stats['pass_files'],
+				'bytes'        => $stats['pass_bytes'],
+			);
+			$stats['pass_files'] = 0;
+			$stats['pass_bytes'] = 0;
+		}
+
+		update_option( self::PACKET_STORE_STATS_OPTION, $stats, false );
+	}
+
+	/**
+	 * Current wpdb error string, read fresh on every call so static analysis
+	 * does not narrow it across consecutive queries.
+	 *
+	 * @return string Last database error, or '' when the last query succeeded.
+	 * @phpstan-impure
+	 */
+	private static function lastDbError(): string {
+		global $wpdb;
+		return (string) $wpdb->last_error;
+	}
+
+	/**
+	 * Log a failed reference scan and signal fail-closed.
+	 *
+	 * @param string $reason Machine reason.
+	 * @param string $detail Detail for operators.
+	 */
+	private static function packetStoreReferenceScanFailed( string $reason, string $detail ): void {
+		do_action(
+			'datamachine_log',
+			'warning',
+			'DataPacket store cleanup skipped: live reference scan unavailable',
+			array(
+				'reason' => $reason,
+				'detail' => $detail,
+			)
+		);
+	}
+
 	public static function countStaleClaims(): int {
 		global $wpdb;
 
@@ -1897,15 +2404,42 @@ class RetentionCleanup {
 		return ( new FileCleanup() )->count_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, self::jobArtifactsMaxAgeDays() );
 	}
 
+	/**
+	 * Delete expired job artifacts in one bounded, resumable batch.
+	 *
+	 * Covers every artifact JobArtifacts writes (tool traces and transcripts
+	 * included) plus legacy unscoped files already on disk. Each run visits at
+	 * most jobArtifactsCleanupBatchSize() job directories within
+	 * jobArtifactsCleanupMaxRuntimeSeconds(), then stores a job-ID cursor so the
+	 * next run resumes where this one stopped. A completed sweep wraps the
+	 * cursor back to 0.
+	 */
 	public static function cleanupJobArtifacts(): array {
 		$retention_days = self::jobArtifactsMaxAgeDays();
-		$deleted        = ( new FileCleanup() )->cleanup_old_job_artifacts( JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE, $retention_days );
+		$batch_size     = self::jobArtifactsCleanupBatchSize();
+		$max_runtime    = self::jobArtifactsCleanupMaxRuntimeSeconds();
+		$cursor         = max( 0, (int) get_option( self::JOB_ARTIFACTS_CURSOR_OPTION, 0 ) );
+		$batch          = ( new FileCleanup() )->cleanup_job_artifacts_batch(
+			JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
+			$retention_days,
+			$batch_size,
+			$cursor,
+			microtime( true ) + $max_runtime
+		);
 
-		if ( $deleted > 0 ) {
+		update_option( self::JOB_ARTIFACTS_CURSOR_OPTION, (int) $batch['next_cursor'], false );
+
+		$deleted = (int) $batch['deleted'];
+		if ( $deleted > 0 || (int) $batch['dirs_removed'] > 0 ) {
 			self::log(
-				'Scheduled cleanup: deleted old scoped job artifacts',
+				'Scheduled cleanup: deleted old job artifacts',
 				array(
 					'artifacts_deleted' => $deleted,
+					'dirs_scanned'      => (int) $batch['dirs_scanned'],
+					'dirs_removed'      => (int) $batch['dirs_removed'],
+					'cursor'            => $cursor,
+					'next_cursor'       => (int) $batch['next_cursor'],
+					'sweep_complete'    => (bool) $batch['complete'],
 					'retention_scope'   => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 					'max_age_days'      => $retention_days,
 				)
@@ -1913,10 +2447,35 @@ class RetentionCleanup {
 		}
 
 		return array(
-			'deleted'         => (int) $deleted,
+			'deleted'         => $deleted,
+			'dirs_scanned'    => (int) $batch['dirs_scanned'],
+			'dirs_removed'    => (int) $batch['dirs_removed'],
+			'cursor'          => $cursor,
+			'next_cursor'     => (int) $batch['next_cursor'],
+			'sweep_complete'  => (bool) $batch['complete'],
+			'batch_size'      => $batch_size,
 			'retention_scope' => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 			'max_age_days'    => $retention_days,
 		);
+	}
+
+	/**
+	 * Maximum job artifact directories visited per cleanup run.
+	 *
+	 * Daily runs must comfortably outpace artifact generation (busy installs
+	 * write several thousand job directories per day) while staying bounded.
+	 */
+	public static function jobArtifactsCleanupBatchSize(): int {
+		$size = (int) apply_filters( 'datamachine_job_artifacts_cleanup_batch_size', 100000 );
+		return $size > 0 ? $size : 100000;
+	}
+
+	/**
+	 * Maximum wall-clock seconds a single job artifact cleanup run may spend.
+	 */
+	public static function jobArtifactsCleanupMaxRuntimeSeconds(): int {
+		$seconds = (int) apply_filters( 'datamachine_job_artifacts_cleanup_max_runtime_seconds', 60 );
+		return $seconds > 0 ? $seconds : 60;
 	}
 
 	public static function countChatSessions(): int {

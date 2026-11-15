@@ -15,6 +15,15 @@ namespace DataMachineEvents\Tests\Unit;
 class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 
 	/**
+	 * Future event date so the upsert past-event guard never rejects fixtures.
+	 *
+	 * @param int $offset Days after the base offset.
+	 */
+	private function future_date( int $offset ): string {
+		return gmdate( 'Y-m-d', strtotime( '+' . ( 30 + $offset ) . ' days' ) );
+	}
+
+	/**
 	 * Event Details block attributes of a stored event.
 	 *
 	 * @param int $post_id Event post ID.
@@ -36,7 +45,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => $name . ' 6-9pm',
 				'venue'     => 'Title Noise Venue ' . uniqid(),
-				'startDate' => '2026-11-12',
+				'startDate' => $this->future_date( 1 ),
 				'startTime' => '18:00',
 			)
 		);
@@ -53,7 +62,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => $name . ' $20',
 				'venue'     => 'Title Noise Venue ' . uniqid(),
-				'startDate' => '2026-11-13',
+				'startDate' => $this->future_date( 2 ),
 				'startTime' => '19:00',
 			)
 		);
@@ -70,7 +79,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => $name . ' 7pm-10pm',
 				'venue'     => 'Title Noise Venue ' . uniqid(),
-				'startDate' => '2026-11-14',
+				'startDate' => $this->future_date( 3 ),
 				'startTime' => '19:00',
 				'endTime'   => '22:30',
 			)
@@ -88,7 +97,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => $name . ' 10pm-1am',
 				'venue'     => 'Title Noise Venue ' . uniqid(),
-				'startDate' => '2026-11-15',
+				'startDate' => $this->future_date( 4 ),
 				'startTime' => '22:00',
 			)
 		);
@@ -103,7 +112,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 		$name     = 'Dave Landeo ' . uniqid();
 		$occasion = array(
 			'venue'     => 'Title Noise Venue ' . uniqid(),
-			'startDate' => '2026-11-16',
+			'startDate' => $this->future_date( 5 ),
 			'startTime' => '18:30',
 		);
 
@@ -121,7 +130,7 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => '$uicideboy$ - Grey Day Tour',
 				'venue'     => 'Title Noise Venue ' . uniqid(),
-				'startDate' => '2026-11-17',
+				'startDate' => $this->future_date( 6 ),
 				'startTime' => '20:00',
 			)
 		);
@@ -141,12 +150,12 @@ class EventUpsertTitleNoiseTest extends EventUpsertTestCase {
 			array(
 				'title'     => $artist . ' at ' . $venue . ' — Phoenix',
 				'venue'     => $venue,
-				'startDate' => '2026-11-15',
+				'startDate' => $this->future_date( 4 ),
 				'startTime' => '19:00',
 				'engine'    => new \DataMachine\Core\EngineData(
 					array(
 						'title'     => $artist,
-						'startDate' => '2026-11-15',
+						'startDate' => $this->future_date( 4 ),
 						'startTime' => '19:00',
 					),
 					0

@@ -344,7 +344,7 @@ class StepLifecycleHandler {
 		}
 
 		$evidence = self::claimEvidence( $flow_step_config, array_keys( $retained ), $completed, $released, $omitted, $exhausted );
-		$engine   = array_replace_recursive( $engine, $seed_data );
+		$engine   = PacketEngineData::applySeed( $engine, $seed_data );
 		if ( isset( $seed_data['packet_fanout_transfer'] ) ) {
 			$engine['packet_fanout_transfer'] = $seed_data['packet_fanout_transfer'];
 		}

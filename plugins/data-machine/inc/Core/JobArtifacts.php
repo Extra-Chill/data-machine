@@ -422,13 +422,14 @@ class JobArtifacts {
 		$session = ConversationStoreFactory::get()->get_session( $session_id );
 		if ( ! $session ) {
 			$payload = array(
-				'schema_version' => self::TRANSCRIPT_ARTIFACT_SCHEMA_VERSION,
-				'artifact_type'  => 'transcript',
-				'artifact_ref'   => $this->artifact_ref( $job_id, 'transcript', $session_id ),
-				'source'         => $this->artifact_source( $job_id, $job, $agent, array( 'session_id' => $session_id ) ),
-				'missing'        => true,
-				'bounded'        => true,
-				'redacted'       => true,
+				'schema_version'  => self::TRANSCRIPT_ARTIFACT_SCHEMA_VERSION,
+				'artifact_type'   => 'transcript',
+				'artifact_ref'    => $this->artifact_ref( $job_id, 'transcript', $session_id ),
+				'source'          => $this->artifact_source( $job_id, $job, $agent, array( 'session_id' => $session_id ) ),
+				'missing'         => true,
+				'bounded'         => true,
+				'redacted'        => true,
+				'retention_scope' => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 			);
 
 			return $this->with_payload_hash( $payload );
@@ -466,6 +467,7 @@ class JobArtifacts {
 			'completed'        => isset( $metadata['completed'] ) ? (bool) $metadata['completed'] : null,
 			'bounded'          => true,
 			'redacted'         => true,
+			'retention_scope'  => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 		);
 
 		return $this->with_payload_hash( $this->filter_empty( $payload ) );
@@ -496,6 +498,7 @@ class JobArtifacts {
 			'entries'         => $entries,
 			'bounded'         => true,
 			'redacted'        => true,
+			'retention_scope' => JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE,
 		);
 
 		return $this->with_payload_hash( $payload );
@@ -633,7 +636,7 @@ class JobArtifacts {
 		}
 
 		$upload_dir = wp_upload_dir();
-		$base_root  = (string) ( $upload_dir['basedir'] ?? '' );
+		$base_root  = (string) $upload_dir['basedir'];
 		if ( '' === trim( $base_root ) ) {
 			return '';
 		}

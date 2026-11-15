@@ -38,6 +38,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Content analytics | Category-level engagement audits, editorial triage flags, and GSC opportunity ranking | Abilities |
 | Media hygiene | Detect and safely remove orphan files and unreferenced attachments | Ability, WP-CLI |
 | Cloudflare Turnstile | List and inspect Turnstile widgets; add/remove allowed hostnames with a dry-run-by-default, read-modify-write update | Abilities, WP-CLI |
+| Hetzner Cloud | Read-only servers, backup freshness (stale/disabled detection), volumes, and server metrics; backup status feeds system health and the wake briefing | Abilities, WP-CLI |
 | Agent context | Generate concise intent-based `AGENTS.md` routing for business integrations | Data Machine memory composition |
 
 ## Abilities
@@ -98,6 +99,17 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/cloudflare-turnstile-list-widgets` | List every Turnstile widget on the configured account |
 | `datamachine/cloudflare-turnstile-get-widget` | Get one Turnstile widget by sitekey |
 | `datamachine/cloudflare-turnstile-update-widget-domains` | Add/remove hostnames from a widget's allowed domains via read-modify-write; dry-run by default |
+
+### Hetzner Cloud
+
+Read-only. See [docs/hetzner.md](docs/hetzner.md) for setup (read-only project token in the `datamachine_hetzner_config` network option).
+
+| Ability | Purpose |
+|---|---|
+| `datamachine/hetzner-list-servers` | List servers (status, type, location, backup window, protection), or get one by ID |
+| `datamachine/hetzner-backup-status` | Per-server last backup time, age, stale flag (> 26h, filterable), count, and backups-disabled detection |
+| `datamachine/hetzner-list-volumes` | List volumes (size, server attachment, location) |
+| `datamachine/hetzner-server-metrics` | CPU / disk / network metrics for a time window with per-series summaries |
 
 ## AI Tools
 
@@ -258,6 +270,15 @@ wp datamachine media delete-unused --limit=50 --apply
 wp datamachine cloudflare turnstile list-widgets
 wp datamachine cloudflare turnstile get-widget <sitekey>
 wp datamachine cloudflare turnstile update-domains <sitekey> --add=<hostnames> --remove=<hostnames> --apply
+```
+
+### Hetzner Cloud
+
+```bash
+wp datamachine hetzner list-servers [<server_id>]
+wp datamachine hetzner backup-status [<server_id>] [--stale-hours=<hours>]
+wp datamachine hetzner list-volumes
+wp datamachine hetzner server-metrics <server_id> [--type=cpu,disk,network] [--hours=<n>]
 ```
 
 `update-domains` is a dry run unless `--apply` is provided. `--add` and `--remove` accept comma-separated hostnames. See [Cloudflare Turnstile](docs/cloudflare-turnstile.md).

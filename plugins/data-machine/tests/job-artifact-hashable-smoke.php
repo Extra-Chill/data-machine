@@ -284,6 +284,7 @@ $assert_true( 'runtime_tool' === $tool_trace_artifact['entries'][1]['source'], '
 $assert_true( 'runtime-req-1' === $tool_trace_artifact['entries'][1]['metadata']['runtime_request']['id'], 'runtime request metadata is preserved' );
 $assert_true( 'ok' === $tool_trace_artifact['entries'][1]['metadata']['runtime_result']['status'], 'runtime result metadata is preserved' );
 $assert_true( isset( $tool_trace_artifact['sha256'] ) && 64 === strlen( $tool_trace_artifact['sha256'] ), 'tool trace artifact has stable payload hash' );
+$assert_true( \DataMachine\Core\JobArtifactSurfaces::DEFAULT_RETENTION_SCOPE === ( $tool_trace_artifact['retention_scope'] ?? '' ), 'tool trace artifact declares the default retention scope' );
 $assert_true( isset( $tool_trace_artifact['entries'][1]['entry_sha256'] ) && 64 === strlen( $tool_trace_artifact['entries'][1]['entry_sha256'] ), 'tool trace entries have stable hashes' );
 $assert_true( false === str_contains( $artifact_json, 'runtime-secret' ), 'tool trace artifact redacts metadata secrets' );
 

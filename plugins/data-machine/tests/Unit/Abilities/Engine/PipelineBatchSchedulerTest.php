@@ -415,6 +415,32 @@ class PipelineBatchSchedulerTest extends WP_UnitTestCase {
 		$this->assertEquals( 2, $parent_engine['batch_scheduled'] );
 	}
 
+	public function test_children_do_not_inherit_first_packets_seeded_engine_data(): void {
+		$parent_id = $this->create_parent_job();
+		$first     = $this->make_data_packet( 'Placeholder' );
+		$second    = $this->make_data_packet( 'Real Show' );
+		$first['metadata']['_engine_data']  = array( 'title' => 'Placeholder', 'status_flag' => 'cancelled' );
+		$second['metadata']['_engine_data'] = array( 'title' => 'Real Show' );
+
+		// The source step seeds the parent with the first packet's engine data.
+		$engine = \DataMachine\Core\PacketEngineData::applySeed( datamachine_get_engine_data( $parent_id ), $first['metadata']['_engine_data'] );
+		datamachine_set_engine_data( $parent_id, $engine );
+
+		$scheduler = new PipelineBatchScheduler();
+		$scheduler->fanOut( $parent_id, 'step_abc_123', array( $first, $second ), $engine );
+		$scheduler->processChunk( $parent_id );
+
+		$by_title = array();
+		foreach ( $this->jobs_db->get_children( $parent_id ) as $child ) {
+			$child_engine                       = datamachine_get_engine_data( (int) $child['job_id'] );
+			$by_title[ $child_engine['title'] ] = $child_engine;
+		}
+
+		$this->assertSame( 'cancelled', $by_title['Placeholder']['status_flag'] );
+		$this->assertArrayNotHasKey( 'status_flag', $by_title['Real Show'] );
+		$this->assertArrayNotHasKey( \DataMachine\Core\PacketEngineData::SEED_RESTORE_KEY, $by_title['Real Show'] );
+	}
+
 	public function test_scheduled_chunk_reads_persisted_batch_state_when_cache_is_stale(): void {
 		$parent_id = $this->create_parent_job();
 		$engine    = $this->make_engine_snapshot( $parent_id );

@@ -13,6 +13,7 @@
  * 5. Firebase Realtime Database (firebaseio.com)
  * 6. ICS Feed (direct .ics files, Tockify, Google Calendar exports)
  * 7. Embedded Calendar (Google Calendar iframe → ICS feed)
+ * 7b. PatronManager / Salesforce PatronTicket (ticket page remoting → fetchEvents)
  * 8. Squarespace context (Static.SQUARESPACE_CONTEXT)
  * 9. Craftpeak/Arryved (craft brewery CMS with Label theme)
  * 10. Dusk.fm/BeatGig venue calendar (data-beatgig-embed → __NEXT_DATA__)
@@ -70,6 +71,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\RedRocksE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FreshtixExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\FirebaseExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EmbeddedCalendarExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PatronManagerExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SpotHopperExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VenuePilotExtractor;
@@ -95,6 +97,7 @@ use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\ShowtimeE
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\EventbriteExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\GenericHtmlEventsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\PlainGigListExtractor;
+use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\MonthHeadingGigListExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SofarSoundsExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\VisionExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquareOnlineExtractor;
@@ -183,6 +186,9 @@ class UniversalWebScraper extends EventImportHandler {
 			new FirebaseExtractor(),
 			new IcsExtractor(),
 			new EmbeddedCalendarExtractor(),
+			// Before Squarespace etc.: venue sites often show posters only and
+			// link to the PatronManager ticket app, which has the real data.
+			new PatronManagerExtractor(),
 			new SquarespaceExtractor(),
 			new CraftpeakExtractor(),
 			new DuskFmExtractor(),
@@ -216,6 +222,8 @@ class UniversalWebScraper extends EventImportHandler {
 			new MicrodataExtractor(),
 			// Most generic heuristic: only after every platform extractor declines.
 			new PlainGigListExtractor(),
+			// Plain "M/D title time" lines under month headings: last resort before HTML fallback.
+			new MonthHeadingGigListExtractor(),
 		);
 	}
 
