@@ -868,4 +868,77 @@ class EventTaxonomyAssignerTest extends WP_UnitTestCase {
 		$this->assertSame( array( 'Vacations' ), $this->assigner->mergeLineup( array( 'Vacations' ), null ) );
 		$this->assertSame( array( 'Vacations' ), $this->assigner->mergeLineup( array( 'Vacations' ), 'TWEN' ) );
 	}
+	public function test_split_lineup_handles_pipe_and_comma_festival_bill(): void {
+		$this->assertSame(
+			array( 'Fitz and the Tantrums', "Plain White T's", 'Vundabar', 'Beach Weather', 'Hotel Fiction', 'Dani Rucker', 'Rohna' ),
+			$this->assigner->splitLineup( "Fitz and the Tantrums | Plain White T's | Vundabar, Beach Weather | Hotel Fiction | Dani Rucker | Rohna" )
+		);
+		$this->assertSame(
+			array( 'Deerhoof', 'Sol', 'Iron Lung', 'J.R.C.G.' ),
+			$this->assigner->splitLineup( 'Deerhoof, Sol, Iron Lung, J.R.C.G.' )
+		);
+	}
+
+	public function test_split_lineup_handles_billing_separators(): void {
+		$this->assertSame( array( 'Headliner', 'Opener' ), $this->assigner->splitLineup( 'Headliner w/ Opener' ) );
+		$this->assertSame( array( 'Headliner', 'Opener' ), $this->assigner->splitLineup( 'Headliner / Opener' ) );
+		$this->assertSame( array( 'Headliner', 'Guest' ), $this->assigner->splitLineup( 'Headliner feat. Guest' ) );
+		$this->assertSame( array( 'Headliner', 'Guest' ), $this->assigner->splitLineup( 'Headliner (ft. Guest)' ) );
+		$this->assertSame( array( 'Headliner', 'Opener' ), $this->assigner->splitLineup( 'Headliner + Opener' ) );
+		$this->assertSame( array( 'Headliner', 'Opener' ), $this->assigner->splitLineup( 'Headliner &#124; Opener' ) );
+	}
+
+	public function test_split_lineup_keeps_ampersand_and_and_names_whole(): void {
+		foreach ( array( 'Richy Mitch & The Coal Miners', 'Fitz and the Tantrums', 'Shevonne & The Force', 'Florence + The Machine', 'AC/DC' ) as $name ) {
+			$this->assertSame( array( $name ), $this->assigner->splitLineup( $name ), $name );
+		}
+	}
+
+	public function test_split_lineup_trims_dedupes_and_drops_empties(): void {
+		$this->assertSame( array( 'Vundabar', 'Rohna' ), $this->assigner->splitLineup( ' Vundabar ,, | vundabar | Rohna , ' ) );
+		$this->assertSame( array(), $this->assigner->splitLineup( ' , | ' ) );
+	}
+
+	public function test_normalize_artists_splits_strings_but_not_array_elements(): void {
+		$this->assertSame( array( 'Vundabar', 'Rohna' ), $this->assigner->normalizeArtists( 'Vundabar | Rohna' ) );
+		$this->assertSame( array( 'Earth, Wind & Fire' ), $this->assigner->normalizeArtists( array( 'Earth, Wind & Fire' ) ) );
+	}
+
+	public function test_assign_artists_tags_lineup_when_selection_is_skip(): void {
+		$post_id  = $this->make_event_post();
+		$existing = wp_insert_term( 'Existing Lineup Artist ' . uniqid(), 'artist' );
+		$this->assertNotWPError( $existing );
+		$name = get_term( $existing['term_id'], 'artist' )->name;
+
+		$result = $this->assigner->assignArtists( $post_id, array( $name, 'New Lineup Artist ' . uniqid() ), 'skip', new \DataMachine\Core\WordPress\TaxonomyHandler() );
+
+		$this->assertTrue( $result['success'] );
+		$ids = wp_get_object_terms( $post_id, 'artist', array( 'fields' => 'ids' ) );
+		$this->assertCount( 2, $ids );
+		$this->assertContains( $existing['term_id'], $ids, 'Existing artist term must be reused, not duplicated.' );
+	}
+
+	public function test_assign_artists_merges_explicit_selection(): void {
+		$post_id  = $this->make_event_post();
+		$selected = wp_insert_term( 'Selected Artist ' . uniqid(), 'artist' );
+		$this->assertNotWPError( $selected );
+		$handler = new \DataMachine\Core\WordPress\TaxonomyHandler();
+
+		$this->assigner->assignArtists( $post_id, array( 'Lineup Artist ' . uniqid() ), (string) $selected['term_id'], $handler );
+		$ids = wp_get_object_terms( $post_id, 'artist', array( 'fields' => 'ids' ) );
+		$this->assertCount( 2, $ids );
+		$this->assertContains( $selected['term_id'], $ids );
+
+		$slug_post = $this->make_event_post();
+		$this->assigner->assignArtists( $slug_post, array(), get_term( $selected['term_id'], 'artist' )->slug, $handler );
+		$this->assertSame( array( $selected['term_id'] ), wp_get_object_terms( $slug_post, 'artist', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_assign_artists_without_lineup_or_selection_leaves_terms(): void {
+		$post_id = $this->make_event_post();
+		wp_set_object_terms( $post_id, 'Manual Artist ' . uniqid(), 'artist' );
+
+		$this->assertNull( $this->assigner->assignArtists( $post_id, array( '' ), 'skip', new \DataMachine\Core\WordPress\TaxonomyHandler() ) );
+		$this->assertCount( 1, wp_get_object_terms( $post_id, 'artist', array( 'fields' => 'ids' ) ) );
+	}
 }

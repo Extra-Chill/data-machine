@@ -16,6 +16,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Selection\SelectionMode;
+use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachineEvents\Steps\Upsert\Events\Venue;
 use DataMachineEvents\Steps\Upsert\Events\Promoter;
 use DataMachineEvents\Core\VenueParameterProvider;
@@ -42,11 +43,14 @@ class EventTaxonomyAssigner {
 	 * Billing suffixes are aliases only when the base artist already exists.
 	 * Explicit term IDs are preserved, including in festival lineups.
 	 *
+	 * A string is treated as a billed lineup and split with splitLineup().
+	 * Array elements are already individual artists and are not split.
+	 *
 	 * @param string|array $artists Artist names or term IDs.
 	 * @return array Normalized artist identifiers.
 	 */
 	public function normalizeArtists( $artists ): array {
-		$artists = is_array( $artists ) ? $artists : explode( ',', (string) $artists );
+		$artists = is_array( $artists ) ? $artists : $this->splitLineup( (string) $artists );
 
 		return array_map(
 			function ( $artist ) {
@@ -66,6 +70,99 @@ class EventTaxonomyAssigner {
 				return $name;
 			},
 			$artists
+		);
+	}
+
+	/**
+	 * Split a billed lineup string into individual artist names.
+	 *
+	 * Splits on the separators real lineups use: `,`, `|`, ` / `, ` w/ `,
+	 * `feat.` / `ft.` / `featuring`, and ` + ` (except `+ The ...`, as in
+	 * "Florence + The Machine"). `&` and `and` never split, so names such as
+	 * "Fitz and the Tantrums" or "Richy Mitch & The Coal Miners" stay whole.
+	 * Parts are trimmed, empties dropped, and duplicates removed
+	 * case-insensitively in billing order.
+	 *
+	 * @param string $lineup Lineup string, e.g. "A | B, C".
+	 * @return string[] Artist names.
+	 */
+	public function splitLineup( string $lineup ): array {
+		$lineup = TextNormalization::decode_entities( $lineup );
+		$parts  = preg_split(
+			'~\s*[,|]\s*|\s+/\s+|\s+w/\s*|(?:\s+|\s*\()(?:feat\.?|ft\.|featuring)\s+|\s+\+\s+(?!the\b)~iu',
+			$lineup
+		);
+
+		$names = array();
+		foreach ( false === $parts ? array( $lineup ) : $parts as $part ) {
+			$part = trim( $part );
+			// A trailing ")" left over from "(feat. X)" is not part of the name.
+			if ( str_ends_with( $part, ')' ) && ! str_contains( $part, '(' ) ) {
+				$part = rtrim( $part, ') ' );
+			}
+			if ( '' === $part ) {
+				continue;
+			}
+			$key = function_exists( 'mb_strtolower' ) ? mb_strtolower( $part ) : strtolower( $part );
+			if ( ! isset( $names[ $key ] ) ) {
+				$names[ $key ] = $part;
+			}
+		}
+
+		return array_values( $names );
+	}
+
+	/**
+	 * Assign every lineup artist to an event, merged with any pre-selection.
+	 *
+	 * The payload lineup is assigned whatever the flow's artist selection is,
+	 * including unset or `skip`: a billed performer is always an artist of
+	 * the event. A pre-selected term (ID, name, or slug) is added on top.
+	 * Terms are resolved by ID, name, then slug before any is created.
+	 * Without lineup or pre-selection the existing terms are left untouched.
+	 *
+	 * @param int             $post_id          Event post ID.
+	 * @param array           $artists          Normalized artist names or term IDs.
+	 * @param mixed           $selection        Flow `taxonomy_artist_selection` value.
+	 * @param TaxonomyHandler $taxonomy_handler Core taxonomy handler.
+	 * @return array|null Assignment result, or null when nothing was assigned.
+	 */
+	public function assignArtists( int $post_id, array $artists, $selection, TaxonomyHandler $taxonomy_handler ): ?array {
+		$post_type = get_post_type( $post_id );
+		if ( ! taxonomy_exists( 'artist' ) || ! $post_type || ! is_object_in_taxonomy( $post_type, 'artist' ) ) {
+			return null;
+		}
+
+		$artists = array_values( array_filter( $artists, static fn( $artist ) => is_int( $artist ) || '' !== trim( (string) $artist ) ) );
+		$result  = null;
+		if ( ! empty( $artists ) ) {
+			$result = $taxonomy_handler->assignTaxonomy( $post_id, 'artist', $artists );
+		}
+
+		if ( ! SelectionMode::isPreSelected( $selection ) ) {
+			return $result;
+		}
+
+		$term = is_numeric( $selection ) ? get_term( (int) $selection, 'artist' ) : get_term_by( 'name', (string) $selection, 'artist' );
+		if ( ! $term instanceof \WP_Term && ! is_numeric( $selection ) ) {
+			$term = get_term_by( 'slug', (string) $selection, 'artist' );
+		}
+		if ( ! $term instanceof \WP_Term ) {
+			return $result;
+		}
+
+		$set = wp_set_object_terms( $post_id, array( (int) $term->term_id ), 'artist', null !== $result );
+		if ( is_wp_error( $set ) ) {
+			return array(
+				'success' => false,
+				'error'   => $set->get_error_message(),
+			);
+		}
+
+		return $result ?? array(
+			'success'  => true,
+			'taxonomy' => 'artist',
+			'terms'    => array( $term->name ),
 		);
 	}
 
