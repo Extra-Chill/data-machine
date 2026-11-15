@@ -1038,7 +1038,7 @@ class Venue_Taxonomy {
 	 *
 	 * @param string $venue_name Venue name to resolve.
 	 * @param array  $venue_data Incoming venue metadata.
-	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[]}
+	 * @return array{term: \WP_Term|null, ambiguous: bool, conflict: bool, conflicting_term_ids: int[], matched_via?: string}
 	 */
 	private static function find_venue_by_qualified_name( string $venue_name, array $venue_data ): array {
 		$no_match = array(
@@ -1206,11 +1206,12 @@ class Venue_Taxonomy {
 			$is_variant = false;
 			if ( ! $core_match && $allow_variants ) {
 				// Cheap shared-word prefilter before the regex-heavy comparison:
-				// the venue taxonomy holds tens of thousands of terms.
+				// the venue taxonomy holds tens of thousands of terms. Substring,
+				// not whole-word, so glued names ("roadrunnerboston") pass.
 				$existing_normalized = $normalized_by_term[ (int) $venue->term_id ] ?? self::normalize_venue_name_for_matching( $venue->name );
 				$shares_word         = false;
 				foreach ( $incoming_tokens as $token ) {
-					if ( strlen( $token ) >= 3 && str_contains( ' ' . $existing_normalized . ' ', ' ' . $token . ' ' ) ) {
+					if ( strlen( $token ) >= 4 && str_contains( $existing_normalized, $token ) ) {
 						$shares_word = true;
 						break;
 					}

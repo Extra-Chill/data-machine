@@ -56,7 +56,18 @@ class VenueTaxonomyListingVariantTest extends WP_UnitTestCase {
 
 		$identity = Venue_Taxonomy::resolve_venue_identity( $incoming, array( 'city' => $city, 'state' => $state ) );
 
-		$this->assertSame( 'matched', $identity['match_status'], "{$incoming} should resolve to {$stored}." );
+		$stored_term = get_term( $term_id, 'venue' );
+		$diagnostic  = wp_json_encode(
+			array(
+				'identity'    => array( $identity['match_status'], $identity['term_id'], $identity['matched_via'] ),
+				'stored_name' => $stored_term ? $stored_term->name : null,
+				'stored_key'  => Venue_Taxonomy::venue_variant_key( $stored_term ? $stored_term->name : $stored, $state, $city ),
+				'incoming'    => Venue_Taxonomy::venue_variant_key( $incoming, $state, $city ),
+				'variants'    => Venue_Taxonomy::venue_names_are_variants( $incoming, $stored_term ? $stored_term->name : $stored, $state, $state, $city, $city ),
+				'term_count'  => count( $this->termIds() ),
+			)
+		);
+		$this->assertSame( 'matched', $identity['match_status'], "{$incoming} should resolve to {$stored}: {$diagnostic}" );
 		$this->assertSame( $term_id, (int) $identity['term_id'] );
 	}
 
