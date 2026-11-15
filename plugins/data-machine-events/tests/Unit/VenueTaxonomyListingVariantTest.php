@@ -86,10 +86,10 @@ class VenueTaxonomyListingVariantTest extends WP_UnitTestCase {
 	}
 
 	public function test_several_same_city_variants_do_not_guess_or_strand_the_event(): void {
-		$upstairs   = $this->venue( 'Middle East - Upstairs', 'Cambridge', 'MA' );
-		$downstairs = $this->venue( 'Middle East - Downstairs', 'Cambridge', 'MA' );
+		$upstairs   = $this->venue( 'Paradise Rock Club presented by Citizens', 'Boston', 'MA' );
+		$downstairs = $this->venue( 'Paradise Rock Club (Boston)', 'Boston', 'MA' );
 
-		$result = Venue_Taxonomy::find_or_create_venue( 'Middle East', array( 'city' => 'Cambridge', 'state' => 'MA' ) );
+		$result = Venue_Taxonomy::find_or_create_venue( 'Paradise Rock Club', array( 'city' => 'Boston', 'state' => 'MA' ) );
 
 		// Neither room is guessed, and the event still gets a venue term.
 		$this->assertNotSame( 'ambiguous', $result['match_status'] );
