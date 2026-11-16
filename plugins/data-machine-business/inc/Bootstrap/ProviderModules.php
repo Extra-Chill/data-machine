@@ -116,6 +116,15 @@ final class ProviderModules {
 				}
 			),
 			new ProviderModule(
+				'exa-search',
+				array_merge( $abilities, $tools ),
+				array( 'datamachine/exa-search', 'tool:exa_search' ),
+				static function (): void {
+					new \DataMachineBusiness\Abilities\Search\ExaSearchAbility();
+					new \DataMachineBusiness\Tools\ExaSearch();
+				}
+			),
+			new ProviderModule(
 				'google-search-console',
 				array_merge( $abilities, $tools ),
 				array( 'datamachine/google-search-console', 'datamachine/gsc-opportunity', 'tool:google_search_console', 'rest:datamachine/v1/analytics/gsc' ),
