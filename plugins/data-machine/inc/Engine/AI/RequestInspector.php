@@ -331,6 +331,7 @@ class RequestInspector {
 			'projected_packet_json_bytes'     => self::jsonBytes( $projected_packets ),
 			'conversation_packet_json_bytes'  => self::jsonBytes( $projected_packets ),
 			'directives'                      => $assembled['directive_breakdown'],
+			'skipped_directives'              => $assembled['skipped_directives'] ?? array(),
 			'tool_count'                      => count( $structured_tools ),
 			'largest_tools'                   => $this->largestTools( $structured_tools ),
 			'request'                         => $request,

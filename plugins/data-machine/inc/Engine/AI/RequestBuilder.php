@@ -1008,7 +1008,8 @@ class RequestBuilder {
 		$applied_directives  = $request['applied_directives'] ?? array();
 		$directive_metadata  = $request['directive_metadata'] ?? array();
 		$directive_breakdown = $request['directive_breakdown'] ?? array();
-		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'] );
+		$skipped_directives  = $request['skipped_directives'] ?? array();
+		unset( $request['applied_directives'], $request['directive_metadata'], $request['directive_breakdown'], $request['skipped_directives'] );
 		$request['model'] = $model;
 
 		return array(
@@ -1018,6 +1019,7 @@ class RequestBuilder {
 			'directive_metadata'    => $directive_metadata,
 			'directive_breakdown'   => $directive_breakdown,
 			'suppressed_directives' => $suppressed,
+			'skipped_directives'    => $skipped_directives,
 		);
 	}
 

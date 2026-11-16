@@ -48,6 +48,16 @@ class PromptBuilder {
 	private array $tools = array();
 
 	/**
+	 * Directive classes already reported as skipped during this PHP request.
+	 *
+	 * Keeps `_doing_it_wrong()` and error logging to once per class per request,
+	 * even when many prompts are built.
+	 *
+	 * @var array<string,bool>
+	 */
+	private static array $reported_skipped_directives = array();
+
+	/**
 	 * Set initial messages.
 	 *
 	 * Adapter callers may pass legacy role/content arrays, but the builder stores
@@ -114,7 +124,9 @@ class PromptBuilder {
 	 * @param array  $modes    Agent modes ('pipeline', 'chat', etc.).
 	 * @param string $provider AI provider name.
 	 * @param array  $payload  Request payload.
-	 * @return array Request array with messages, tools, applied_directives, directive_metadata, and directive_breakdown.
+	 * @return array Request array with messages, tools, applied_directives, directive_metadata,
+	 *               directive_breakdown, and skipped_directives (registered directives that could
+	 *               not run, each with class, name, priority, and reason).
 	 */
 	public function buildDetailed( array $modes, string $provider, array $payload = array() ): array {
 		$modes = self::normalizeModes( $modes );
@@ -133,6 +145,7 @@ class PromptBuilder {
 		$applied_directives    = array();
 		$directive_metadata    = array();
 		$directive_breakdown   = array();
+		$skipped_directives    = array();
 		$validation_context    = is_array( $payload['directive_context'] ?? null )
 			? $payload['directive_context']
 			: array();
@@ -148,23 +161,27 @@ class PromptBuilder {
 
 			$stepId          = $payload['step_id'] ?? null;
 			$directive_class = is_string( $directive ) ? $directive : ( is_object( $directive ) ? get_class( $directive ) : '' );
-			if ( '' === $directive_class ) {
-				continue;
-			}
 			$namespace_pos  = strrpos( $directive_class, '\\' );
 			$directive_name = false === $namespace_pos ? $directive_class : substr( $directive_class, $namespace_pos + 1 );
 
-			$outputs = null;
+			$skip_reason = self::getSkipReason( $directive, $directive_class );
+			if ( null !== $skip_reason ) {
+				$skipped_directives[] = array(
+					'class'    => $directive_class,
+					'name'     => $directive_name,
+					'priority' => $priority,
+					'reason'   => $skip_reason,
+				);
+				self::reportSkippedDirective( $directive_class, $skip_reason );
+				continue;
+			}
 
-			if ( is_string( $directive ) && class_exists( $directive ) && is_subclass_of( $directive, DirectiveInterface::class ) ) {
+			if ( is_string( $directive ) ) {
 				$outputs = $directive::get_outputs( $provider, $this->tools, $stepId, $payload );
-			} elseif ( is_object( $directive ) && $directive instanceof DirectiveInterface ) {
+			} else {
 				$outputs = $directive->get_outputs( $provider, $this->tools, $stepId, $payload );
 			}
 
-			if ( null === $outputs ) {
-				continue;
-			}
 
 			if ( ! empty( $outputs ) ) {
 				$directive_outputs = array_merge( $directive_outputs, $outputs );
@@ -195,7 +212,89 @@ class PromptBuilder {
 			'applied_directives'  => $applied_directives,
 			'directive_metadata'  => $directive_metadata,
 			'directive_breakdown' => $directive_breakdown,
+			'skipped_directives'  => $skipped_directives,
 		);
+	}
+
+	/**
+	 * Determine why a registered directive cannot run, if at all.
+	 *
+	 * @param mixed  $directive       Registered directive (class name or instance).
+	 * @param string $directive_class Resolved class name ('' when unresolvable).
+	 * @return string|null Machine-readable skip reason, or null when the directive is runnable.
+	 */
+	private static function getSkipReason( $directive, string $directive_class ): ?string {
+		if ( '' === $directive_class ) {
+			return 'invalid_registration';
+		}
+
+		if ( is_object( $directive ) ) {
+			return $directive instanceof DirectiveInterface ? null : 'missing_interface';
+		}
+
+		if ( ! class_exists( $directive_class ) ) {
+			return 'class_not_found';
+		}
+
+		if ( ! is_subclass_of( $directive_class, DirectiveInterface::class ) ) {
+			return 'missing_interface';
+		}
+
+		return null;
+	}
+
+	/**
+	 * Report a skipped directive loudly, once per class per PHP request.
+	 *
+	 * @param string $directive_class Directive class name ('' when unresolvable).
+	 * @param string $reason          Machine-readable skip reason.
+	 */
+	private static function reportSkippedDirective( string $directive_class, string $reason ): void {
+		$key = $directive_class . '|' . $reason;
+		if ( isset( self::$reported_skipped_directives[ $key ] ) ) {
+			return;
+		}
+		self::$reported_skipped_directives[ $key ] = true;
+
+		$label = '' === $directive_class ? '(unresolvable directive registration)' : $directive_class;
+		switch ( $reason ) {
+			case 'class_not_found':
+				$detail = 'the class does not exist or is not loaded';
+				break;
+			case 'missing_interface':
+				$detail = sprintf( 'it does not implement %s', DirectiveInterface::class );
+				break;
+			default:
+				$detail = 'the registration is not a class name or object';
+				break;
+		}
+
+		$message = sprintf(
+			'Directive %1$s was registered but skipped because %2$s. It will not contribute to AI prompts.',
+			$label,
+			$detail
+		);
+
+		if ( function_exists( '_doing_it_wrong' ) ) {
+			_doing_it_wrong(
+				self::class . '::buildDetailed',
+				function_exists( 'esc_html' ) ? esc_html( $message ) : $message, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped when available.
+				'0.203.1'
+			);
+		}
+
+		if ( function_exists( 'do_action' ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'PromptBuilder: registered directive skipped',
+				array(
+					'class'   => $directive_class,
+					'reason'  => $reason,
+					'message' => $message,
+				)
+			);
+		}
 	}
 
 	/**
