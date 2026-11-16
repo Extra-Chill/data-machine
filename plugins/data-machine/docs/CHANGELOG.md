@@ -2,6 +2,13 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.203.2] - 2026-11-16
+
+### Fixed
+- make skipped prompt directives loud
+- release sync-run claims and terminate job on bounded stop
+- match source-rejected processed items by rejection evidence
+
 ## [0.203.1] - 2026-11-15
 
 ### Fixed
