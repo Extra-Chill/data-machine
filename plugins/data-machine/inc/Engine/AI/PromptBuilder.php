@@ -161,8 +161,8 @@ class PromptBuilder {
 
 			$stepId          = $payload['step_id'] ?? null;
 			$directive_class = is_string( $directive ) ? $directive : ( is_object( $directive ) ? get_class( $directive ) : '' );
-			$namespace_pos  = strrpos( $directive_class, '\\' );
-			$directive_name = false === $namespace_pos ? $directive_class : substr( $directive_class, $namespace_pos + 1 );
+			$namespace_pos   = strrpos( $directive_class, '\\' );
+			$directive_name  = false === $namespace_pos ? $directive_class : substr( $directive_class, $namespace_pos + 1 );
 
 			$skip_reason = self::getSkipReason( $directive, $directive_class );
 			if ( null !== $skip_reason ) {
@@ -181,7 +181,6 @@ class PromptBuilder {
 			} else {
 				$outputs = $directive->get_outputs( $provider, $this->tools, $stepId, $payload );
 			}
-
 
 			if ( ! empty( $outputs ) ) {
 				$directive_outputs = array_merge( $directive_outputs, $outputs );
