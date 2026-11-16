@@ -105,6 +105,7 @@ $expected_ids   = array(
 	'google-drive',
 	'pagespeed',
 	'google-search',
+	'exa-search',
 	'google-search-console',
 	'slack',
 	'discord',
@@ -129,7 +130,7 @@ foreach ( $expected_ids as $provider_id ) {
 	);
 }
 
-$sendy = $actual_modules[18]->capabilities();
+$sendy = $actual_modules[ array_search( 'sendy', $actual_ids, true ) ]->capabilities();
 assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',
