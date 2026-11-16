@@ -26,7 +26,20 @@ defined( 'ABSPATH' ) || exit;
  */
 class ProcessedItemsCommand extends BaseCommand {
 
-	private const DEFAULT_SOURCE_REJECTED_JOB_STATUS = 'agent_skipped - source-rejected';
+	/**
+	 * Legacy job status written before AI rejections finished as completed_no_items.
+	 */
+	private const LEGACY_SOURCE_REJECTED_JOB_STATUS = 'agent_skipped - source-rejected';
+
+	/**
+	 * Step result value FetchItemDispositionTool records for reject_source.
+	 */
+	private const SOURCE_REJECTED_STEP_RESULT = 'source_rejected';
+
+	/**
+	 * Engine data key FetchItemDispositionTool records the rejection reason under.
+	 */
+	private const SOURCE_REJECTION_REASON_KEY = 'source_rejection_reason';
 
 	/**
 	 * Audit processed items vs actual published posts per flow.
@@ -529,7 +542,11 @@ class ProcessedItemsCommand extends BaseCommand {
 	}
 
 	/**
-	 * List processed items whose owning job ended with a source-rejected skip.
+	 * List processed items whose owning job rejected its source.
+	 *
+	 * Matches persisted rejection evidence by default: legacy
+	 * `agent_skipped - source-rejected` jobs and current reject_source jobs
+	 * (typically `completed_no_items`) that recorded a source_rejection_reason.
 	 *
 	 * ## OPTIONS
 	 *
@@ -549,10 +566,14 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * : Only include items processed on or before this date (YYYY-MM-DD or datetime).
 	 *
 	 * [--job-status=<status>]
-	 * : Owning job status to match. Defaults to agent_skipped - source-rejected.
-	 * ---
-	 * default: agent_skipped - source-rejected
-	 * ---
+	 * : Match owning jobs by this exact status instead of persisted source-rejection
+	 * evidence. By default, jobs match when they carry the legacy
+	 * `agent_skipped - source-rejected` status or a `reject_source` step result
+	 * with a non-empty `source_rejection_reason`, so empty `completed_no_items`
+	 * runs without rejection evidence are excluded.
+	 *
+	 * [--reason=<substring>]
+	 * : Only match jobs whose recorded source_rejection_reason contains this substring.
 	 *
 	 * [--limit=<count>]
 	 * : Maximum rows to display. Default: 50.
@@ -575,6 +596,7 @@ class ProcessedItemsCommand extends BaseCommand {
 	 *
 	 *     wp datamachine processed-items source-rejected --pipeline=12
 	 *     wp datamachine processed-items source-rejected --source-type=slack --after=2026-05-01 --format=json
+	 *     wp datamachine processed-items source-rejected --flow=34 --reason=location
 	 *
 	 * @subcommand source-rejected
 	 */
@@ -645,7 +667,10 @@ class ProcessedItemsCommand extends BaseCommand {
 	}
 
 	/**
-	 * Clear processed rows whose owning job ended with a source-rejected skip.
+	 * Clear processed rows whose owning job rejected its source.
+	 *
+	 * Uses the same persisted rejection evidence as `source-rejected`, so
+	 * empty `completed_no_items` runs without a rejection are left alone.
 	 *
 	 * ## OPTIONS
 	 *
@@ -665,10 +690,14 @@ class ProcessedItemsCommand extends BaseCommand {
 	 * : Only clear items processed on or before this date (YYYY-MM-DD or datetime).
 	 *
 	 * [--job-status=<status>]
-	 * : Owning job status to match. Defaults to agent_skipped - source-rejected.
-	 * ---
-	 * default: agent_skipped - source-rejected
-	 * ---
+	 * : Match owning jobs by this exact status instead of persisted source-rejection
+	 * evidence. By default, jobs match when they carry the legacy
+	 * `agent_skipped - source-rejected` status or a `reject_source` step result
+	 * with a non-empty `source_rejection_reason`, so empty `completed_no_items`
+	 * runs without rejection evidence are excluded.
+	 *
+	 * [--reason=<substring>]
+	 * : Only match jobs whose recorded source_rejection_reason contains this substring.
 	 *
 	 * [--dry-run]
 	 * : Show matching counts and example identifiers without deleting.
@@ -680,6 +709,7 @@ class ProcessedItemsCommand extends BaseCommand {
 	 *
 	 *     wp datamachine processed-items clear-source-rejected --pipeline=12 --dry-run
 	 *     wp datamachine processed-items clear-source-rejected --source-type=slack --after=2026-05-01 --yes
+	 *     wp datamachine processed-items clear-source-rejected --flow=34 --reason=irrelevant_location --dry-run
 	 *
 	 * @subcommand clear-source-rejected
 	 */
@@ -757,24 +787,48 @@ class ProcessedItemsCommand extends BaseCommand {
 	private function build_source_rejected_query_parts( array $assoc_args, string $processed_table, string $jobs_table ): array {
 		global $wpdb;
 
-		$job_status  = (string) ( $assoc_args['job-status'] ?? self::DEFAULT_SOURCE_REJECTED_JOB_STATUS );
+		$job_status  = isset( $assoc_args['job-status'] ) ? trim( (string) $assoc_args['job-status'] ) : '';
+		$reason      = isset( $assoc_args['reason'] ) ? trim( (string) $assoc_args['reason'] ) : '';
 		$pipeline_id = $assoc_args['pipeline'] ?? null;
 		$flow_id     = $assoc_args['flow'] ?? null;
 		$source_type = $assoc_args['source-type'] ?? null;
 		$after       = $assoc_args['after'] ?? null;
 		$before      = $assoc_args['before'] ?? null;
 
-		$parsed_status = JobStatus::fromString( $job_status );
-		$where_parts   = array( 'pi.status = %s' );
-		$values        = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED );
-		if ( $parsed_status->hasReason() ) {
-			$where_parts[] = '(j.status = %s OR (j.status = %s AND j.engine_data LIKE %s))';
-			$values[]      = $job_status;
-			$values[]      = $parsed_status->getBaseStatus();
-			$values[]      = '%' . $wpdb->esc_like( '"job_status_reason":"' . $parsed_status->getReason() . '"' ) . '%';
+		$where_parts = array( 'pi.status = %s' );
+		$values      = array( $processed_table, $jobs_table, ProcessedItems::STATUS_PROCESSED );
+
+		if ( '' !== $job_status ) {
+			// Explicit operator override: match the owning job status only.
+			$parsed_status = JobStatus::fromString( $job_status );
+			if ( $parsed_status->hasReason() ) {
+				$where_parts[] = '(j.status = %s OR (j.status = %s AND (j.status_reason = %s OR j.engine_data LIKE %s)))';
+				$values[]      = $job_status;
+				$values[]      = $parsed_status->getBaseStatus();
+				$values[]      = $parsed_status->getReason();
+				$values[]      = '%' . $wpdb->esc_like( '"job_status_reason":"' . $parsed_status->getReason() . '"' ) . '%';
+			} else {
+				$where_parts[] = 'j.status = %s';
+				$values[]      = $parsed_status->getBaseStatus();
+			}
 		} else {
-			$where_parts[] = 'j.status = %s';
-			$values[]      = $parsed_status->getBaseStatus();
+			// Default: match persisted source-rejection evidence, not a status string.
+			// Legacy runs finished as `agent_skipped - source-rejected`; current AI
+			// reject_source runs finish as completed_no_items with the rejection
+			// recorded in engine_data step_results (see FetchItemDispositionTool).
+			$legacy        = JobStatus::fromString( self::LEGACY_SOURCE_REJECTED_JOB_STATUS );
+			$where_parts[] = '(j.status = %s OR (j.status = %s AND (j.status_reason = %s OR j.engine_data LIKE %s)) OR j.engine_data LIKE %s OR j.engine_data REGEXP %s)';
+			$values[]      = self::LEGACY_SOURCE_REJECTED_JOB_STATUS;
+			$values[]      = $legacy->getBaseStatus();
+			$values[]      = $legacy->getReason();
+			$values[]      = '%' . $wpdb->esc_like( '"job_status_reason":"' . $legacy->getReason() . '"' ) . '%';
+			$values[]      = '%' . $wpdb->esc_like( '"result":"' . self::SOURCE_REJECTED_STEP_RESULT . '"' ) . '%';
+			$values[]      = '"' . self::SOURCE_REJECTION_REASON_KEY . '":"[^"]';
+		}
+
+		if ( '' !== $reason ) {
+			$where_parts[] = 'j.engine_data REGEXP %s';
+			$values[]      = '"' . self::SOURCE_REJECTION_REASON_KEY . '":"[^"]*' . self::regex_literal( self::json_string_fragment( $reason ) );
 		}
 
 		if ( null !== $pipeline_id && '' !== (string) $pipeline_id ) {
@@ -809,17 +863,46 @@ class ProcessedItemsCommand extends BaseCommand {
 	}
 
 	/**
+	 * Encode a value the way it appears inside a JSON string in engine_data.
+	 *
+	 * @param string $value Raw value.
+	 * @return string JSON string body without surrounding quotes.
+	 */
+	private static function json_string_fragment( string $value ): string {
+		$encoded = wp_json_encode( $value );
+		if ( ! is_string( $encoded ) || strlen( $encoded ) < 2 ) {
+			return $value;
+		}
+
+		return substr( $encoded, 1, -1 );
+	}
+
+	/**
+	 * Escape a literal for use inside a SQL REGEXP pattern.
+	 *
+	 * Every character outside [A-Za-z0-9_ ] is backslash-escaped, which both
+	 * MySQL (ICU) and MariaDB (PCRE) treat as a literal.
+	 *
+	 * @param string $value Literal text.
+	 * @return string Regex-safe pattern fragment.
+	 */
+	private static function regex_literal( string $value ): string {
+		return (string) preg_replace( '/[^A-Za-z0-9_ ]/', '\\\\$0', $value );
+	}
+
+	/**
 	 * Describe source-rejected filters for operator-facing output.
 	 *
 	 * @param array $assoc_args CLI associative args.
 	 * @return string Human-readable filter description.
 	 */
 	private function describe_source_rejected_filters( array $assoc_args ): string {
-		$parts = array(
-			'job-status=' . ( (string) ( $assoc_args['job-status'] ?? self::DEFAULT_SOURCE_REJECTED_JOB_STATUS ) ),
+		$job_status = isset( $assoc_args['job-status'] ) ? trim( (string) $assoc_args['job-status'] ) : '';
+		$parts      = array(
+			'' !== $job_status ? 'job-status=' . $job_status : 'evidence=source-rejection',
 		);
 
-		foreach ( array( 'pipeline', 'flow', 'source-type', 'after', 'before' ) as $key ) {
+		foreach ( array( 'reason', 'pipeline', 'flow', 'source-type', 'after', 'before' ) as $key ) {
 			if ( isset( $assoc_args[ $key ] ) && '' !== (string) $assoc_args[ $key ] ) {
 				$parts[] = $key . '=' . (string) $assoc_args[ $key ];
 			}
