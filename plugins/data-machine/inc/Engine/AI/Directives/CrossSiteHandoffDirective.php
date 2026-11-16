@@ -24,7 +24,7 @@ namespace DataMachine\Engine\AI\Directives;
 
 defined( 'ABSPATH' ) || exit;
 
-class CrossSiteHandoffDirective {
+class CrossSiteHandoffDirective implements DirectiveInterface {
 
 	/**
 	 * Produce a handoff note when the current host differs from the last-seen host.

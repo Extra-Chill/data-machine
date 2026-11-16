@@ -36,7 +36,7 @@ use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
-class CallerContextDirective {
+class CallerContextDirective implements DirectiveInterface {
 
 	/**
 	 * Produce directive outputs from the authenticated caller context.
