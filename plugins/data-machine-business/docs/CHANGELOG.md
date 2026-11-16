@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.24.0] - 2026-11-16
+
+### Added
+- add Exa web search ability and tool
+
 ## [0.23.0] - 2026-11-14
 
 ### Added
