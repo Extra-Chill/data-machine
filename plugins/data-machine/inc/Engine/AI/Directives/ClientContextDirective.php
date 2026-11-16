@@ -21,7 +21,7 @@ namespace DataMachine\Engine\AI\Directives;
 
 defined( 'ABSPATH' ) || exit;
 
-class ClientContextDirective {
+class ClientContextDirective implements DirectiveInterface {
 
 	/**
 	 * Render a scalar or structured value for directive output.
