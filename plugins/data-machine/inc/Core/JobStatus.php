@@ -110,6 +110,18 @@ class JobStatus {
 	}
 
 	/**
+	 * Create a cancelled status with optional reason.
+	 *
+	 * Cancelled is terminal but neither success nor failure: claims are
+	 * released (not completed) and flow failure health is not affected.
+	 *
+	 * @param ?string $reason Optional cancellation reason for compound status.
+	 */
+	public static function cancelled( ?string $reason = null ): self {
+		return new self( self::CANCELLED, $reason );
+	}
+
+	/**
 	 * Create a completed_no_items status.
 	 */
 	public static function completedNoItems(): self {

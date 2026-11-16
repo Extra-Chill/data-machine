@@ -114,7 +114,8 @@ class SyncRunner {
 			if ( ! empty( $step_result['error'] ) ) {
 				$packet['errors'][]       = $step_result['error'];
 				$packet['stopped_reason'] = 'error';
-				$this->db_jobs->complete_job( $job_id, JobStatus::FAILED . ' - sync_runner_error' );
+				$this->db_jobs->complete_job( $job_id, JobStatus::failed( 'sync_runner_error' )->toString() );
+				$this->releaseJobClaims( $job_id );
 				break;
 			}
 
@@ -342,11 +343,58 @@ class SyncRunner {
 	}
 
 	/**
-	 * Mark a non-terminal bounded stop on the debug job.
+	 * Terminate the debug job after a bounded stop and release its claims.
+	 *
+	 * A bounded stop means downstream steps never ran, so nothing committed
+	 * the items the job claimed. The job ends cancelled (terminal, but not a
+	 * failure for flow health) and every claim it owns is released so the
+	 * next real run can pick the items up again.
+	 *
+	 * @param int    $job_id Debug job ID.
+	 * @param string $reason Bounded stop reason (e.g. sync_runner_max_items).
 	 */
-	private function markBoundedStop( int $job_id, string $status ): void {
-		if ( $job_id > 0 ) {
-			$this->db_jobs->update_job_status( $job_id, $status );
+	private function markBoundedStop( int $job_id, string $reason ): void {
+		if ( $job_id <= 0 ) {
+			return;
+		}
+
+		$status = JobStatus::cancelled( $reason )->toString();
+		if ( ! $this->db_jobs->complete_job( $job_id, $status ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Sync runner could not terminate bounded debug job.',
+				array(
+					'job_id' => $job_id,
+					'status' => $status,
+				)
+			);
+		}
+
+		$this->releaseJobClaims( $job_id );
+	}
+
+	/**
+	 * Release every in-flight item claim owned by the debug job.
+	 *
+	 * Terminal non-success transitions already release claims inside the job
+	 * transaction; this is the explicit backstop for claims left behind when
+	 * that transition is rejected or the job was already terminal.
+	 *
+	 * @param int $job_id Debug job ID.
+	 */
+	private function releaseJobClaims( int $job_id ): void {
+		if ( $job_id <= 0 ) {
+			return;
+		}
+
+		if ( false === $this->db_processed_items->release_claims_for_job( $job_id ) ) {
+			do_action(
+				'datamachine_log',
+				'error',
+				'Sync runner could not release item claims for debug job.',
+				array( 'job_id' => $job_id )
+			);
 		}
 	}
 
