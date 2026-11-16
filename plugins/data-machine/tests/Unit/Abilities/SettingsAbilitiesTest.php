@@ -301,6 +301,32 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$this->assertEquals( 'manual', $first_interval['value'] );
 	}
 
+	public function test_tool_config_secrets_are_masked_unless_explicitly_requested(): void {
+		$tools = static function ( $tools ) {
+			$tools['cli_secret_test'] = array( 'label' => 'CLI secret test', 'requires_config' => true );
+			return $tools;
+		};
+		$fields = static function ( $fields, $tool_id ) {
+			return 'cli_secret_test' === $tool_id ? array( 'api_key' => array( 'type' => 'password' ) ) : $fields;
+		};
+		$config = static function ( $config, $tool_id ) {
+			return 'cli_secret_test' === $tool_id ? array( 'api_key' => 'private-credential-value' ) : $config;
+		};
+		add_filter( 'datamachine_tools', $tools );
+		add_filter( 'datamachine_get_tool_config_fields', $fields, 10, 2 );
+		add_filter( 'datamachine_get_tool_config', $config, 10, 2 );
+		try {
+			$masked = $this->settings_abilities->executeGetToolConfig( array( 'tool_id' => 'cli_secret_test' ) );
+			$this->assertNotSame( 'private-credential-value', $masked['config']['api_key'] );
+			$revealed = $this->settings_abilities->executeGetToolConfig( array( 'tool_id' => 'cli_secret_test', 'show_secrets' => true ) );
+			$this->assertSame( 'private-credential-value', $revealed['config']['api_key'] );
+		} finally {
+			remove_filter( 'datamachine_tools', $tools );
+			remove_filter( 'datamachine_get_tool_config_fields', $fields );
+			remove_filter( 'datamachine_get_tool_config', $config );
+		}
+	}
+
 	public function test_get_tool_config_returns_error_for_missing_tool_id(): void {
 		$result = $this->settings_abilities->executeGetToolConfig(
 			array( 'tool_id' => '' )

@@ -53,6 +53,7 @@ final class CliServiceProvider {
 			'datamachine batch'            => \DataMachine\Cli\Commands\BatchCommand::class,
 			'datamachine image'            => \DataMachine\Cli\Commands\ImageCommand::class,
 			'datamachine auth'             => \DataMachine\Cli\Commands\AuthCommand::class,
+			'datamachine tools'            => \DataMachine\Cli\Commands\ToolsCommand::class,
 			'datamachine email'            => \DataMachine\Cli\Commands\EmailCommand::class,
 			'datamachine system'           => \DataMachine\Cli\Commands\SystemCommand::class,
 			'datamachine handlers'         => \DataMachine\Cli\Commands\HandlersCommand::class,
