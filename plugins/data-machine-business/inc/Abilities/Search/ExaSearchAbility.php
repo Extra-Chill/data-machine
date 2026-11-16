@@ -37,13 +37,36 @@ class ExaSearchAbility {
 			'type'                 => 'object',
 			'required'             => array( 'query' ),
 			'properties'           => array(
-				'query'                => array( 'type' => 'string', 'description' => 'Search query.' ),
-				'num_results'          => array( 'type' => 'integer', 'default' => 5, 'description' => 'Number of results, clamped to 1-25.' ),
-				'type'                 => array( 'type' => 'string', 'enum' => array( 'auto', 'neural', 'keyword', 'fast' ), 'default' => 'auto' ),
-				'include_domains'      => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-				'exclude_domains'      => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-				'start_published_date' => array( 'type' => 'string', 'description' => 'Earliest publication date (ISO date).' ),
-				'include_text'         => array( 'type' => 'boolean', 'default' => true ),
+				'query'                => array(
+					'type'        => 'string',
+					'description' => 'Search query.',
+				),
+				'num_results'          => array(
+					'type'        => 'integer',
+					'default'     => 5,
+					'description' => 'Number of results, clamped to 1-25.',
+				),
+				'type'                 => array(
+					'type'    => 'string',
+					'enum'    => array( 'auto', 'neural', 'keyword', 'fast' ),
+					'default' => 'auto',
+				),
+				'include_domains'      => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'exclude_domains'      => array(
+					'type'  => 'array',
+					'items' => array( 'type' => 'string' ),
+				),
+				'start_published_date' => array(
+					'type'        => 'string',
+					'description' => 'Earliest publication date (ISO date).',
+				),
+				'include_text'         => array(
+					'type'    => 'boolean',
+					'default' => true,
+				),
 			),
 			'additionalProperties' => false,
 		);
@@ -81,7 +104,10 @@ class ExaSearchAbility {
 				'permission_callback' => array( self::class, 'can_search' ),
 				'meta'                => array(
 					'show_in_rest' => true,
-					'annotations'  => array( 'readonly' => true, 'idempotent' => true ),
+					'annotations'  => array(
+						'readonly'   => true,
+						'idempotent' => true,
+					),
 				),
 			)
 		);
@@ -122,7 +148,10 @@ class ExaSearchAbility {
 			'numResults' => max( 1, min( self::MAX_RESULTS, (int) ( $input['num_results'] ?? 5 ) ) ),
 			'type'       => $type,
 		);
-		foreach ( array( 'include_domains' => 'includeDomains', 'exclude_domains' => 'excludeDomains' ) as $key => $api_key ) {
+		foreach ( array(
+			'include_domains' => 'includeDomains',
+			'exclude_domains' => 'excludeDomains',
+		) as $key => $api_key ) {
 			if ( ! empty( $input[ $key ] ) ) {
 				$body[ $api_key ] = array_values( array_map( 'sanitize_text_field', (array) $input[ $key ] ) );
 			}
@@ -136,11 +165,15 @@ class ExaSearchAbility {
 
 		$options = array(
 			'timeout' => 30,
-			'headers' => array( 'x-api-key' => $config['api_key'], 'Content-Type' => 'application/json', 'Accept' => 'application/json' ),
+			'headers' => array(
+				'x-api-key'    => $config['api_key'],
+				'Content-Type' => 'application/json',
+				'Accept'       => 'application/json',
+			),
 			'body'    => wp_json_encode( $body ),
 			'context' => 'Exa Search',
 		);
-		$result = is_callable( self::$http_post )
+		$result  = is_callable( self::$http_post )
 			? (array) call_user_func( self::$http_post, self::ENDPOINT, $options )
 			: HttpClient::post( self::ENDPOINT, $options );
 
@@ -170,6 +203,10 @@ class ExaSearchAbility {
 			}
 			$results[] = $row;
 		}
-		return array( 'success' => true, 'query' => $query, 'results' => $results );
+		return array(
+			'success' => true,
+			'query'   => $query,
+			'results' => $results,
+		);
 	}
 }

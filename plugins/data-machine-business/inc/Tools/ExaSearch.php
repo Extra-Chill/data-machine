@@ -31,7 +31,11 @@ class ExaSearch extends BaseTool {
 
 		$count             = count( $result['results'] );
 		$result['message'] = "SEARCH COMPLETE: Found {$count} results for \"{$result['query']}\".";
-		return array( 'success' => true, 'data' => $result, 'tool_name' => 'exa_search' );
+		return array(
+			'success'   => true,
+			'data'      => $result,
+			'tool_name' => 'exa_search',
+		);
 	}
 
 	public function getToolDefinition(): array {
@@ -68,15 +72,24 @@ class ExaSearch extends BaseTool {
 		}
 		$api_key = sanitize_text_field( $config_data['api_key'] ?? '' );
 		if ( empty( $api_key ) ) {
-			return array( 'success' => false, 'error' => __( 'API Key is required', 'data-machine-business' ) );
+			return array(
+				'success' => false,
+				'error'   => __( 'API Key is required', 'data-machine-business' ),
+			);
 		}
 
 		$stored_config               = get_site_option( 'datamachine_search_config', array() );
 		$stored_config['exa_search'] = array( 'api_key' => $api_key );
 		if ( update_site_option( 'datamachine_search_config', $stored_config ) ) {
-			return array( 'success' => true, 'message' => __( 'Exa Search configuration saved successfully', 'data-machine-business' ) );
+			return array(
+				'success' => true,
+				'message' => __( 'Exa Search configuration saved successfully', 'data-machine-business' ),
+			);
 		}
-		return array( 'success' => false, 'error' => __( 'Failed to save configuration', 'data-machine-business' ) );
+		return array(
+			'success' => false,
+			'error'   => __( 'Failed to save configuration', 'data-machine-business' ),
+		);
 	}
 
 	public function get_config_fields( $fields = array(), $tool_id = '' ) {
