@@ -251,16 +251,16 @@ wp datamachine-socials instagram reply-comment <comment_id> "Reply text"
 wp datamachine-socials instagram status
 ```
 
-## Chat Tools
+## Abilities
 
-| Tool Name | Description |
-|-----------|-------------|
-| `read_instagram` | List posts, get details, get comments |
-| `update_instagram` | Edit caption, delete, archive |
-| `delete_instagram` | Dedicated delete |
-| `reply_instagram_comment` | Reply to a comment |
-| `publish_reel_instagram` | Publish a video Reel |
-| `publish_story_instagram` | Publish an ephemeral Story |
+| Ability | Description |
+|---------|-------------|
+| `datamachine/instagram-read` | List posts, get details, get comments, read DM conversations |
+| `datamachine/instagram-update` | Edit caption, archive |
+| `datamachine/instagram-delete` | Delete media |
+| `datamachine/instagram-comment-reply` | Reply to a comment |
+| `datamachine/instagram-publish` | Publish image, carousel, Reel (`media_kind=reel`), or Story (`media_kind=story`) |
+| `datamachine/instagram-message-send` | Send a direct message |
 
 ## Error Handling
 

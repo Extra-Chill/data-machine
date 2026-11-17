@@ -209,14 +209,9 @@ if ( defined( 'WP_CLI' ) ) {
 }
 
 /**
- * Register chat tools.
- *
- * Chat tools extend BaseTool from core and self-register via filters.
- * Only load when Data Machine core's AI engine is available.
+ * Register platform WP-CLI commands.
  */
-function datamachine_socials_load_chat_tools() {
-	$bootstrap = \DataMachineSocials\Bootstrap\PlatformBootstrap::instance();
-	$bootstrap->register_tools();
-	$bootstrap->register_cli();
+function datamachine_socials_register_platform_cli() {
+	\DataMachineSocials\Bootstrap\PlatformBootstrap::instance()->register_cli();
 }
-add_action( 'plugins_loaded', 'datamachine_socials_load_chat_tools', 25 );
+add_action( 'plugins_loaded', 'datamachine_socials_register_platform_cli', 25 );

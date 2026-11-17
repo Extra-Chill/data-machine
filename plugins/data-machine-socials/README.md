@@ -83,16 +83,9 @@ Once authenticated, social handlers appear in the Data Machine Pipeline Builder:
    - **Link Handling:** How to handle source URLs (append, reply, comment, none)
 5. Save and run your flow
 
-## AI Tool Integration
+## Abilities
 
-Social handlers register AI tools that can be used in Data Machine Chat:
-
-- `twitter_publish` - Post to Twitter with media support
-- `facebook_publish` - Post to Facebook Pages
-- `bluesky_publish` - Post to Bluesky
-- `threads_publish` - Post to Threads
-- `pinterest_publish` - Create Pinterest pins
-- `tumblr_publish` - Create Tumblr NPF text posts
+Every platform exposes its operations as WordPress Abilities (`datamachine/{platform}-publish`, `-read`, `-update`, `-delete`, and platform-specific extras), callable from pipelines, REST, MCP, any agents-api runtime, and the `wp datamachine-socials <platform>` CLI.
 
 ## Architecture
 
