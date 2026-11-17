@@ -52,51 +52,47 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'subreddit', 'title', 'access_token' ),
+						'required'   => array( 'subreddit', 'title' ),
 						'properties' => array(
-							'subreddit'    => array(
+							'subreddit'  => array(
 								'type'        => 'string',
 								'description' => __( 'Subreddit name to post to (without "r/").', 'data-machine-socials' ),
 							),
-							'title'        => array(
+							'title'      => array(
 								'type'        => 'string',
 								'maxLength'   => self::MAX_TITLE_LENGTH,
 								'description' => __( 'Post title.', 'data-machine-socials' ),
 							),
-							'text'         => array(
+							'text'       => array(
 								'type'        => 'string',
 								'default'     => '',
 								'maxLength'   => self::MAX_TEXT_LENGTH,
 								'description' => __( 'Self-post body text in markdown. Omit for link posts.', 'data-machine-socials' ),
 							),
-							'url'          => array(
+							'url'        => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'URL for link posts. Omit for self (text) posts.', 'data-machine-socials' ),
 							),
-							'flair_id'     => array(
+							'flair_id'   => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'Flair template ID (if required by subreddit).', 'data-machine-socials' ),
 							),
-							'flair_text'   => array(
+							'flair_text' => array(
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'Flair text (if editable).', 'data-machine-socials' ),
 							),
-							'nsfw'         => array(
+							'nsfw'       => array(
 								'type'        => 'boolean',
 								'default'     => false,
 								'description' => __( 'Mark as NSFW.', 'data-machine-socials' ),
 							),
-							'spoiler'      => array(
+							'spoiler'    => array(
 								'type'        => 'boolean',
 								'default'     => false,
 								'description' => __( 'Mark as spoiler.', 'data-machine-socials' ),
-							),
-							'access_token' => array(
-								'type'        => 'string',
-								'description' => __( 'Reddit OAuth access token.', 'data-machine-socials' ),
 							),
 						),
 					),
@@ -128,15 +124,14 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 	 * @return array Result with post data or error.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$subreddit    = sanitize_text_field( $input['subreddit'] ?? '' );
-		$title        = trim( sanitize_text_field( $input['title'] ?? '' ) );
-		$text         = trim( $input['text'] ?? '' );
-		$url          = esc_url_raw( $input['url'] ?? '' );
-		$flair_id     = sanitize_text_field( $input['flair_id'] ?? '' );
-		$flair_text   = sanitize_text_field( $input['flair_text'] ?? '' );
-		$nsfw         = ! empty( $input['nsfw'] );
-		$spoiler      = ! empty( $input['spoiler'] );
-		$access_token = $input['access_token'] ?? '';
+		$subreddit  = sanitize_text_field( $input['subreddit'] ?? '' );
+		$title      = trim( sanitize_text_field( $input['title'] ?? '' ) );
+		$text       = trim( $input['text'] ?? '' );
+		$url        = esc_url_raw( $input['url'] ?? '' );
+		$flair_id   = sanitize_text_field( $input['flair_id'] ?? '' );
+		$flair_text = sanitize_text_field( $input['flair_text'] ?? '' );
+		$nsfw       = ! empty( $input['nsfw'] );
+		$spoiler    = ! empty( $input['spoiler'] );
 
 		if ( empty( $subreddit ) ) {
 			return new \WP_Error( 'missing_param', 'subreddit is required.', array( 'status' => 400 ) );
@@ -154,8 +149,9 @@ class SubmitRedditAbility extends AbstractSocialAbility {
 			$title = mb_substr( $title, 0, self::MAX_TITLE_LENGTH );
 		}
 
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
+		$access_token = $this->resolveAccessToken( 'reddit', 'Reddit' );
+		if ( is_wp_error( $access_token ) ) {
+			return $access_token;
 		}
 
 		// Determine post kind: 'self' for text, 'link' for URL.

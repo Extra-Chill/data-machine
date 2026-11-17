@@ -42,8 +42,8 @@ Fetches posts from Reddit subreddits via OAuth 2.0 with timeframe filtering, key
 
 ## Fetch Behavior
 
-1. Authenticates via `RedditAuth::get_valid_access_token()` (auto-refreshes expired tokens)
-2. Delegates to `FetchRedditAbility::execute()` with config parameters
+1. Delegates to `FetchRedditAbility::executeWithCollector()` with config parameters (no credentials)
+2. The ability resolves the OAuth token server-side via `RedditAuth::get_valid_access_token()` (auto-refreshes expired tokens)
 3. Fetches up to `fetch_batch_size` (100) posts across `max_pages` (5) pages, stopping early when a direct `max_items` cap or pipeline collector target is met
 4. Filters by upvotes, comment count, and keywords
 5. Checks processed items for dedup
@@ -86,6 +86,9 @@ Each eligible item contains:
 
 ## Abilities
 
+All Reddit abilities resolve the OAuth token server-side from the connected Reddit account. None accept an `access_token` input; an unauthenticated account returns a `missing_auth` error.
+
+- `datamachine/fetch-reddit` — fetch subreddit posts or search Reddit (`wp datamachine-socials reddit fetch`)
 - `datamachine/vote-reddit` — upvote/downvote Reddit posts (`wp datamachine-socials reddit vote`)
 - `datamachine/reply-reddit` — reply to Reddit posts or comments (`wp datamachine-socials reddit reply`)
 - `datamachine/submit-reddit` — submit new posts to subreddits (`wp datamachine-socials reddit submit`)

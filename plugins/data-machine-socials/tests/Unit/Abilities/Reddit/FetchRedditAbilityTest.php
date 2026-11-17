@@ -10,12 +10,25 @@
 
 namespace DataMachineSocials\Tests\Unit\Abilities\Reddit;
 
+use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineSocials\Abilities\Reddit\FetchRedditAbility;
 use WP_UnitTestCase;
 
 class FetchRedditAbilityTest extends WP_UnitTestCase {
+
+	/**
+	 * Stub Reddit auth provider filter callback.
+	 *
+	 * @var callable|null
+	 */
+	private $provider_filter = null;
+
+	public function set_up(): void {
+		parent::set_up();
+		$this->stubRedditProvider( true, 'reddit-token' );
+	}
 
 	public function test_registered_output_schema_describes_items_pagination_and_target_url(): void {
 		new FetchRedditAbility();
@@ -31,7 +44,52 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 
 	public function tear_down(): void {
 		remove_all_filters( 'pre_http_request' );
+		$this->removeRedditProviderStub();
 		parent::tear_down();
+	}
+
+	public function test_registered_input_schema_does_not_accept_access_token(): void {
+		new FetchRedditAbility();
+		$schema = wp_get_ability( 'datamachine/fetch-reddit' )->get_input_schema();
+
+		$this->assertArrayNotHasKey( 'access_token', $schema['properties'] );
+		$this->assertNotContains( 'access_token', $schema['required'] ?? array() );
+	}
+
+	public function test_resolves_token_server_side_and_ignores_token_input(): void {
+		$auth_header = '';
+		add_filter(
+			'pre_http_request',
+			static function ( $preempt, $args ) use ( &$auth_header ) {
+				$auth_header = $args['headers']['Authorization'] ?? '';
+				return self::redditListingResponse( null, array() );
+			},
+			10,
+			3
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput( array( 'access_token' => 'caller-supplied' ) ) );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 'Bearer reddit-token', $auth_header );
+	}
+
+	public function test_returns_missing_auth_when_provider_is_unauthenticated(): void {
+		$this->stubRedditProvider( false, 'reddit-token' );
+		$requests = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$requests ) {
+				++$requests;
+				return self::redditListingResponse( null, array() );
+			}
+		);
+
+		$result = ( new FetchRedditAbility() )->execute( $this->fetchInput() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
+		$this->assertSame( 0, $requests );
 	}
 
 	public function test_collector_skips_processed_first_result_and_accepts_later_fresh_result(): void {
@@ -301,7 +359,6 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		$result = ( new FetchRedditAbility() )->execute(
 			array(
 				'query'           => 'Charleston live music',
-				'access_token'    => 'reddit-token',
 				'sort_by'         => $sort,
 				'timeframe_limit' => '90_days',
 				'download_images' => false,
@@ -330,9 +387,8 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 	public function test_global_query_rejects_browse_only_sort(): void {
 		$result = ( new FetchRedditAbility() )->execute(
 			array(
-				'query'        => 'Charleston live music',
-				'access_token' => 'reddit-token',
-				'sort_by'      => 'rising',
+				'query'   => 'Charleston live music',
+				'sort_by' => 'rising',
 			)
 		);
 
@@ -430,7 +486,6 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		return array_merge(
 			array(
 				'subreddit'        => 'WordPress',
-				'access_token'     => 'reddit-token',
 				'fetch_batch_size' => 100,
 				'max_pages'        => 5,
 				'download_images'  => false,
@@ -452,5 +507,36 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 			'author'       => 'reddit_user',
 			'is_self'      => true,
 		);
+	}
+
+	private function stubRedditProvider( bool $authenticated, string $token ): void {
+		$this->removeRedditProviderStub();
+
+		$provider = new class( $authenticated, $token ) {
+			public function __construct( private bool $authenticated, private string $token ) {}
+
+			public function is_authenticated(): bool {
+				return $this->authenticated;
+			}
+
+			public function get_valid_access_token(): ?string {
+				return $this->token;
+			}
+		};
+
+		$this->provider_filter = static function ( $providers ) use ( $provider ) {
+			$providers['reddit'] = $provider;
+			return $providers;
+		};
+		add_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
+	}
+
+	private function removeRedditProviderStub(): void {
+		if ( null !== $this->provider_filter ) {
+			remove_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+			$this->provider_filter = null;
+		}
+		AuthAbilities::clearCache();
 	}
 }

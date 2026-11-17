@@ -3,8 +3,8 @@
  * Fetch Reddit posts with timeframe and keyword filtering.
  *
  * Migrated from data-machine core to data-machine-socials.
- * Uses get_valid_access_token() for automatic token lifecycle management
- * instead of manual expiry checks.
+ * The fetch ability resolves and refreshes the OAuth token server-side,
+ * so the handler never handles credentials directly.
  *
  * @package    DataMachineSocials
  * @subpackage Handlers\Reddit
@@ -26,8 +26,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Reddit extends FetchHandler {
 
 	use HandlerRegistrationTrait;
-
-	private $oauth_reddit;
 
 	public function __construct() {
 		parent::__construct( 'reddit' );
@@ -54,32 +52,6 @@ class Reddit extends FetchHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	 * Lazy-load auth provider when needed.
-	 *
-	 * @return RedditAuth|null Auth provider instance or null if unavailable
-	 */
-	private function get_oauth_reddit() {
-		if ( null === $this->oauth_reddit ) {
-			$this->oauth_reddit = $this->getAuthProvider( 'reddit' );
-
-			if ( null === $this->oauth_reddit ) {
-				$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-				do_action(
-					'datamachine_log',
-					'error',
-					'Reddit Handler: Authentication service not available',
-					array(
-						'handler'             => 'reddit',
-						'missing_service'     => 'reddit',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->oauth_reddit;
 	}
 
 	/**
@@ -117,22 +89,10 @@ class Reddit extends FetchHandler {
 	 * Final dedupe/claim/cap remain authoritative inside
 	 * `FetchHandler::get_fetch_data()`.
 	 *
-	 * Uses get_valid_access_token() for automatic token lifecycle management.
+	 * The ability resolves (and refreshes) the Reddit OAuth token server-side,
+	 * so no credentials are passed through ability input.
 	 */
 	protected function executeFetch( array $config, ExecutionContext $context ): array {
-		$oauth_reddit = $this->get_oauth_reddit();
-		if ( ! $oauth_reddit ) {
-			$context->log( 'error', 'Reddit: Authentication not configured' );
-			return array();
-		}
-
-		// Use the modern token lifecycle — handles expiry checks and refresh automatically.
-		$access_token = $oauth_reddit->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			$context->log( 'error', 'Reddit: Failed to obtain valid access token (expired or refresh failed)' );
-			return array();
-		}
-
 		/*
 		 * Build the core fresh-candidate collector. Selection-time eligibility
 		 * (processed/claimed/reprocess) is decided by Data Machine core, not by
@@ -146,7 +106,6 @@ class Reddit extends FetchHandler {
 		// Delegate Reddit-specific concerns to the ability.
 		$ability_input = array(
 			'subreddit'         => $config['subreddit'] ?? '',
-			'access_token'      => $access_token,
 			'sort_by'           => $config['sort_by'] ?? 'hot',
 			'timeframe_limit'   => $config['timeframe_limit'] ?? 'all_time',
 			'min_upvotes'       => isset( $config['min_upvotes'] ) ? absint( $config['min_upvotes'] ) : 0,
@@ -160,6 +119,20 @@ class Reddit extends FetchHandler {
 
 		$ability = new FetchRedditAbility();
 		$result  = $ability->executeWithCollector( $ability_input, $collector );
+
+		if ( is_wp_error( $result ) ) {
+			$error_data = $result->get_error_data();
+			$error_logs = is_array( $error_data ) && is_array( $error_data['logs'] ?? null ) ? $error_data['logs'] : array();
+			foreach ( $error_logs as $log_entry ) {
+				$context->log(
+					$log_entry['level'] ?? 'debug',
+					$log_entry['message'] ?? '',
+					$log_entry['data'] ?? array()
+				);
+			}
+			$context->log( 'error', 'Reddit: ' . $result->get_error_message(), array( 'code' => $result->get_error_code() ) );
+			return array();
+		}
 
 		// Log ability logs
 		if ( ! empty( $result['logs'] ) && is_array( $result['logs'] ) ) {
@@ -231,7 +204,7 @@ class Reddit extends FetchHandler {
 					'image_file_path' => $data['file_info']['file_path'] ?? '',
 				),
 				static function ( $value ) {
-					return '' !== $value && null !== $value;
+					return '' !== $value;
 				}
 			);
 

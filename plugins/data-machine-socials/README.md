@@ -85,7 +85,7 @@ Once authenticated, social handlers appear in the Data Machine Pipeline Builder:
 
 ## Abilities
 
-Every platform exposes its operations as WordPress Abilities (`datamachine/{platform}-publish`, `-read`, `-update`, `-delete`, and platform-specific extras), callable from pipelines, REST, MCP, any agents-api runtime, and the `wp datamachine-socials <platform>` CLI.
+Every platform exposes its operations as WordPress Abilities (`datamachine/{platform}-publish`, `-read`, `-update`, `-delete`, and platform-specific extras), callable from pipelines, REST, MCP, any agents-api runtime, and the `wp datamachine-socials <platform>` CLI. Abilities resolve platform credentials server-side from the connected account; OAuth tokens are never passed as ability input.
 
 ## Architecture
 

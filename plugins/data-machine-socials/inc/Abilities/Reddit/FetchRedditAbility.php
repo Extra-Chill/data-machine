@@ -39,7 +39,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'access_token' ),
 						'properties' => array(
 							'subreddit'         => array(
 								'type'        => 'string',
@@ -50,10 +49,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 								'type'        => 'string',
 								'default'     => '',
 								'description' => __( 'Search query for Reddit global search. When provided without subreddit, searches across all of Reddit. Can also be combined with subreddit to search within it.', 'data-machine-socials' ),
-							),
-							'access_token'      => array(
-								'type'        => 'string',
-								'description' => __( 'Reddit OAuth access token', 'data-machine-socials' ),
 							),
 							'sort_by'           => array(
 								'type'        => 'string',
@@ -245,7 +240,6 @@ class FetchRedditAbility extends AbstractSocialAbility {
 
 		$subreddit             = $config['subreddit'];
 		$query                 = $config['query'];
-		$access_token          = $config['access_token'];
 		$sort                  = $config['sort_by'];
 		$timeframe_limit       = $config['timeframe_limit'];
 		$min_upvotes           = $config['min_upvotes'];
@@ -254,15 +248,19 @@ class FetchRedditAbility extends AbstractSocialAbility {
 		$search_term           = $config['search'];
 		$fetch_batch_size      = $config['fetch_batch_size'];
 		$max_pages             = $config['max_pages'];
-		$max_items             = null === $collector ? $config['max_items'] : null;
 		$download_images       = $config['download_images'];
 
-		if ( null !== $max_items && ( ! is_int( $max_items ) || $max_items < 1 || $max_items > 500 ) ) {
-			return new \WP_Error(
-				'invalid_param',
-				'max_items must be an integer between 1 and 500',
-				array( 'status' => 400 )
-			);
+		// The direct-call result cap only applies without a core collector.
+		$max_items = null;
+		if ( null === $collector && null !== $config['max_items'] ) {
+			$max_items = $config['max_items'];
+			if ( ! is_int( $max_items ) || $max_items < 1 || $max_items > 500 ) {
+				return new \WP_Error(
+					'invalid_param',
+					'max_items must be an integer between 1 and 500',
+					array( 'status' => 400 )
+				);
+			}
 		}
 
 		// Determine mode: global search vs subreddit fetch.
@@ -318,6 +316,22 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				'Invalid sort parameter',
 				array(
 					'status' => 400,
+					'logs'   => $logs,
+				)
+			);
+		}
+
+		$access_token = $this->resolveAccessToken( 'reddit', 'Reddit' );
+		if ( is_wp_error( $access_token ) ) {
+			$logs[] = array(
+				'level'   => 'error',
+				'message' => 'Reddit: ' . $access_token->get_error_message(),
+			);
+			return new \WP_Error(
+				$access_token->get_error_code(),
+				$access_token->get_error_message(),
+				array(
+					'status' => 401,
 					'logs'   => $logs,
 				)
 			);
@@ -719,11 +733,10 @@ class FetchRedditAbility extends AbstractSocialAbility {
 	/**
 	 * Normalize input configuration with defaults.
 	 */
-	private function normalizeConfig( array $input ): array|\WP_Error {
+	private function normalizeConfig( array $input ): array {
 		$defaults = array(
 			'subreddit'         => '',
 			'query'             => '',
-			'access_token'      => '',
 			'sort_by'           => 'hot',
 			'timeframe_limit'   => 'all_time',
 			'min_upvotes'       => 0,
@@ -735,6 +748,9 @@ class FetchRedditAbility extends AbstractSocialAbility {
 			'max_items'         => null,
 			'download_images'   => true,
 		);
+
+		// Credentials are resolved server-side; never accept a token from input.
+		unset( $input['access_token'] );
 
 		return array_merge( $defaults, $input );
 	}
@@ -898,7 +914,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				'used'        => wp_remote_retrieve_header( $response, 'x-ratelimit-used' ),
 				'reset'       => wp_remote_retrieve_header( $response, 'x-ratelimit-reset' ),
 			);
-			$rate_limit_headers = array_filter( $rate_limit_headers, static fn( $value ): bool => '' !== (string) $value );
+			$rate_limit_headers = array_filter( $rate_limit_headers, static fn( $value ): bool => '' !== ( is_array( $value ) ? implode( ', ', $value ) : $value ) );
 			if ( ! empty( $rate_limit_headers ) ) {
 				$error_data['rate_limit'] = $rate_limit_headers;
 			}
@@ -920,7 +936,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 	/**
 	 * Fetch comments for a Reddit post.
 	 */
-	private function fetchComments( string $permalink, string $access_token, int $comment_count ): array|\WP_Error {
+	private function fetchComments( string $permalink, string $access_token, int $comment_count ): array {
 		$comments_array  = array();
 		$comments_url    = 'https://oauth.reddit.com' . $permalink . '.json?limit=' . $comment_count . '&sort=top';
 		$comments_result = $this->httpGet(
@@ -987,7 +1003,7 @@ class FetchRedditAbility extends AbstractSocialAbility {
 				$mime_type  = 'image/jpeg';
 			} else {
 				$direct_url = $url;
-				$ext        = strtolower( pathinfo( wp_parse_url( $url, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
+				$ext        = strtolower( pathinfo( (string) wp_parse_url( $url, PHP_URL_PATH ), PATHINFO_EXTENSION ) );
 				$mime_map   = array(
 					'jpg'  => 'image/jpeg',
 					'jpeg' => 'image/jpeg',

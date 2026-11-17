@@ -41,20 +41,16 @@ class VoteRedditAbility extends AbstractSocialAbility {
 					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'thing_id', 'direction', 'access_token' ),
+						'required'   => array( 'thing_id', 'direction' ),
 						'properties' => array(
-							'thing_id'     => array(
+							'thing_id'  => array(
 								'type'        => 'string',
 								'description' => __( 'Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to vote on.', 'data-machine-socials' ),
 							),
-							'direction'    => array(
+							'direction' => array(
 								'type'        => 'integer',
 								'enum'        => array( 1, 0, -1 ),
 								'description' => __( 'Vote direction: 1 (upvote), 0 (unvote), -1 (downvote).', 'data-machine-socials' ),
-							),
-							'access_token' => array(
-								'type'        => 'string',
-								'description' => __( 'Reddit OAuth access token.', 'data-machine-socials' ),
 							),
 						),
 					),
@@ -86,9 +82,8 @@ class VoteRedditAbility extends AbstractSocialAbility {
 	 * @return array Result.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$thing_id     = sanitize_text_field( $input['thing_id'] ?? '' );
-		$direction    = (int) ( $input['direction'] ?? 0 );
-		$access_token = $input['access_token'] ?? '';
+		$thing_id  = sanitize_text_field( $input['thing_id'] ?? '' );
+		$direction = (int) ( $input['direction'] ?? 0 );
 
 		if ( empty( $thing_id ) ) {
 			return new \WP_Error( 'missing_param', 'thing_id is required.', array( 'status' => 400 ) );
@@ -102,8 +97,9 @@ class VoteRedditAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'direction must be 1 (upvote), 0 (unvote), or -1 (downvote).', array( 'status' => 400 ) );
 		}
 
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
+		$access_token = $this->resolveAccessToken( 'reddit', 'Reddit' );
+		if ( is_wp_error( $access_token ) ) {
+			return $access_token;
 		}
 
 		$url = self::API_BASE . '/api/vote';
@@ -139,7 +135,7 @@ class VoteRedditAbility extends AbstractSocialAbility {
 			'data'    => array(
 				'thing_id'  => $thing_id,
 				'direction' => $direction,
-				'action'    => $direction_labels[ $direction ] ?? 'voted',
+				'action'    => $direction_labels[ $direction ],
 			),
 		);
 	}
