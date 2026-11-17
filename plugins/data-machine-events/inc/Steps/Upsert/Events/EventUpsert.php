@@ -351,7 +351,10 @@ class EventUpsert extends UpsertHandler {
 			'state'   => $venueState,
 			'country' => $venueCountry,
 		) );
-		if ( '' !== $festival_venue['festival'] ) {
+		$explicit_festival      = trim( (string) ( $handler_config['explicit_festival'] ?? '' ) );
+		if ( '' !== $explicit_festival ) {
+			$parameters['festival'] = $explicit_festival;
+		} elseif ( '' !== $festival_venue['festival'] ) {
 			$parameters['festival'] = $festival_venue['festival'];
 		}
 
@@ -727,6 +730,14 @@ class EventUpsert extends UpsertHandler {
 						'error'   => $artist_result['error'] ?? '',
 					)
 				);
+			}
+
+			if ( '' !== $explicit_festival && taxonomy_exists( 'festival' ) ) {
+				$festival_result = wp_set_object_terms( $post_id, array( $explicit_festival ), 'festival', true );
+				if ( is_wp_error( $festival_result ) ) {
+					$lifecycle_result = $festival_result;
+					return $this->lifecycleErrorResponse( $festival_result, $title );
+				}
 			}
 
 			foreach ( $retained_terms as $taxonomy => $term_ids ) {

@@ -902,12 +902,22 @@ class Venue_Taxonomy {
 	 * Unknown suffixes and ordinary artist/venue strings remain untouched.
 	 */
 	public static function parse_festival_venue( string $name, array $data = array() ): array {
-		$parts = preg_split( '/\s+(?:@|at|-|—)\s+/iu', $name );
-		if ( false !== $parts && count( $parts ) > 1 ) {
-			$venue          = (string) array_pop( $parts );
-			$festival       = implode( ' ', $parts );
-			$known_festival = taxonomy_exists( 'festival' ) ? get_term_by( 'name', $festival, 'festival' ) : false;
-			if ( $known_festival || preg_match( '/\b(?:festival|fest)\b/iu', $festival ) ) {
+		// An explicit "@" is the festival/venue separator, so venue names may
+		// themselves contain "at" or dashes ("Spa Beach Park at St. Pete Pier").
+		// Without one, try split points left to right so the venue keeps any
+		// separator words after the first qualifying festival prefix.
+		$pattern = preg_match( '/\s@\s/u', $name ) ? '/\s+@\s+/u' : '/\s+(?:@|at|-|—)\s+/iu';
+		if ( preg_match_all( $pattern, $name, $matches, PREG_OFFSET_CAPTURE ) ) {
+			foreach ( $matches[0] as $match ) {
+				$festival = trim( substr( $name, 0, $match[1] ) );
+				$venue    = trim( substr( $name, $match[1] + strlen( $match[0] ) ) );
+				if ( '' === $festival || '' === $venue ) {
+					continue;
+				}
+				$known_festival = taxonomy_exists( 'festival' ) ? get_term_by( 'name', $festival, 'festival' ) : false;
+				if ( ! $known_festival && ! preg_match( '/\b(?:festival|fest)\b/iu', $festival ) ) {
+					continue;
+				}
 				$identity = self::resolve_venue_identity( $venue, $data );
 				if ( ! empty( $identity['term_id'] ) && 'matched' === $identity['match_status'] ) {
 					return array(

@@ -45,6 +45,35 @@ class EventFestivalLineupTest extends EventUpsertTestCase {
 		$this->assertSame( '', Venue_Taxonomy::parse_festival_venue( 'Festival @ Unknown Venue' )['festival'] );
 	}
 
+	public function test_venue_names_containing_separators_keep_their_full_name(): void {
+		$venue = (int) wp_insert_term( 'Spa Beach Park at St. Pete Pier', 'venue' )['term_id'];
+		update_term_meta( $venue, '_venue_city', 'Saint Petersburg' );
+		update_term_meta( $venue, '_venue_state', 'FL' );
+		$location = array( 'city' => 'Saint Petersburg', 'state' => 'FL' );
+		foreach ( array( ' @ ', ' at ' ) as $separator ) {
+			$parsed = Venue_Taxonomy::parse_festival_venue( 'Florida Fin Fest' . $separator . 'Spa Beach Park at St. Pete Pier', $location );
+			$this->assertSame( 'Spa Beach Park at St. Pete Pier', $parsed['venue'] );
+			$this->assertSame( 'Florida Fin Fest', $parsed['festival'] );
+		}
+	}
+
+	public function test_explicit_festival_is_assigned_on_create(): void {
+		$result = $this->invoke_upsert(
+			array(
+				'title'      => 'Fin Fest Day One',
+				'startDate'  => '2027-11-13',
+				'startTime'  => '12:00',
+				'venue'      => 'The Royal American',
+				'venueCity'  => 'Charleston',
+				'venueState' => 'SC',
+				'performer'  => 'Dani Rucker',
+			),
+			array( 'explicit_festival' => 'Florida Fin Fest' )
+		);
+		$this->assertTrue( $result['success'], wp_json_encode( $result ) );
+		$this->assertSame( array( 'Florida Fin Fest' ), wp_get_post_terms( $result['data']['post_id'], 'festival', array( 'fields' => 'names' ) ) );
+	}
+
 	public function test_artist_set_merges_lineup_without_rewriting_festival(): void {
 		wp_set_object_terms( $this->festival, 'Original Artist', 'artist' );
 		$before = get_post( $this->festival )->to_array();
