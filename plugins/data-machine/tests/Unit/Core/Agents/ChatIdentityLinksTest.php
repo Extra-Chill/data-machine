@@ -24,7 +24,7 @@ class ChatIdentityLinksTest extends WP_UnitTestCase {
 		$this->other_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 
 		// WP_User_Query salts its cache with the users `last_changed` value,
-		// which comes from microtime(). The WP Codebox runtime can return the
+		// which comes from microtime(). Some test runtimes return the
 		// same value for back-to-back calls, so a lookup cached just before
 		// a meta write can survive it. Drop cached user queries on every
 		// user-meta write so lookups always see the current links.
