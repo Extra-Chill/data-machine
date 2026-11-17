@@ -16,7 +16,7 @@ class ExaSearch extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'exa_search' );
-		$this->registerTool( 'exa_search', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'access_level' => 'admin' ) );
+		$this->registerTool( 'exa_search', array( $this, 'getToolDefinition' ), array( 'pipeline' ), array( 'access_level' => 'admin' ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
