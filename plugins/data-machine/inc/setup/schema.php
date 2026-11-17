@@ -147,6 +147,83 @@ function datamachine_run_deferred_site_setup(): void {
 	delete_option( 'datamachine_routine_schedule_hashes' );
 
 	datamachine_drop_legacy_chat_sessions();
+	datamachine_migrate_legacy_mode_models();
+}
+
+/**
+ * Move stored `chat` model overrides to the neutral `agent` model key.
+ *
+ * Data Machine no longer has a `chat` agent mode (Extra-Chill/data-machine#3973).
+ * The model override that used to be stored under `mode_models['chat']` now
+ * lives under `mode_models['agent']`, the default model for agents that Data
+ * Machine provisions. This pass rewrites the three stores that can hold
+ * `mode_models`:
+ *
+ * - the per-site `datamachine_settings` option,
+ * - the network `datamachine_network_settings` site option,
+ * - each agent's `agent_config` row in the agents table.
+ *
+ * An existing `agent` entry wins over the legacy one, so the copy never
+ * overwrites a value an operator already set. The legacy `chat` key is removed
+ * after the copy. Stores without a `chat` entry are left untouched, which makes
+ * re-running on later version bumps or on other subsites a no-op.
+ *
+ * @return void
+ */
+function datamachine_migrate_legacy_mode_models(): void {
+	$site_settings = get_option( 'datamachine_settings', array() );
+	$migrated      = datamachine_migrate_legacy_mode_models_config( is_array( $site_settings ) ? $site_settings : array() );
+	if ( null !== $migrated ) {
+		update_option( 'datamachine_settings', $migrated );
+	}
+
+	if ( function_exists( 'get_site_option' ) && function_exists( 'update_site_option' ) ) {
+		$network_settings = get_site_option( 'datamachine_network_settings', array() );
+		$migrated         = datamachine_migrate_legacy_mode_models_config( is_array( $network_settings ) ? $network_settings : array() );
+		if ( null !== $migrated ) {
+			update_site_option( 'datamachine_network_settings', $migrated );
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		foreach ( $agents_repo->get_all() as $agent ) {
+			$config   = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+			$migrated = datamachine_migrate_legacy_mode_models_config( $config );
+			if ( null !== $migrated && ! empty( $agent['agent_id'] ) ) {
+				$agents_repo->update_agent( (int) $agent['agent_id'], array( 'agent_config' => $migrated ) );
+			}
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
+		\DataMachine\Core\PluginSettings::clearCache();
+	}
+}
+
+/**
+ * Rewrite one settings or agent-config array's legacy `chat` model override.
+ *
+ * @param array<string,mixed> $config Settings or agent config containing `mode_models`.
+ * @return array<string,mixed>|null Migrated config, or null when nothing changed.
+ */
+function datamachine_migrate_legacy_mode_models_config( array $config ): ?array {
+	$mode_models = $config['mode_models'] ?? null;
+	if ( ! is_array( $mode_models ) || ! array_key_exists( 'chat', $mode_models ) ) {
+		return null;
+	}
+
+	$legacy  = $mode_models['chat'];
+	$current = $mode_models['agent'] ?? null;
+	unset( $mode_models['chat'] );
+
+	$has_current = is_array( $current ) && ( ! empty( $current['provider'] ) || ! empty( $current['model'] ) );
+	if ( ! $has_current && is_array( $legacy ) ) {
+		$mode_models['agent'] = $legacy;
+	}
+
+	$config['mode_models'] = $mode_models;
+	return $config;
 }
 
 /**
