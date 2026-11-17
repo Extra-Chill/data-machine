@@ -221,22 +221,10 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $result['event_data']['items'] );
 	}
 
-	public function test_max_items_does_not_cap_source_inventory_or_full_items_list(): void {
-		$events = array();
-		foreach ( range( 1, 105 ) as $index ) {
-			$events[] = array(
-				'@context'  => 'https://schema.org',
-				'@type'     => 'MusicEvent',
-				'name'      => 'Inventory Event ' . $index,
-				'startDate' => '2030-09-01T20:00:00-04:00',
-			);
-		}
+	public function test_max_items_does_not_cap_source_inventory_and_packet_bound_is_surfaced(): void {
+		$this->mockHttpResponse( $this->buildJsonLdHtml( 105, 'Inventory Event' ) );
 
-		$html = '<script type="application/ld+json">' . wp_json_encode( $events ) . '</script>';
-		$this->mockHttpResponse( $html );
-
-		$admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
-		wp_set_current_user( $admin_id );
+		$this->loginAsAdministrator();
 
 		$ability = wp_get_ability( 'data-machine-events/test-event-scraper' );
 		$this->assertNotNull( $ability );
@@ -250,13 +238,243 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 			)
 		);
 
+		// The production cap (1) is reported but not applied. The delegated
+		// datamachine/test-handler raw mode is bounded to 100 packets, and that
+		// bound must be surfaced rather than silently undercounting (#3869).
 		$this->assertIsArray( $result );
-		$this->assertSame( 105, $result['extraction_info']['extracted_packet_count'] );
-		$this->assertSame( 105, $result['extraction_info']['unique_source_event_count'] );
+		$this->assertSame( EventScraperTest::MAX_PACKET_LIMIT, $result['extraction_info']['extracted_packet_count'] );
+		$this->assertSame( EventScraperTest::MAX_PACKET_LIMIT, $result['extraction_info']['unique_source_event_count'] );
 		$this->assertSame( 1, $result['extraction_info']['production_max_items'] );
 		$this->assertSame( 0, $result['extraction_info']['candidate_packet_count'] );
-		$this->assertSame( 105, $result['event_data']['event_count'] );
-		$this->assertCount( 105, $result['event_data']['items'] );
+		$this->assertSame( EventScraperTest::MAX_PACKET_LIMIT, $result['event_data']['event_count'] );
+		$this->assertCount( EventScraperTest::MAX_PACKET_LIMIT, $result['event_data']['items'] );
+		$this->assertSame( 0, $result['extraction_info']['omitted_packet_count'] );
+		$this->assertContains( 'packet_limit', $result['extraction_info']['truncation_reasons'] );
+		$this->assertSame( 'warning', $result['status'] );
+		$this->assertNotEmpty(
+			array_filter( $result['warnings'], static fn( string $warning ): bool => str_starts_with( $warning, 'PACKET LIMIT:' ) ),
+			'Packet bound must be surfaced as a warning.'
+		);
+	}
+
+	// ────────────────────────────────────────────────────────────────────
+	// #3869: delegation to datamachine/test-handler + output modes
+	// ────────────────────────────────────────────────────────────────────
+
+	public function test_ability_schema_exposes_output_mode_and_limits(): void {
+		$ability = wp_get_ability( 'data-machine-events/test-event-scraper' );
+		$this->assertNotNull( $ability );
+
+		$input = $ability->get_input_schema();
+		$this->assertSame( array( 'compact', 'raw' ), $input['properties']['output_mode']['enum'] );
+		$this->assertSame( 'compact', $input['properties']['output_mode']['default'] );
+		$this->assertSame( 100, $input['properties']['limit']['maximum'] );
+		$this->assertSame( 4096, $input['properties']['byte_limit']['minimum'] );
+		$this->assertSame( 5242880, $input['properties']['byte_limit']['maximum'] );
+
+		$output = $ability->get_output_schema();
+		foreach ( array( 'raw_events', 'packets', 'omitted_packet_count', 'truncation', 'limits' ) as $key ) {
+			$this->assertArrayHasKey( $key, $output['properties'] );
+		}
+		$this->assertNotContains( 'raw_events', $output['required'] );
+	}
+
+	public function test_handler_executes_once_through_test_handler_ability(): void {
+		$this->mockHttpResponse( $this->buildJsonLdHtml( 3, 'Delegated Event' ) );
+
+		$executions = array();
+		$listener   = static function ( string $name ) use ( &$executions ): void {
+			$executions[] = $name;
+		};
+		add_action( 'wp_before_execute_ability', $listener );
+
+		$this->loginAsAdministrator();
+
+		try {
+			$result = wp_get_ability( 'data-machine-events/test-event-scraper' )->execute(
+				array(
+					'target_url'  => 'https://example.com/delegated',
+					'output_mode' => 'raw',
+				)
+			);
+		} finally {
+			remove_action( 'wp_before_execute_ability', $listener );
+		}
+
+		$this->assertIsArray( $result, (string) wp_json_encode( $result ) );
+		$this->assertSame(
+			1,
+			count( array_keys( $executions, EventScraperTest::TEST_HANDLER_ABILITY, true ) ),
+			'Exactly one datamachine/test-handler execution per scrape, in raw mode too.'
+		);
+		$this->assertSame( 3, $result['event_data']['event_count'] );
+	}
+
+	public function test_event_scraper_test_no_longer_instantiates_handler_directly(): void {
+		$source = (string) file_get_contents( (string) ( new ReflectionClass( EventScraperTest::class ) )->getFileName() );
+		$code   = '';
+		foreach ( token_get_all( $source ) as $token ) {
+			if ( is_array( $token ) && in_array( $token[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ) {
+				continue;
+			}
+			$code .= is_array( $token ) ? $token[1] : $token;
+		}
+
+		$this->assertStringNotContainsString( 'new UniversalWebScraper', $code );
+		$this->assertStringNotContainsString( 'get_fetch_data(', $code );
+		$this->assertStringNotContainsString( 'Handlers\\WebScraper\\UniversalWebScraper', $code );
+		$this->assertStringContainsString( 'TEST_HANDLER_ABILITY', $code );
+	}
+
+	public function test_compact_output_is_unchanged(): void {
+		$this->mockHttpResponse( $this->buildJsonLdHtml( 3, 'Compact Event' ) );
+
+		$result = ( new EventScraperTest() )->test( 'https://example.com/compact', array( 'venue_name' => 'Compact Hall' ) );
+
+		$this->assertIsArray( $result, (string) wp_json_encode( $result ) );
+		$this->assertSame(
+			array( 'success', 'status', 'target_url', 'event_data', 'extraction_info', 'coverage_issues', 'warnings', 'logs' ),
+			array_keys( $result )
+		);
+		$this->assertSame( 3, $result['event_data']['event_count'] );
+		$this->assertCount( 3, $result['event_data']['items'] );
+		$this->assertSame( array( 'title', 'startDate', 'startTime', 'ticketUrl' ), array_keys( $result['event_data']['items'][0] ) );
+		$this->assertSame( 'Compact Event 1', $result['event_data']['title'] );
+		$this->assertSame( 'event', $result['extraction_info']['payload_type'] );
+		$this->assertArrayNotHasKey( 'omitted_packet_count', $result['extraction_info'] );
+		$this->assertArrayNotHasKey( 'truncation_reasons', $result['extraction_info'] );
+		$this->assertTrue( $result['extraction_info']['context_supplied'] );
+	}
+
+	public function test_raw_mode_returns_full_events_and_packets_from_same_execution(): void {
+		$html = '<script type="application/ld+json">' . wp_json_encode(
+			array(
+				array(
+					'@context'    => 'https://schema.org',
+					'@type'       => 'MusicEvent',
+					'name'        => 'Raw Concert',
+					'description' => 'A complete description that compact summaries drop.',
+					'startDate'   => '2030-08-01T20:00:00-04:00',
+					'endDate'     => '2030-08-01T23:00:00-04:00',
+				),
+				array(
+					'@context'    => 'https://schema.org',
+					'@type'       => 'MusicEvent',
+					'name'        => 'Raw Concert',
+					'description' => 'A complete description that compact summaries drop.',
+					'startDate'   => '2030-08-01T20:00:00-04:00',
+					'endDate'     => '2030-08-01T23:00:00-04:00',
+				),
+				array(
+					'@context'  => 'https://schema.org',
+					'@type'     => 'MusicEvent',
+					'name'      => 'Second Raw Show',
+					'startDate' => '2030-08-03T21:00:00-04:00',
+				),
+			)
+		) . '</script>';
+		$this->mockHttpResponse( $html );
+
+		$config  = array( 'venue_name' => 'Raw Hall' );
+		$compact = ( new EventScraperTest() )->test( 'https://example.com/raw', $config );
+		$raw     = ( new EventScraperTest() )->test( 'https://example.com/raw', $config, array( 'output_mode' => 'raw' ) );
+
+		$this->assertIsArray( $compact, (string) wp_json_encode( $compact ) );
+		$this->assertIsArray( $raw, (string) wp_json_encode( $raw ) );
+
+		// Compact projection is identical in both modes (logs aside).
+		foreach ( array( 'success', 'status', 'target_url', 'event_data', 'extraction_info', 'coverage_issues', 'warnings' ) as $key ) {
+			$this->assertSame( $compact[ $key ], $raw[ $key ], "Compact field {$key} must not change in raw mode." );
+		}
+
+		$this->assertSame( 'raw', $raw['output_mode'] );
+		$this->assertSame( 2, $raw['extraction_info']['unique_source_event_count'] );
+		$this->assertSame( 1, $raw['extraction_info']['duplicate_packet_count'] );
+
+		// raw_events: complete decoded event per unique structured packet.
+		$this->assertCount( 2, $raw['raw_events'] );
+		$this->assertSame( 'Raw Concert', $raw['raw_events'][0]['title'] );
+		$this->assertSame( 'Second Raw Show', $raw['raw_events'][1]['title'] );
+		$this->assertStringContainsString( 'complete description', (string) ( $raw['raw_events'][0]['description'] ?? '' ) );
+		$this->assertNotEmpty( $raw['raw_events'][0]['endDate'] ?? '' );
+		$this->assertGreaterThan( 4, count( $raw['raw_events'][0] ), 'raw_events must carry the full event, not the summary.' );
+
+		// packets: test-handler raw envelopes, before stable-identifier dedup.
+		$this->assertCount( 3, $raw['packets'] );
+		$this->assertSame( 3, $raw['packet_count'] );
+		$this->assertSame( 0, $raw['omitted_packet_count'] );
+		foreach ( array( 'type', 'timestamp', 'data', 'metadata' ) as $key ) {
+			$this->assertArrayHasKey( $key, $raw['packets'][0] );
+		}
+		$body = json_decode( $raw['packets'][0]['data']['body'], true );
+		$this->assertSame( $raw['raw_events'][0], $body['event'] );
+		$this->assertFalse( $raw['truncation']['truncated'] );
+		$this->assertSame( EventScraperTest::MAX_PACKET_LIMIT, $raw['limits']['packet_count'] );
+		$this->assertSame( EventScraperTest::MAX_BYTE_LIMIT, $raw['limits']['bytes'] );
+	}
+
+	public function test_byte_limit_omission_is_surfaced(): void {
+		$this->mockHttpResponse( $this->buildJsonLdHtml( 20, 'Byte Event', str_repeat( 'Long description. ', 200 ) ) );
+
+		$this->loginAsAdministrator();
+
+		$result = wp_get_ability( 'data-machine-events/test-event-scraper' )->execute(
+			array(
+				'target_url'     => 'https://example.com/bytes',
+				'handler_config' => array( 'venue_name' => 'Byte Hall' ),
+				'output_mode'    => 'raw',
+				'byte_limit'     => 65536,
+			)
+		);
+
+		$this->assertIsArray( $result, (string) wp_json_encode( $result ) );
+		$returned = count( $result['packets'] );
+		$this->assertSame( 20, $result['packet_count'] );
+		$this->assertGreaterThan( 0, $returned, 'At least one packet must fit the byte limit.' );
+		$this->assertGreaterThan( 0, $result['omitted_packet_count'] );
+		$this->assertSame( 20 - $returned, $result['omitted_packet_count'] );
+		$this->assertContains( 'byte_limit', $result['truncation']['reasons'] );
+		$this->assertSame( 65536, $result['limits']['bytes'] );
+
+		// Compact diagnostics flag the omission instead of silently undercounting.
+		$this->assertSame( $result['omitted_packet_count'], $result['extraction_info']['omitted_packet_count'] );
+		$this->assertContains( 'byte_limit', $result['extraction_info']['truncation_reasons'] );
+		$this->assertSame( $returned, $result['event_data']['event_count'] );
+		$this->assertCount( $returned, $result['raw_events'] );
+		$this->assertSame( 'warning', $result['status'] );
+		$this->assertNotEmpty(
+			array_filter( $result['warnings'], static fn( string $warning ): bool => str_starts_with( $warning, 'BYTE LIMIT:' ) )
+		);
+	}
+
+	public function test_limit_is_forwarded_and_bounded(): void {
+		$this->assertSame(
+			array(
+				'limit'      => 100,
+				'byte_limit' => 5242880,
+			),
+			EventScraperTest::normalizeLimits( array() )
+		);
+		$this->assertSame(
+			array(
+				'limit'      => 100,
+				'byte_limit' => 4096,
+			),
+			EventScraperTest::normalizeLimits(
+				array(
+					'limit'      => 0,
+					'byte_limit' => 1,
+				)
+			)
+		);
+		$this->assertSame( 100, EventScraperTest::normalizeLimits( array( 'limit' => 500 ) )['limit'] );
+
+		$this->mockHttpResponse( $this->buildJsonLdHtml( 5, 'Limited Event' ) );
+		$result = ( new EventScraperTest() )->test( 'https://example.com/limited', null, array( 'limit' => 2 ) );
+
+		$this->assertIsArray( $result, (string) wp_json_encode( $result ) );
+		$this->assertSame( 2, $result['event_data']['event_count'] );
+		$this->assertContains( 'packet_limit', $result['extraction_info']['truncation_reasons'] );
 	}
 
 	public function test_raw_and_vision_packets_report_truthful_source_counts(): void {
@@ -543,6 +761,31 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 				'source_type' => 'universal_web_scraper',
 			),
 		);
+	}
+
+	private function loginAsAdministrator(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+	}
+
+	/**
+	 * Build a JSON-LD listing page with $count future MusicEvent records.
+	 */
+	private function buildJsonLdHtml( int $count, string $title_prefix, string $description = '' ): string {
+		$events = array();
+		foreach ( range( 1, $count ) as $index ) {
+			$event = array(
+				'@context'  => 'https://schema.org',
+				'@type'     => 'MusicEvent',
+				'name'      => $title_prefix . ' ' . $index,
+				'startDate' => sprintf( '2030-09-%02dT20:00:00-04:00', ( ( $index - 1 ) % 28 ) + 1 ),
+			);
+			if ( '' !== $description ) {
+				$event['description'] = $description . ' #' . $index;
+			}
+			$events[] = $event;
+		}
+
+		return '<script type="application/ld+json">' . wp_json_encode( $events ) . '</script>';
 	}
 
 	private function buildNonEventPacketEntry( array $payload, string $identifier ): array {
