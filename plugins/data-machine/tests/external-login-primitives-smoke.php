@@ -18,24 +18,6 @@ namespace {
 		public function get_error_message(): string { return $this->message; }
 	}
 
-	class DataMachine_External_Login_WPDB_Smoke {
-		public string $prefix = 'wp_';
-		public string $base_prefix = 'wp_';
-		public array $rows = array();
-		public function update( string $table, array $data, array $where, array $formats = array(), array $where_formats = array() ) {
-			unset( $table, $formats, $where_formats );
-			$count = 0;
-			foreach ( $this->rows as &$row ) {
-				if ( $row['owner_type'] === $where['owner_type'] && $row['owner_key_hash'] === $where['owner_key_hash'] ) {
-					$row = array_merge( $row, $data );
-					++$count;
-				}
-			}
-			return $count;
-		}
-	}
-
-	$GLOBALS['wpdb'] = new DataMachine_External_Login_WPDB_Smoke();
 	$GLOBALS['datamachine_external_login_providers'] = array();
 
 	if ( ! function_exists( '__' ) ) {
@@ -83,20 +65,6 @@ namespace {
 	}
 }
 
-namespace DataMachine\Abilities\Chat {
-	class ChatTranscriptOwner {
-		public static function user_owner( int $user_id ): array {
-			return array( 'owner_type' => 'user', 'owner_key' => 'user:' . $user_id, 'owner_key_hash' => hash( 'sha256', 'user:' . $user_id ), 'owner_label' => 'User ' . $user_id, 'user_id' => $user_id );
-		}
-		public static function resolve_for_request( array $input = array(), int $fallback_user_id = 0 ) {
-			unset( $fallback_user_id );
-			$owner = $input['transcript_owner'] ?? array();
-			$key = ( $owner['type'] ?? '' ) . ':' . ( $owner['key'] ?? '' );
-			return array( 'owner_type' => $owner['type'] ?? '', 'owner_key' => $key, 'owner_key_hash' => hash( 'sha256', $key ), 'owner_label' => $owner['type'] ?? '', 'user_id' => 0 );
-		}
-	}
-}
-
 namespace {
 	require_once __DIR__ . '/smoke-bootstrap.php';
 
@@ -116,11 +84,6 @@ namespace {
 
 	$assert( 'provider registry filters invalid entries', array( 'demo' ) === array_keys( \DataMachine\Core\Auth\ExternalLoginRouter::providers() ) );
 	$assert( 'callback URL resolves from provider', 'https://example.test/login/demo/callback' === \DataMachine\Core\Auth\ExternalLoginRouter::callback_url( 'demo' ) );
-
-	$browser_id = 'browser:abc';
-	$GLOBALS['wpdb']->rows[] = array( 'session_id' => 's1', 'user_id' => 1, 'owner_type' => 'browser', 'owner_key_hash' => hash( 'sha256', 'browser:' . $browser_id ), 'owner_label' => 'Browser' );
-	$count = \DataMachine\Core\Auth\PrincipalSessionPromoter::promote_browser_to_user( $browser_id, 12 );
-	$assert( 'browser sessions promote to user owner', 1 === $count && 'user' === $GLOBALS['wpdb']->rows[0]['owner_type'] && 12 === $GLOBALS['wpdb']->rows[0]['user_id'] );
 
 	echo "\n{$pass} passed, {$fail} failed\n";
 	exit( $fail > 0 ? 1 : 0 );

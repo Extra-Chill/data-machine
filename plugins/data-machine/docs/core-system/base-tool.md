@@ -100,7 +100,7 @@ class ExternalLookup extends BaseTool {
 
 ```php
 <?php
-namespace DataMachine\Api\Chat\Tools;
+namespace MyPlugin\Tools;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 

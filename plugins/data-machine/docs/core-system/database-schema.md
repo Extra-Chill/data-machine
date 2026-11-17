@@ -1,15 +1,15 @@
 # Database Schema
 
-Data Machine persists workflow definitions, execution state, access control, source tracking, artifacts, chat, approvals, and logs in custom tables. The authoritative installation path is `ActivationServiceProvider::ensure_all_tables()`; table names and columns are authoritative in each repository's `TABLE_NAME` and `create_table()` implementation.
+Data Machine persists workflow definitions, execution state, access control, source tracking, artifacts, approvals, and logs in custom tables. The authoritative installation path is `ActivationServiceProvider::ensure_all_tables()`; table names and columns are authoritative in each repository's `TABLE_NAME` and `create_table()` implementation.
 
-The current install path creates 17 named tables. Agent identity tables use `$wpdb->base_prefix`; workflow tables generally use the current site's `$wpdb->prefix`; the chat repository is network-aware.
+The current install path creates 16 named tables. Agent identity tables use `$wpdb->base_prefix`; workflow tables generally use the current site's `$wpdb->prefix`.
 
 | Scope | Tables |
 |---|---|
 | Network agent identity | `datamachine_agents`, `datamachine_agent_access`, `datamachine_agent_principal_access`, `datamachine_agent_tokens` |
 | Workflow and execution | `datamachine_pipelines`, `datamachine_flows`, `datamachine_jobs`, `datamachine_batch_items`, `datamachine_run_metadata` |
 | Source and content identity | `datamachine_processed_items`, `datamachine_tracked_items`, `datamachine_post_identity`, `datamachine_post_identity_reservations` |
-| Artifacts, chat, approvals, and operations | `datamachine_bundle_artifacts`, `datamachine_chat_sessions`, `datamachine_pending_actions`, `datamachine_logs` |
+| Artifacts, approvals, and operations | `datamachine_bundle_artifacts`, `datamachine_pending_actions`, `datamachine_logs` |
 
 The detailed sections below explain the primary product tables. The implementations under `inc/Core/Database/` and `inc/Engine/AI/Actions/PendingActionStore.php` define tables not expanded here.
 
@@ -206,56 +206,9 @@ CREATE TABLE wp_datamachine_tracked_items (
 - `source_ref` — source-scoped audits.
 - `updated_at` — recent changes and stale-state scans.
 
-### `wp_datamachine_chat_sessions`
+### Retired: `datamachine_chat_sessions`
 
-**Purpose**: Persistent conversation state for chat API with multi-turn conversation support
-
-**Implementation**: `inc/Core/Database/Chat/Chat.php`
-
-```sql
-CREATE TABLE wp_datamachine_chat_sessions (
-    session_id VARCHAR(50) NOT NULL,
-    user_id BIGINT(20) UNSIGNED NOT NULL,
-    agent_id BIGINT(20) UNSIGNED NULL,
-    title VARCHAR(100) NULL,
-    messages LONGTEXT NOT NULL COMMENT 'JSON array of conversation messages',
-    metadata LONGTEXT NULL COMMENT 'JSON object for session metadata',
-    provider VARCHAR(50) NULL COMMENT 'AI provider (anthropic, openai, etc)',
-    model VARCHAR(100) NULL COMMENT 'AI model identifier',
-    context VARCHAR(20) NOT NULL DEFAULT 'chat',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    expires_at DATETIME NULL COMMENT 'Auto-cleanup timestamp',
-    PRIMARY KEY (session_id),
-    KEY user_id (user_id),
-    KEY agent_id (agent_id),
-    KEY context (context),
-    KEY user_context (user_id, context),
-    KEY created_at (created_at),
-    KEY updated_at (updated_at),
-    KEY expires_at (expires_at)
-);
-```
-
-**Fields**:
-- `session_id` - UUID4 session identifier (primary key)
-- `user_id` - WordPress user ID (user-scoped isolation)
-- `agent_id` - Agent this session belongs to (multi-agent scoping, @since v0.36.1)
-- `title` - Auto-generated session title
-- `messages` - JSON array of conversation messages (chronological ordering)
-- `metadata` - JSON object with message_count, last_activity timestamps
-- `provider` - AI provider used for session (optional, tracked for continuity)
-- `model` - AI model used for session (optional, tracked for continuity)
-- `context` - Session context: `'chat'` (default) or `'pipeline'`
-- `created_at` - Session creation timestamp
-- `updated_at` - Last activity timestamp
-- `expires_at` - Expiration timestamp (24-hour default timeout)
-
-**Session Management**:
-- User-scoped and agent-scoped session isolation
-- Automatic session creation on first message
-- Session expiration with cleanup mechanism
-- Metadata tracking for message count and activity timestamps
+Data Machine no longer owns chat. The legacy `datamachine_chat_sessions` table (network and per-site variants) is dropped on upgrade by `datamachine_drop_legacy_chat_sessions()` in `inc/setup/schema.php`, and `uninstall.php` still drops it for installs that never upgraded. Chat sessions are owned by Agents API (`agents/chat`) and host chat runtimes; pipeline transcripts go to the Agents API conversation store registered through the `wp_agent_conversation_store` filter.
 
 ### `wp_datamachine_agents`
 
@@ -359,7 +312,6 @@ CREATE TABLE wp_datamachine_logs (
 Agent (1) ──→ Pipeline (many)
            ──→ Flow (many)
            ──→ Job (many)
-           ──→ ChatSession (many)
 
 AgentAccess: Agent (1) ←→ User (many)  [role-based]
 
@@ -368,8 +320,6 @@ Pipeline (1) → Flow (many) → Job (many)
             ProcessedItems (many)
 
 Job (1) → ChildJob (many)  [via parent_job_id, batch execution]
-
-User (1) → ChatSession (many)
 ```
 
 ### Key Identifiers
@@ -463,42 +413,6 @@ $context->markItemProcessed($item_id);
 $is_processed = $context->isItemProcessed($item_id);
 ```
 
-### Chat Session Operations
-
-**Create Session**:
-```php
-use DataMachine\Core\Database\Chat\Chat as ChatDatabase;
-
-$chat_db = new ChatDatabase();
-$session_id = $chat_db->create_session($user_id, [
-    'started_at' => current_time('mysql'),
-    'message_count' => 0
-]);
-```
-
-**Get Session**:
-```php
-$session = $chat_db->get_session($session_id);
-// Returns: ['session_id', 'user_id', 'agent_id', 'title', 'messages', 'metadata',
-//           'provider', 'model', 'context', 'created_at', 'updated_at', 'expires_at']
-```
-
-**Update Session**:
-```php
-$chat_db->update_session(
-    $session_id,
-    $messages,  // Complete messages array
-    $metadata,  // Updated metadata
-    $provider,  // AI provider
-    $model      // AI model
-);
-```
-
-**Cleanup Expired Sessions**:
-```php
-$deleted_count = $chat_db->cleanup_expired_sessions();
-```
-
 ### Agent Operations
 
 **Create Agent**:
@@ -580,7 +494,6 @@ $db_processed_items = new \DataMachine\Core\Database\ProcessedItems\ProcessedIte
 $db_agents         = new \DataMachine\Core\Database\Agents\Agents();
 $db_agent_access   = new \DataMachine\Core\Database\Agents\AgentAccess();
 $db_logs           = new \DataMachine\Core\Database\Logs\LogRepository();
-$db_chat           = new \DataMachine\Core\Database\Chat\Chat();
 ```
 
 ### Transactional Operations
@@ -633,7 +546,6 @@ All major tables carry `user_id` and `agent_id` columns for resource isolation:
 | v0.36.1 | `Pipelines::migrate_columns()` | Added `user_id`, `agent_id` to pipelines |
 | v0.36.1 | `Flows::migrate_columns()` | Added `user_id`, `agent_id` to flows |
 | v0.36.1 | `Jobs::migrate_columns()` | Added `user_id`, `agent_id`, `source`, `label`, `parent_job_id` to jobs |
-| v0.36.1 | `Chat::ensure_agent_id_column()` | Added `agent_id`, `title`, `context` to chat_sessions |
 | v0.36.1 | `datamachine_backfill_agent_ids()` | Backfilled agent_id on existing resources |
 
 The canonical schema is checked by `datamachine_maybe_ensure_current_schema()` on `plugins_loaded` at priority 5. It runs the idempotent current-schema bootstrap whenever the stored database version or live schema is not current.

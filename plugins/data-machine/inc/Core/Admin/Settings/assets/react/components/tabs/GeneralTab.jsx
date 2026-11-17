@@ -22,8 +22,6 @@ import SettingsSaveBar, {
 const EMPTY_FORM = {
 	cleanup_job_data_on_failure: true,
 	file_retention_days: 7,
-	chat_retention_days: 90,
-	chat_ai_titles_enabled: true,
 	wp_ai_client_connect_timeout: 15,
 	wp_ai_client_request_timeout: 300,
 	pipeline_ai_concurrency_limit: 3,
@@ -105,10 +103,6 @@ const GeneralTab = () => {
 					data.settings.cleanup_job_data_on_failure ?? EMPTY_FORM.cleanup_job_data_on_failure,
 				file_retention_days:
 					data.settings.file_retention_days ?? EMPTY_FORM.file_retention_days,
-				chat_retention_days:
-					data.settings.chat_retention_days ?? EMPTY_FORM.chat_retention_days,
-				chat_ai_titles_enabled:
-					data.settings.chat_ai_titles_enabled ?? EMPTY_FORM.chat_ai_titles_enabled,
 				wp_ai_client_connect_timeout:
 					data.settings.wp_ai_client_connect_timeout ?? transportDefaults.connectTimeout,
 				wp_ai_client_request_timeout:
@@ -326,66 +320,6 @@ const GeneralTab = () => {
 									than this many days. Includes Reddit images,
 									Files handler uploads, and other temporary
 									workflow files.
-								</p>
-							</fieldset>
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">Chat session retention (days)</th>
-						<td>
-							<fieldset>
-								<input
-									type="number"
-									id="chat_retention_days"
-									value={ form.data.chat_retention_days }
-									onChange={ ( e ) =>
-										updateField(
-											'chat_retention_days',
-											clamp(
-												e.target.value,
-												1,
-												365,
-												90
-											)
-										)
-									}
-									min="1"
-									max="365"
-									className="small-text"
-								/>
-								<p className="description">
-									Automatically delete chat sessions with no
-									activity older than this many days.
-								</p>
-							</fieldset>
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">AI-generated chat titles</th>
-						<td>
-							<fieldset>
-								<label htmlFor="chat_ai_titles_enabled">
-									<input
-										type="checkbox"
-										id="chat_ai_titles_enabled"
-										checked={
-											form.data.chat_ai_titles_enabled
-										}
-										onChange={ ( e ) =>
-											updateField(
-												'chat_ai_titles_enabled',
-												e.target.checked
-											)
-										}
-									/>
-									Use AI to generate descriptive titles for
-									chat sessions
-								</label>
-								<p className="description">
-									Disable to reduce API costs. Titles will use
-									the first message instead.
 								</p>
 							</fieldset>
 						</td>

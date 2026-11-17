@@ -92,13 +92,14 @@ An AI-powered system task that runs daily via Action Scheduler. The task lifecyc
 
 The task gathers same-day Data Machine activity and injects it into the single maintenance prompt as `{{activity_section}}`. Activity context is supporting material for compaction; it is not a separate summary prompt.
 
-**Data sources:**
+**Data source:**
 - `datamachine_jobs` — pipeline and system jobs created on the target date (job_id, pipeline_id, flow_id, source, label, status)
-- `datamachine_chat_sessions` — chat sessions created on the target date (session_id, title, context)
+
+Chat sessions are owned by Agents API and host chat runtimes, so they are not part of the activity context.
 
 **Process:**
-1. Query jobs and chat sessions for the target date.
-2. Format as structured context with `## Jobs completed on YYYY-MM-DD` and `## Chat sessions on YYYY-MM-DD` sections.
+1. Query jobs for the target date.
+2. Format as structured context with a `## Jobs completed on YYYY-MM-DD` section.
 3. Wrap that context in `## Today's Activity` and pass it as `{{activity_section}}`.
 
 If no Data Machine activity occurred and `MEMORY.md` is already within `AgentMemory::MAX_FILE_SIZE`, the task completes as a skipped no-op. External tools such as Kimaki can still write temporal details directly with `agent_daily_memory`.
@@ -148,7 +149,7 @@ Variables:
 - `{{memory_content}}` — current full `MEMORY.md` content.
 - `{{date}}` — target archive date in `YYYY-MM-DD` format.
 - `{{max_size}}` — recommended persistent memory limit, e.g. `8 KB`.
-- `{{activity_section}}` — optional `## Today's Activity` section generated from jobs and chat sessions.
+- `{{activity_section}}` — optional `## Today's Activity` section generated from same-day jobs.
 
 Prompts can be overridden via the System Tasks admin tab or programmatically:
 

@@ -20,6 +20,26 @@ function update_option( $key, $value, $autoload = null ) { $GLOBALS['setup_optio
 function add_action( $hook, $callback, $priority = 10 ) { $GLOBALS['setup_actions'][] = compact( 'hook', 'callback', 'priority' ); }
 function wp_installing() { return false; }
 function datamachine_mark_flow_schedule_reconciliation() { $GLOBALS['setup_calls'][] = 'flow-schedules'; }
+function delete_site_option( $key ) { $GLOBALS['setup_deleted_site_options'][] = $key; return true; }
+function as_unschedule_all_actions( $hook, $args = array(), $group = '' ) { $GLOBALS['setup_unscheduled'][] = $hook; return null; }
+
+$GLOBALS['setup_dropped_tables']       = array();
+$GLOBALS['setup_deleted_site_options'] = array();
+$GLOBALS['setup_unscheduled']          = array();
+
+$GLOBALS['wpdb'] = new class() {
+	public string $prefix      = 'wp_2_';
+	public string $base_prefix = 'wp_';
+	public function prepare( string $query, ...$args ): string {
+		return str_replace( '%i', (string) $args[0], $query );
+	}
+	public function query( string $query ) {
+		if ( 0 === strpos( $query, 'DROP TABLE IF EXISTS ' ) ) {
+			$GLOBALS['setup_dropped_tables'][] = substr( $query, strlen( 'DROP TABLE IF EXISTS ' ) );
+		}
+		return true;
+	}
+};
 
 eval(
 	'namespace DataMachine\Core\Bootstrap;
@@ -71,12 +91,18 @@ datamachine_maybe_ensure_current_schema();
 $assert( DATAMACHINE_VERSION === $GLOBALS['setup_options']['datamachine_db_version'], 'successful setup advances version gate' );
 $assert( array( 'schema', 'capabilities', 'defaults', 'flow-schedules' ) === $GLOBALS['setup_calls'], 'deferred setup converges schema, capabilities, defaults, and schedules' );
 
+$assert( array( 'wp_datamachine_chat_sessions', 'wp_2_datamachine_chat_sessions' ) === $GLOBALS['setup_dropped_tables'], 'version-bump setup drops the retired network and per-site chat-session tables' );
+$assert( in_array( 'datamachine_chat_sessions_network_migrated', $GLOBALS['setup_deleted_site_options'], true ), 'version-bump setup clears the retired chat convergence marker' );
+$assert( in_array( 'datamachine_recurring_retention_chat_sessions', $GLOBALS['setup_unscheduled'], true ), 'version-bump setup unschedules the retired chat retention task' );
+
 $GLOBALS['setup_calls']                           = array();
+$GLOBALS['setup_dropped_tables']                  = array();
 $GLOBALS['setup_schema_succeeds']                 = false;
 $GLOBALS['setup_options']['datamachine_db_version'] = 'retry-me';
 datamachine_maybe_ensure_current_schema();
 $assert( 'retry-me' === $GLOBALS['setup_options']['datamachine_db_version'], 'failed data-preservation setup does not advance version gate' );
 $assert( array( 'schema' ) === $GLOBALS['setup_calls'], 'failed schema setup does not run dependent defaults' );
+$assert( array() === $GLOBALS['setup_dropped_tables'], 'failed schema setup does not drop retired chat tables' );
 
 $GLOBALS['setup_schema_succeeds']                    = true;
 $GLOBALS['setup_options']['datamachine_settings']    = array( 'operator' => true );

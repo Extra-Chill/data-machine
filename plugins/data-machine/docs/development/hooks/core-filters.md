@@ -372,10 +372,8 @@ $ai_response = RequestBuilder::build(
 
 - `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
 - `AgentModeDirective` - Mode-specific guidance for chat, pipeline, system, and extension modes (priority 22)
-- `CallerContextDirective` - Authenticated cross-site caller identity (priority 25)
-- `AgentDailyMemoryDirective` and `ClientContextDirective` - Optional daily memory and client context (priority 35)
+- `AgentDailyMemoryDirective` - Optional daily memory (priority 35)
 - `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
-- `ChatPipelinesDirective` - Pipeline and flow inventory for chat (priority 45)
 
 **Unified Directive Registration**:
 
@@ -399,55 +397,6 @@ add_filter('datamachine_directives', function($directives) {
 ```
 
 All AI request building uses `RequestBuilder::build()` for consistent request structure and directive application.
-
-### `datamachine_session_title_prompt`
-
-**Purpose**: Customize or replace the AI prompt used for generating session titles.
-
-**Parameters**:
-
-- `$default_prompt` (string) - The default prompt for title generation
-- `$context` (array) - Conversation context with the following keys:
-  - `first_user_message` (string) - The first message from the user
-  - `first_assistant_response` (string) - The assistant's first response
-  - `conversation_context` (string) - Combined conversation context
-
-**Return**: String - The prompt to use for title generation
-
-**Location**: `/inc/Abilities/SystemAbilities.php`
-
-**Usage Example**:
-
-```php
-// Generate code names instead of descriptive titles
-add_filter('datamachine_session_title_prompt', function($prompt, $context) {
-    return "Generate a two-word code name like 'cosmic-owl' or 'azure-phoenix'. " .
-           "Return ONLY the code name, nothing else.";
-}, 10, 2);
-
-// Add custom context to the default prompt
-add_filter('datamachine_session_title_prompt', function($prompt, $context) {
-    return $prompt . "\n\nAdditional instruction: Keep titles under 5 words.";
-}, 10, 2);
-
-// Generate privacy-safe titles without chat content
-add_filter('datamachine_session_title_prompt', function($prompt, $context) {
-    $words = ['cosmic', 'azure', 'golden', 'silent', 'swift'];
-    $nouns = ['owl', 'phoenix', 'river', 'mountain', 'forest'];
-    return sprintf(
-        "Return exactly this title: %s-%s",
-        $words[array_rand($words)],
-        $nouns[array_rand($nouns)]
-    );
-}, 10, 2);
-```
-
-**Use Cases**:
-
-- Generate code names instead of descriptive titles
-- Add custom instructions to title generation
-- Create privacy-safe titles that don't expose chat content
-- Customize title style per site or plugin
 
 ## Preview & Approval Filters
 
@@ -1164,7 +1113,7 @@ add_filter('datamachine_directives', function($directives) {
 - **20**: Registered memory files
 - **22**: Runtime agent-mode guidance
 - **25-35**: Caller, daily memory, and client-reported context
-- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
+- **40-50**: Pipeline, flow, and workflow-specific directives
 
 ### `datamachine_directives_enabled`
 
@@ -1470,99 +1419,23 @@ and event callback.
 - Transcript persistence and loop event emission
 - Runtime tool mediation through Agents API loop options
 
-### ConversationStoreInterface (`/inc/Core/Database/Chat/ConversationStoreInterface.php`)
+### Pipeline transcript storage (`wp_agent_conversation_store`)
 
-**Purpose**: Single seam between chat session persistence and the underlying
-storage backend. The default implementation ([`Chat`](../../../inc/Core/Database/Chat/Chat.php))
-preserves byte-for-byte the MySQL-table behavior the codebase used before
-this seam was introduced — self-hosted users see no change.
+Data Machine no longer ships a chat-session table or the
+`datamachine_conversation_store` filter. Chat sessions are owned by Agents API
+(`agents/chat`) and host chat runtimes.
 
-**Filter: `datamachine_conversation_store`**
+When a pipeline step opts into transcript persistence, Data Machine resolves the
+Agents API conversation store through
+`WP_Agent_Conversation_Sessions::get_store( array( 'source' => 'datamachine' ) )`
+(wrapped by `DataMachine\Engine\AI\TranscriptStore`). Hosts provide a store by
+returning a `WP_Agent_Conversation_Store` from the `wp_agent_conversation_store`
+filter. When no store is registered, transcript persistence is skipped and a
+debug log entry is written. Retention of stored transcripts is the store's
+responsibility.
 
-```php
-apply_filters(
-    'datamachine_conversation_store',
-    ConversationStoreInterface $default  // the built-in MySQL-table Chat store
-);
-```
-
-Return a different `ConversationStoreInterface` implementation to swap the
-backend. Return the default (or anything not implementing the interface) to
-keep the built-in store. Misuse falls back to the default and logs via
-`datamachine_log`.
-
-**Use case**: managed-host environments where chat sessions should live in
-a framework-provided conversation store rather than the site DB (e.g.
-a consumer on WordPress.com routing through `\WPCOM\AI\Services\Conversation_Storage`).
-A consumer plugin ships an adapter and registers it conditionally:
-
-```php
-add_filter( 'datamachine_conversation_store', function ( $store ) {
-    if ( $store instanceof My_AIFramework_Conversation_Store ) {
-        return $store; // already swapped
-    }
-    if ( ! function_exists( 'my_host_is_wpcom' ) || ! my_host_is_wpcom() ) {
-        return $store; // self-hosted — keep MySQL default
-    }
-    return new My_AIFramework_Conversation_Store();
-}, 10, 1 );
-```
-
-**Single consumer of the store**: `\DataMachine\Core\Database\Chat\ConversationStoreFactory::get()`.
-
-Every core caller — `ChatOrchestrator`, the five Chat Session abilities
-(via `ChatSessionHelpers`), `ChatCommand`, `SystemAbilities`, the
-scheduled cleanup action — resolves the store through the factory. The
-factory caches the store per request and applies the filter exactly once.
-
-**Message shape contract**
-
-Stores MUST normalize messages on read to the canonical agent message envelope,
-documented in
-[`ai-message-envelope.md`](../../core-system/ai-message-envelope.md). The
-chat/session storage contract is this JSON-friendly envelope shape:
-
-```php
-[
-	'schema'     => 'agents-api.message',
-	'version'    => 1,
-	'type'       => 'text'|'tool_call'|'tool_result'|...,
-	'role'       => 'user'|'assistant'|'system'|'tool',
-	'content'    => string|array,
-	'payload'    => array,                  // Type-specific fields.
-	'metadata'   => array,                  // Extension/provider details.
-	'id'         => string,                 // Optional stable message identifier.
-	'created_at' => string,                 // Optional MySQL DATETIME (UTC).
-	'updated_at' => string,                 // Optional MySQL DATETIME (UTC).
-]
-```
-
-The five Chat Session abilities and the DM chat UI consume this shape.
-Adapter stores that wrap another host runtime are responsible for translating
-host-specific message objects into the canonical envelope at the boundary and
-returning envelopes on the way out. Provider-specific `role/content/metadata`
-arrays are projection shapes at provider boundaries, not the store contract.
-
-**Swap boundary**
-
-- ✅ What stays stable: all 5 chat abilities, REST endpoints, the DM chat
-  UI, the session switcher, title generation, unread counts, last-read logic.
-- 🔄 What swaps: concrete storage (MySQL table vs. framework-managed store
-  vs. in-memory test fixture).
-- ❌ What is NOT a replacement point: session ownership checks, agent
-  adoption, token resolution, title generation. Those stay in the higher-
-  level callers.
-
-**Contract summary** (full signatures in [`ConversationStoreInterface.php`](../../../inc/Core/Database/Chat/ConversationStoreInterface.php)):
-
-- `create_session / get_session / update_session / delete_session`
-- `get_user_sessions / get_user_session_count` — switcher data
-- `get_recent_pending_session` — timeout-retry dedup
-- `update_title / mark_session_read` — UI state
-- `count_unread` — pure derivation from a messages array
-- `cleanup_expired_sessions / cleanup_old_sessions / cleanup_orphaned_sessions` — scheduled cleanup
-- `list_sessions_for_day` — day-scoped summary rows for the Daily Memory Task
-- `get_storage_metrics` — row count + on-disk size for the `wp datamachine retention show` CLI; return `null` to opt out
+Stores MUST normalize messages to the canonical agent message envelope
+documented in [`ai-message-envelope.md`](../../core-system/ai-message-envelope.md).
 
 ### WP_Agent_Memory_Store (`/agents-api/inc/Core/FilesRepository/WP_Agent_Memory_Store.php`)
 

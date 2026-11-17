@@ -53,8 +53,9 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_chat_excludes_pipeline_editing_tools(): void {
-		// Pipeline-editing tools moved to the pipeline_editor mode (data-machine#2425),
-		// so generic chat no longer surfaces them. Portable chat surfaces stay clean.
+		// The pipeline_editor mode and its chat-only pipeline-editing tools were
+		// removed with Data Machine chat (data-machine#3973). Pipeline editing is
+		// reached through the datamachine/* abilities instead.
 		$tools = $this->resolver->resolve(
 			array(
 				'mode' => ToolPolicyResolver::MODE_CHAT,
@@ -65,33 +66,6 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'update_flow', $tools );
 		$this->assertArrayNotHasKey( 'create_pipeline', $tools );
 		$this->assertArrayNotHasKey( 'run_flow', $tools );
-	}
-
-	public function test_pipeline_editor_includes_pipeline_editing_tools(): void {
-		// The DM admin pipeline chat opts into [chat, pipeline_editor]; the
-		// pipeline-editing tools resolve under the pipeline_editor mode.
-		$tools = $this->resolver->resolve(
-			array(
-				'mode' => 'pipeline_editor',
-			)
-		);
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'update_flow', $tools );
-	}
-
-	public function test_composed_chat_pipeline_editor_unions_tools(): void {
-		// Mode composition is additive: the admin surface sends both modes and
-		// gets the union — generic chat tools plus pipeline-editing tools.
-		$tools = $this->resolver->resolve(
-			array(
-				'modes' => array( ToolPolicyResolver::MODE_CHAT, 'pipeline_editor' ),
-			)
-		);
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'update_flow', $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
 	public function test_chat_tools_pass_availability_check(): void {

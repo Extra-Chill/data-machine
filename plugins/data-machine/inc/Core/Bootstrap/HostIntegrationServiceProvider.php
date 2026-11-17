@@ -12,16 +12,9 @@ defined( 'ABSPATH' ) || exit;
 use AgentsAPI\Core\FilesRepository\WP_Agent_Memory_Store;
 use DataMachine\Abilities\AbilityScopePermissionFilter;
 use DataMachine\Abilities\AgentAbilities;
-use DataMachine\Abilities\Chat\AgentsChatHandler;
-use DataMachine\Abilities\Chat\CreateChatSessionAbility;
-use DataMachine\Abilities\Chat\DeleteChatSessionAbility;
-use DataMachine\Abilities\Chat\GetChatSessionAbility;
-use DataMachine\Abilities\Chat\ListChatSessionsAbility;
-use DataMachine\Abilities\Chat\MarkSessionReadAbility;
 use DataMachine\Core\Auth\AgentAccessFilterBridge;
 use DataMachine\Core\Auth\AgentAccessStoreAdapter;
 use DataMachine\Core\Content\ContentFormat;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\FilesRepository\DiskAgentMemoryStore;
 use DataMachine\Core\Identity\AgentIdentityStoreAdapter;
 use DataMachine\Core\OAuth\HttpBasicAuthProvider;
@@ -45,12 +38,6 @@ final class HostIntegrationServiceProvider {
 		add_action( 'plugins_loaded', array( WpAiClientCache::class, 'install' ), 20 );
 		AbilityScopePermissionFilter::register();
 		ContentFormat::register();
-		new ListChatSessionsAbility();
-		new GetChatSessionAbility();
-		new DeleteChatSessionAbility();
-		new CreateChatSessionAbility();
-		new MarkSessionReadAbility();
-		new AgentsChatHandler();
 
 		add_filter( 'wp_agent_runtime_import_bundle', array( AgentAbilities::class, 'importRuntimeAgentBundle' ), 5, 4 );
 		add_filter( 'wp_agent_runtime_run_bundle', array( AgentAbilities::class, 'runRuntimeAgentBundle' ), 10, 4 );
@@ -62,7 +49,6 @@ final class HostIntegrationServiceProvider {
 		AgentAccessFilterBridge::register();
 		AgentIdentityStoreAdapter::register();
 
-		add_filter( 'wp_agent_conversation_store', array( self::class, 'conversation_store' ) );
 		add_filter( 'wp_agent_pending_action_store', array( self::class, 'pending_action_store' ) );
 		add_filter( 'wp_agent_pending_action_resolver', array( self::class, 'pending_action_resolver' ) );
 		add_filter( 'agents_pending_action_permission', array( self::class, 'pending_action_permission' ) );
@@ -125,11 +111,6 @@ final class HostIntegrationServiceProvider {
 		return $fields;
 	}
 
-	/** Return the Agents API conversation store adapter. */
-	public static function conversation_store() {
-		return ConversationStoreFactory::get_transcript_store();
-	}
-
 	/** Return the Agents API pending-action store adapter. */
 	public static function pending_action_store() {
 		return PendingActionStore::adapter();
@@ -157,18 +138,13 @@ final class HostIntegrationServiceProvider {
 	public static function register_agent_modes(): void {
 		AgentModeRegistry::register( 'chat', 10, array(
 			'label'           => __( 'Chat Agent', 'data-machine' ),
-			'description'     => __( 'Interactive chat conversations. Benefits from capable models for complex reasoning.', 'data-machine' ),
+			'description'     => __( 'Interactive chat conversations run by a host chat runtime. Benefits from capable models for complex reasoning.', 'data-machine' ),
 			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
 		) );
 		AgentModeRegistry::register( 'pipeline', 20, array(
 			'label'           => __( 'Pipeline Agent', 'data-machine' ),
 			'description'     => __( 'Structured workflow execution. Operates within defined steps — efficient models work well.', 'data-machine' ),
 			'memory_contexts' => array( 'agent_identity', 'agent_memory' ),
-		) );
-		AgentModeRegistry::register( 'pipeline_editor', 25, array(
-			'label'           => __( 'Pipeline Editor Agent', 'data-machine' ),
-			'description'     => __( 'Admin pipeline-editing surface. Composes on top of chat to add pipeline/handler/flow guidance, the pipelines inventory, and pipeline-editing tools.', 'data-machine' ),
-			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
 		) );
 		AgentModeRegistry::register( 'system', 30, array(
 			'label'       => __( 'System Agent', 'data-machine' ),

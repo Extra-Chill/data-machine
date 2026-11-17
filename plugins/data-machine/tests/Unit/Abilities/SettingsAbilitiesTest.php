@@ -89,8 +89,6 @@ class SettingsAbilitiesTest extends WP_UnitTestCase {
 		$settings = $result['settings'];
 		$this->assertArrayHasKey( 'cleanup_job_data_on_failure', $settings );
 		$this->assertArrayHasKey( 'file_retention_days', $settings );
-		$this->assertArrayHasKey( 'chat_retention_days', $settings );
-		$this->assertArrayHasKey( 'chat_ai_titles_enabled', $settings );
 		$this->assertArrayHasKey( 'alt_text_auto_generate_enabled', $settings );
 		$this->assertArrayHasKey( 'problem_flow_threshold', $settings );
 		$this->assertArrayHasKey( 'flows_per_page', $settings );

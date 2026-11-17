@@ -9,7 +9,7 @@ The multi-agent system consists of five layers:
 1. **Agents table** — first-class identity records in the database
 2. **Agent access control** — role-based grants (admin/operator/viewer) per agent
 3. **Filesystem scoping** — isolated directory trees per agent
-4. **Database scoping** — agent_id on pipelines, flows, jobs, and chat sessions
+4. **Database scoping** — agent_id on pipelines, flows, and jobs
 5. **Resolution** — CLI and API helpers that resolve the active agent from context
 
 Plugins that ship bundled agent roles (e.g. a wiki-generator, a support-triage bot) declare them via the `wp_agents_api_init` action and `wp_register_agent()` helper. See `agent-registration.md` for the declarative registration surface.
@@ -141,7 +141,6 @@ Resources in Data Machine carry `agent_id` (or `user_id`) to scope them to a spe
 | `datamachine_pipelines` | `user_id` | Pipeline ownership |
 | `datamachine_flows` | `user_id` | Flow ownership |
 | `datamachine_jobs` | `user_id` | Job execution ownership |
-| `datamachine_chat_sessions` | `user_id` | Chat session ownership |
 
 **Note:** The scope column is `user_id` (not `agent_id`) for historical reasons. A `user_id` of `0` indicates single-agent mode — a valid operational state where all resources are shared.
 

@@ -56,7 +56,7 @@ const PROCEED                  = 'proceed';
  *     @var string $model
  *     @var bool   $memory_loaded   Whether AgentMemory::get_all() returned content.
  *     @var int    $original_size   Bytes of MEMORY.md.
- *     @var bool   $has_context     Whether jobs/chat-sessions activity exists.
+ *     @var bool   $has_context     Whether same-day job activity exists.
  *     @var int    $max_size        AgentMemory::MAX_FILE_SIZE.
  * }
  * @return string One of the SKIP_* / PROCEED constants.

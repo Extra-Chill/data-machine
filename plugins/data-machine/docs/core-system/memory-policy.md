@@ -143,7 +143,7 @@ Match `ToolPolicyResolver` for consistency across the policy layer:
 
 ```php
 MemoryPolicyResolver::MODE_PIPELINE  // pipeline step AI execution
-MemoryPolicyResolver::MODE_CHAT      // admin chat session
+MemoryPolicyResolver::MODE_CHAT      // host chat runtime session
 MemoryPolicyResolver::MODE_SYSTEM    // system task execution
 ```
 

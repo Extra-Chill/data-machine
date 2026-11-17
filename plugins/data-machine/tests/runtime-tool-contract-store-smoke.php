@@ -26,23 +26,6 @@ namespace DataMachine\Core {
 	}
 }
 
-namespace DataMachine\Api\Chat {
-	class ChatOrchestrator {
-		public static array $calls = array();
-
-		public static function processContinue( string $session_id, int $user_id, ?int $calling_user_id = null ): array {
-			self::$calls[] = array(
-				'session_id'      => $session_id,
-				'user_id'         => $user_id,
-				'calling_user_id' => $calling_user_id,
-				'tools'           => null !== $calling_user_id && $calling_user_id > 0 ? array( 'owner_tool' ) : array(),
-			);
-
-			return array();
-		}
-	}
-}
-
 namespace DataMachine\Core\Database\Jobs {
 	class Jobs {
 		public static array $jobs        = array();
@@ -86,52 +69,6 @@ namespace DataMachine\Core\Database\Jobs {
 	}
 }
 
-namespace DataMachine\Core\Database\Chat {
-	class RuntimeToolContractStoreSmokeSessionStore {
-		public array $sessions = array();
-
-		public function get_session( string $session_id ): ?array {
-			return $this->sessions[ $session_id ] ?? null;
-		}
-
-		public function update_session( string $session_id, array $messages, array $metadata, string $provider, string $model ): bool {
-			$this->sessions[ $session_id ] = array_merge(
-				$this->sessions[ $session_id ] ?? array(),
-				array(
-					'messages' => $messages,
-					'metadata' => $metadata,
-					'provider' => $provider,
-					'model'    => $model,
-				)
-			);
-
-			return true;
-		}
-
-		public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string {
-			unset( $session_id, $ttl_seconds );
-			return 'runtime-tool-contract-lock';
-		}
-
-		public function release_session_lock( string $session_id, string $lock_token ): bool {
-			unset( $session_id, $lock_token );
-			return true;
-		}
-	}
-
-	class ConversationStoreFactory {
-		public static ?RuntimeToolContractStoreSmokeSessionStore $store = null;
-
-		public static function get(): RuntimeToolContractStoreSmokeSessionStore {
-			if ( null === self::$store ) {
-				self::$store = new RuntimeToolContractStoreSmokeSessionStore();
-			}
-
-			return self::$store;
-		}
-	}
-}
-
 namespace DataMachine\Engine\AI {
 	class ConversationManager {
 		public static function validateToolCall( string $tool_name, array $tool_parameters, array $messages, ?array $tool_definition ): array {
@@ -163,7 +100,6 @@ namespace {
 	use AgentsAPI\AI\WP_Agent_Runtime_Tool_Lifecycle;
 	use AgentsAPI\AI\WP_Agent_Conversation_Loop;
 	use AgentsAPI\AI\Tools\WP_Agent_Tool_Executor;
-	use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 	use DataMachine\Core\Database\Jobs\Jobs;
 	use DataMachine\Engine\AI\DataMachineToolRuntimeRules;
 	use DataMachine\Engine\AI\LoopEventSinkInterface;
@@ -234,15 +170,31 @@ namespace {
 		return 0;
 	}
 
+	// Host chat runtimes continue deferred conversations from this action.
+	$GLOBALS['datamachine_runtime_tool_continue_calls'] = array();
+
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( string $hook, ...$args ): void {
-			unset( $hook, $args );
+			if ( 'datamachine_runtime_tool_continue' !== $hook ) {
+				return;
+			}
+
+			$calling_user_id = $args[2] ?? null;
+			$GLOBALS['datamachine_runtime_tool_continue_calls'][] = array(
+				'session_id'      => $args[0] ?? '',
+				'user_id'         => $args[1] ?? 0,
+				'calling_user_id' => $calling_user_id,
+				'tools'           => null !== $calling_user_id && $calling_user_id > 0 ? array( 'owner_tool' ) : array(),
+			);
 		}
 	}
 
 	if ( ! function_exists( 'apply_filters' ) ) {
 		function apply_filters( string $hook, $value, ...$args ) {
-			unset( $hook, $args );
+			unset( $args );
+			if ( 'wp_agent_conversation_store' === $hook ) {
+				return $GLOBALS['datamachine_runtime_tool_smoke_store'] ?? $value;
+			}
 			return $value;
 		}
 	}
@@ -269,7 +221,68 @@ namespace {
 	require __DIR__ . '/../vendor/autoload.php';
 	require_once __DIR__ . '/../inc/Engine/AI/RuntimeToolRunStateStore.php';
 	require_once __DIR__ . '/../inc/Engine/AI/Tools/ToolExecutor.php';
+	require_once __DIR__ . '/../inc/Engine/AI/TranscriptStore.php';
 	require_once __DIR__ . '/../inc/Engine/AI/conversation-loop.php';
+
+	class RuntimeToolContractStoreSmokeSessionStore implements \AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store, \AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock {
+		public array $sessions = array();
+
+		public function create_session( \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope $workspace, int $user_id, string $agent_slug = '', array $metadata = array(), string $context = 'chat' ): string {
+			unset( $workspace, $user_id, $agent_slug, $metadata, $context );
+			return '';
+		}
+
+		public function list_sessions( \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array {
+			unset( $workspace, $user_id, $args );
+			return array();
+		}
+
+		public function get_session( string $session_id ): ?array {
+			return $this->sessions[ $session_id ] ?? null;
+		}
+
+		public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
+			unset( $provider_response_id );
+			$this->sessions[ $session_id ] = array_merge(
+				$this->sessions[ $session_id ] ?? array(),
+				array(
+					'messages' => $messages,
+					'metadata' => $metadata,
+					'provider' => $provider,
+					'model'    => $model,
+				)
+			);
+
+			return true;
+		}
+
+		public function delete_session( string $session_id ): bool {
+			unset( $this->sessions[ $session_id ] );
+			return true;
+		}
+
+		public function get_recent_pending_session( \AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array {
+			unset( $workspace, $user_id, $seconds, $context, $token_id );
+			return null;
+		}
+
+		public function update_title( string $session_id, string $title ): bool {
+			unset( $session_id, $title );
+			return true;
+		}
+
+		public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string {
+			unset( $session_id, $ttl_seconds );
+			return 'runtime-tool-contract-lock';
+		}
+
+		public function release_session_lock( string $session_id, string $lock_token ): bool {
+			unset( $session_id, $lock_token );
+			return true;
+		}
+	}
+
+	$GLOBALS['datamachine_runtime_tool_smoke_store'] = new RuntimeToolContractStoreSmokeSessionStore();
 
 	class RuntimeToolContractStoreSmokeExecutor implements WP_Agent_Tool_Executor {
 		public int $calls = 0;
@@ -311,7 +324,7 @@ namespace {
 
 	echo "runtime-tool-contract-store-smoke\n\n";
 
-	$chat_db                              = ConversationStoreFactory::get();
+	$chat_db                              = $GLOBALS['datamachine_runtime_tool_smoke_store'];
 	$chat_db->sessions['session-1']       = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$chat_db->sessions['session-timeout'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 
@@ -363,7 +376,7 @@ namespace {
 	$assert( $before_recovery_messages === count( $chat_db->sessions['session-1']['messages'] ), 'fulfilled timeout recovery does not duplicate transcript projection' );
 	$assert( $before_recovery_actions === count( $GLOBALS['datamachine_runtime_tool_enqueued'] ), 'fulfilled timeout recovery adopts existing resume action idempotently' );
 	datamachine_resume_runtime_tool_request( $request_id );
-	$delegated_resume = \DataMachine\Api\Chat\ChatOrchestrator::$calls[0] ?? array();
+	$delegated_resume = $GLOBALS['datamachine_runtime_tool_continue_calls'][0] ?? array();
 	$assert( 7 === ( $delegated_resume['user_id'] ?? null ), 'async delegated resume retains runtime/session ownership' );
 	$assert( 52 === ( $delegated_resume['calling_user_id'] ?? null ), 'async delegated resume restores the original acting caller' );
 	$assert( array( 'owner_tool' ) === ( $delegated_resume['tools'] ?? null ), 'delegated caller-scoped tools remain visible after async resume' );
@@ -407,7 +420,7 @@ namespace {
 	$assert( 0 === ( $system_request['metadata']['datamachine']['calling_user_id'] ?? null ), 'deferred request preserves an explicit no-human caller' );
 	datamachine_submit_runtime_tool_result( $system_request_id, array( 'selected_id' => 'block-2' ) );
 	datamachine_resume_runtime_tool_request( $system_request_id );
-	$system_resume = \DataMachine\Api\Chat\ChatOrchestrator::$calls[1] ?? array();
+	$system_resume = $GLOBALS['datamachine_runtime_tool_continue_calls'][1] ?? array();
 	$assert( 7 === ( $system_resume['user_id'] ?? null ), 'async no-human resume retains runtime/session ownership' );
 	$assert( 0 === ( $system_resume['calling_user_id'] ?? null ), 'async no-human resume restores explicit zero without owner fallback' );
 	$assert( array() === ( $system_resume['tools'] ?? null ), 'owner-scoped tools do not appear after async no-human resume' );
@@ -475,10 +488,10 @@ namespace {
 	$assert( ! isset( Jobs::$engine_data[ $packet_job_id ]['packet_tool_executions'] ), 'terminal cleanup runs only after reservation finalization is durable' );
 	$assert( ! empty( $packet_phases['job_terminalized_at'] ) && ! empty( $packet_phases['session_projected_at'] ) && ! empty( $packet_phases['resume_scheduled_at'] ), 'duplicate callback persists terminal, projection, and resume phases' );
 	$assert( $before_packet_messages + 1 === count( $chat_db->sessions['session-packet']['messages'] ), 'recovery projects the packet result exactly once' );
-	$before_packet_resumes = count( \DataMachine\Api\Chat\ChatOrchestrator::$calls );
+	$before_packet_resumes = count( $GLOBALS['datamachine_runtime_tool_continue_calls'] );
 	datamachine_resume_runtime_tool_request( (string) $packet_request['request_id'] );
 	datamachine_resume_runtime_tool_request( (string) $packet_request['request_id'] );
-	$assert( $before_packet_resumes + 1 === count( \DataMachine\Api\Chat\ChatOrchestrator::$calls ), 'duplicate resume action delivery continues the conversation exactly once' );
+	$assert( $before_packet_resumes + 1 === count( $GLOBALS['datamachine_runtime_tool_continue_calls'] ), 'duplicate resume action delivery continues the conversation exactly once' );
 	$GLOBALS['datamachine_runtime_tool_enqueued'] = array_values( array_filter( $GLOBALS['datamachine_runtime_tool_enqueued'], static fn( array $action ): bool => 'datamachine_runtime_tool_resume' !== $action['hook'] || array( $packet_request['request_id'] ) !== $action['args'] ) );
 	datamachine_submit_runtime_tool_result( (string) $packet_request['request_id'], array( 'published' => true ) );
 	$assert( 0 === count( array_filter( $GLOBALS['datamachine_runtime_tool_enqueued'], static fn( array $action ): bool => 'datamachine_runtime_tool_resume' === $action['hook'] && array( $packet_request['request_id'] ) === $action['args'] ) ), 'completed duplicate callback does not enqueue another resume after the first action ran' );

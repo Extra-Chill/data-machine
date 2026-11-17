@@ -145,6 +145,47 @@ function datamachine_run_deferred_site_setup(): void {
 	// (wordpress/agents-api v0.11.1). delete_option() on an already-absent
 	// row is a cheap no-op, so this is safe to run on every version bump.
 	delete_option( 'datamachine_routine_schedule_hashes' );
+
+	datamachine_drop_legacy_chat_sessions();
+}
+
+/**
+ * Drop the retired Data Machine chat-session storage.
+ *
+ * Chat moved to Agents API (Extra-Chill/data-machine#3973). Data Machine no
+ * longer reads or writes `datamachine_chat_sessions`, so the version-bump
+ * pass removes the canonical network table, any legacy per-site table from
+ * before the network convergence, the convergence marker, and the retired
+ * chat retention schedules. Every step is idempotent: `DROP TABLE IF EXISTS`
+ * and unscheduling absent actions are no-ops, so re-running on later version
+ * bumps or on other subsites is safe.
+ *
+ * @return void
+ */
+function datamachine_drop_legacy_chat_sessions(): void {
+	global $wpdb;
+
+	$tables = array_unique(
+		array(
+			$wpdb->base_prefix . 'datamachine_chat_sessions',
+			$wpdb->prefix . 'datamachine_chat_sessions',
+		)
+	);
+
+	foreach ( $tables as $table ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
+	}
+
+	if ( function_exists( 'delete_site_option' ) ) {
+		delete_site_option( 'datamachine_chat_sessions_network_migrated' );
+	}
+	delete_option( 'datamachine_pipeline_transcript_retention_days' );
+
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'datamachine_recurring_retention_chat_sessions' );
+		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions' );
+	}
 }
 
 // Ensure schema early in plugins_loaded (priority 5) so that

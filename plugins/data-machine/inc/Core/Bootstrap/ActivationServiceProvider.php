@@ -114,7 +114,6 @@ final class ActivationServiceProvider {
 		as_unschedule_all_actions( 'datamachine_cleanup_processed_items', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_as_actions', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_old_files', array(), 'datamachine-files' );
-		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions', array(), 'datamachine-chat' );
 	}
 
 	/**
@@ -263,7 +262,6 @@ final class ActivationServiceProvider {
 			\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
 			\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
 
-			\DataMachine\Core\Database\Chat\Chat::create_table();
 			\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 		} catch ( \Throwable $error ) {
 			do_action( 'datamachine_log', 'error', 'Data Machine schema convergence threw an exception', array( 'error' => $error->getMessage() ) );
@@ -369,10 +367,6 @@ final class ActivationServiceProvider {
 			$site . 'datamachine_run_metadata'     => array(
 				'columns' => array( 'metadata_id', 'job_id', 'metadata_path', 'metadata_value', 'value_type', 'created_at', 'updated_at' ),
 				'indexes' => array( 'PRIMARY', 'job_path', 'path_value', 'job_id' ),
-			),
-			$network . 'datamachine_chat_sessions' => array(
-				'columns' => array( 'session_id', 'workspace_type', 'workspace_id', 'user_id', 'owner_type', 'owner_key_hash', 'owner_label', 'agent_id', 'title', 'messages', 'metadata', 'provider', 'model', 'provider_response_id', 'mode', 'created_at', 'updated_at', 'last_read_at', 'expires_at', 'transcript_lock_token', 'transcript_lock_expires_at' ),
-				'indexes' => array( 'PRIMARY', 'workspace', 'user_id', 'owner', 'agent_id', 'mode', 'user_mode', 'created_at', 'updated_at', 'expires_at', 'transcript_lock_expires_at' ),
 			),
 			$site . 'datamachine_pending_actions'  => array(
 				'columns' => array( 'action_id', 'kind', 'summary', 'preview_data', 'apply_input', 'agent_id', 'agent', 'workspace_type', 'workspace_id', 'created_by', 'creator', 'context', 'metadata', 'status', 'created_at', 'expires_at', 'resolved_at', 'resolved_by', 'resolver', 'resolution_result', 'resolution_error', 'resolution_metadata', 'receipt_nonce', 'receipt_consumed_at', 'receipt_operation', 'receipt_evidence' ),

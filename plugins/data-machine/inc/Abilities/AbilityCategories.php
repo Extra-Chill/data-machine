@@ -40,7 +40,6 @@ class AbilityCategories {
 	public const AUTH       = 'datamachine-auth';
 	public const LOGGING    = 'datamachine-logging';
 	public const SYSTEM     = 'datamachine-system';
-	public const CHAT       = 'datamachine-chat';
 	public const ACTIONS    = 'datamachine-actions';
 
 	private static bool $registered = false;
@@ -200,11 +199,7 @@ class AbilityCategories {
 			),
 			self::SYSTEM     => array(
 				'label'       => __( 'System', 'data-machine' ),
-				'description' => __( 'System health, session titles, and background task execution.', 'data-machine' ),
-			),
-			self::CHAT       => array(
-				'label'       => __( 'Chat', 'data-machine' ),
-				'description' => __( 'Chat session management and messaging.', 'data-machine' ),
+				'description' => __( 'System health and background task execution.', 'data-machine' ),
 			),
 			self::ACTIONS    => array(
 				'label'       => __( 'Actions', 'data-machine' ),

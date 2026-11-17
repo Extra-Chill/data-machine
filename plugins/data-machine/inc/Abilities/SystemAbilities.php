@@ -3,7 +3,7 @@
  * System Abilities
  *
  * WordPress 6.9 Abilities API primitives for system infrastructure operations.
- * Handles session title generation and other system-level tasks.
+ * Handles health checks, system task runs, and other system-level tasks.
  *
  * @package DataMachine\Abilities
  * @since   0.13.7
@@ -13,12 +13,8 @@ namespace DataMachine\Abilities;
 
 use DataMachine\Abilities\PermissionHelper;
 
-use DataMachine\Engine\AI\RequestBuilder;
-use AgentsAPI\AI\WP_Agent_Message;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Flows\Flows;
 use DataMachine\Core\Database\Pipelines\Pipelines;
-use DataMachine\Core\PluginSettings;
 use DataMachine\Core\Bootstrap\DependencyChecker;
 use DataMachine\Core\ActionScheduler\GroupRegistrar;
 use DataMachine\Engine\Scheduling\FlowRoutines;
@@ -45,55 +41,12 @@ class SystemAbilities {
 
 	private function registerAbilities(): void {
 		$register_callback = function () {
-			$this->registerSessionTitleAbility();
 			$this->registerHealthCheckAbility();
 			// registerGitHubIssueAbility moved to data-machine-code extension.
 			$this->registerRunTaskAbility();
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	private function registerSessionTitleAbility(): void {
-		wp_register_ability(
-			'datamachine/generate-session-title',
-			array(
-				'label'               => 'Generate Session Title',
-				'description'         => 'Generate an AI-powered title for a chat session based on conversation content',
-				'category'            => 'datamachine-system',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'properties' => array(
-						'session_id' => array(
-							'type'        => 'string',
-							'description' => 'UUID of the chat session to generate title for',
-						),
-						'force'      => array(
-							'type'        => 'boolean',
-							'description' => 'Force regeneration even if title already exists',
-							'default'     => false,
-						),
-					),
-					'required'   => array( 'session_id' ),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
-						'title'   => array( 'type' => 'string' ),
-						'method'  => array(
-							'type' => 'string',
-							'enum' => array( 'ai', 'fallback', 'existing' ),
-						),
-						'message' => array( 'type' => 'string' ),
-						'error'   => array( 'type' => 'string' ),
-					),
-				),
-				'execute_callback'    => array( self::class, 'generateSessionTitle' ),
-				'permission_callback' => fn() => PermissionHelper::can_manage(),
-				'meta'                => array( 'show_in_rest' => false ),
-			)
-		);
 	}
 
 	private function registerHealthCheckAbility(): void {
@@ -879,252 +832,5 @@ class SystemAbilities {
 	 */
 	private static function hasNonEmptyParam( array $params, string $key ): bool {
 		return array_key_exists( $key, $params ) && null !== $params[ $key ] && '' !== $params[ $key ];
-	}
-
-	public static function generateSessionTitle( array $input ): array|\WP_Error {
-		$session_id = $input['session_id'];
-		$force      = $input['force'] ?? false;
-
-		$chat_db = ConversationStoreFactory::get();
-		$session = $chat_db->get_session( $session_id );
-
-		if ( ! $session ) {
-			return new \WP_Error(
-				'session_not_found',
-				'Session not found',
-				array(
-					'status'  => 404,
-					'message' => 'Unable to find chat session',
-				)
-			);
-		}
-
-		// Check if title already exists and we're not forcing regeneration
-		if ( ! empty( $session['title'] ) && ! $force ) {
-			return array(
-				'success' => true,
-				'title'   => $session['title'],
-				'method'  => 'existing',
-				'message' => 'Title already exists',
-			);
-		}
-
-		$messages = $session['messages'] ?? array();
-		if ( empty( $messages ) ) {
-			return new \WP_Error(
-				'session_messages_missing',
-				'No messages found',
-				array(
-					'status'  => 422,
-					'message' => 'Session has no conversation messages',
-				)
-			);
-		}
-
-		// Extract first user message and first assistant response
-		$first_user_message       = null;
-		$first_assistant_response = null;
-
-		foreach ( $messages as $msg ) {
-			$msg     = WP_Agent_Message::normalize( $msg );
-			$role    = $msg['role'] ?? '';
-			$content = $msg['content'] ?? '';
-			$content = is_string( $content ) ? $content : wp_json_encode( $content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
-
-			if ( 'user' === $role && null === $first_user_message && ! empty( $content ) ) {
-				$first_user_message = $content;
-			} elseif ( 'assistant' === $role && null === $first_assistant_response && ! empty( $content ) ) {
-				$first_assistant_response = $content;
-			}
-
-			if ( null !== $first_user_message && null !== $first_assistant_response ) {
-				break;
-			}
-		}
-
-		if ( null === $first_user_message ) {
-			return new \WP_Error(
-				'session_user_message_missing',
-				'No user message found',
-				array(
-					'status'  => 422,
-					'message' => 'Session has no user messages to generate title from',
-				)
-			);
-		}
-
-		// Check if AI titles are enabled
-		$ai_titles_enabled = PluginSettings::get( 'chat_ai_titles_enabled', true );
-
-		if ( ! $ai_titles_enabled ) {
-			$title   = self::generateTruncatedTitle( $first_user_message );
-			$success = $chat_db->update_title( $session_id, $title );
-			if ( ! $success ) {
-				return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
-			}
-
-			return array(
-				'success' => true,
-				'title'   => $title,
-				'method'  => 'fallback',
-				'message' => 'Title generated using fallback method',
-			);
-		}
-
-		// Try AI generation
-		$title = self::generateAITitle( $first_user_message, $first_assistant_response );
-
-		if ( null === $title ) {
-			$title  = self::generateTruncatedTitle( $first_user_message );
-			$method = 'fallback';
-		} else {
-			$method = 'ai';
-		}
-
-		$success = $chat_db->update_title( $session_id, $title );
-		if ( ! $success ) {
-			return new \WP_Error( 'session_title_update_failed', 'Failed to update session title', array( 'status' => 500 ) );
-		}
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'Session title generated',
-			array(
-				'session_id' => $session_id,
-				'title'      => $title,
-				'method'     => $method,
-				'context'    => 'system',
-			)
-		);
-
-		return array(
-			'success' => true,
-			'title'   => $title,
-			'method'  => $method,
-			'message' => 'Title generated successfully',
-		);
-	}
-
-	private static function generateAITitle( string $first_user_message, ?string $first_assistant_response ): ?string {
-		$chat_defaults = PluginSettings::resolveModelForAgentMode( null, 'chat' );
-		$provider      = $chat_defaults['provider'];
-		$model         = $chat_defaults['model'];
-
-		if ( empty( $provider ) || empty( $model ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Session title AI generation skipped - no default provider/model configured',
-				array( 'context' => 'system' )
-			);
-			return null;
-		}
-
-		$context = 'User: ' . mb_substr( $first_user_message, 0, 500 );
-		if ( $first_assistant_response ) {
-			$context .= "\n\nAssistant: " . mb_substr( $first_assistant_response, 0, 500 );
-		}
-
-		$default_prompt = "Generate a concise title (3-6 words) for this conversation. Return ONLY the title text, nothing else.\n\n" . $context;
-
-		/**
-		 * Filter the prompt used for AI session title generation.
-		 *
-		 * Allows plugins to customize or completely replace the title generation prompt.
-		 * Return a different prompt to change title style (e.g., code names like 'azure-phoenix').
-		 *
-		 * @since 0.21.1
-		 *
-		 * @param string $prompt  The default prompt including conversation context.
-		 * @param array  $context {
-		 *     Context data for prompt customization.
-		 *
-		 *     @type string $first_user_message       The first user message (truncated to 500 chars).
-		 *     @type string $first_assistant_response The first assistant response (truncated to 500 chars).
-		 *     @type string $conversation_context     Formatted "User: ... Assistant: ..." context string.
-		 * }
-		 */
-		/** @phpstan-ignore-next-line WordPress filters accept context arguments beyond the filtered value. */
-		$prompt = apply_filters(
-			'datamachine_session_title_prompt',
-			$default_prompt,
-			array(
-				'first_user_message'       => $first_user_message,
-				'first_assistant_response' => $first_assistant_response,
-				'conversation_context'     => $context,
-			)
-		);
-
-		$messages = array(
-			\DataMachine\Engine\AI\ConversationManager::buildConversationMessage( 'user', $prompt ),
-		);
-
-		$request = array(
-			'model'      => $model,
-			'messages'   => $messages,
-			'max_tokens' => 50,
-		);
-
-		try {
-			$response = RequestBuilder::build(
-				$messages,
-				$provider,
-				$model,
-				array(), // No tools for title generation
-				array( 'system' ), // Agent modes
-				array() // No payload needed
-			);
-
-			if ( $response instanceof \WP_Error ) {
-				do_action(
-					'datamachine_log',
-					'error',
-					'Session title AI generation failed',
-					array(
-						'error'   => $response->get_error_message(),
-						'context' => 'system',
-					)
-				);
-					return null;
-			}
-
-			$content = RequestBuilder::resultText( $response );
-			if ( empty( $content ) ) {
-				return null;
-			}
-
-			// Clean up the response - remove quotes, trim, limit length
-			$title = trim( $content );
-			$title = trim( $title, '"\'' );
-			$title = mb_substr( $title, 0, 100 ); // Max title length
-
-			return $title;
-		} catch ( \Exception $e ) {
-			do_action(
-				'datamachine_log',
-				'error',
-				'Session title AI generation exception',
-				array(
-					'exception' => $e->getMessage(),
-					'context'   => 'system',
-				)
-			);
-			return null;
-		}
-	}
-
-	private static function generateTruncatedTitle( string $first_message ): string {
-		$title = trim( $first_message );
-
-		// Remove newlines and excessive whitespace
-		$title = preg_replace( '/\s+/', ' ', $title );
-
-		// Truncate to max length
-		if ( mb_strlen( $title ) > 97 ) { // Leave room for "..."
-			$title = mb_substr( $title, 0, 97 ) . '...';
-		}
-
-		return $title;
 	}
 }

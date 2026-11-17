@@ -326,10 +326,6 @@ namespace DataMachine\Core\Database\RunMetadata {
 	class RunMetadata extends \DataMachineTestRepository {}
 }
 
-namespace DataMachine\Core\Database\Chat {
-	class Chat extends \DataMachineTestRepository {}
-}
-
 namespace DataMachine\Engine\AI\Actions {
 	class PendingActionStore extends \DataMachineTestRepository {}
 }

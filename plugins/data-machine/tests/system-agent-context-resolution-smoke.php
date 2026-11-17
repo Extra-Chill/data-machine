@@ -205,13 +205,6 @@ foreach ( $sources as $name => $path ) {
 	);
 }
 
-echo "\n[11] Chat path is untouched — it still auto-provisions via resolve_or_create_agent_id\n";
-$chat_src = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' );
-$assert(
-	'ChatOrchestrator calls datamachine_resolve_or_create_agent_id()',
-	str_contains( $chat_src, 'datamachine_resolve_or_create_agent_id' )
-);
-
 echo "\n[12] The resolver documents the attribution-vs-identity distinction\n";
 $plugin_src = (string) file_get_contents( $root . '/data-machine.php' );
 $assert( 'datamachine_resolve_system_agent_context() defined', str_contains( $plugin_src, 'function datamachine_resolve_system_agent_context(): array' ) );

@@ -42,7 +42,7 @@ $result = datamachine_run_conversation(
 );
 ```
 
-Current callers, including `AIStep` and `ChatOrchestrator`, call this function directly.
+Current callers, including `AIStep`, system tasks, and host chat runtimes, call this function directly.
 
 ## What Data Machine Owns
 

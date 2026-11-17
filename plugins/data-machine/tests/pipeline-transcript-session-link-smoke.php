@@ -32,13 +32,13 @@ $assert(
 );
 
 $assert(
-	false !== strpos( $jobs_cli, 'findTranscriptSessionIdForJob' ),
-	'jobs transcript command has metadata fallback for old transcript rows'
+	false !== strpos( $persister, 'TranscriptStore::get()' ) && false === strpos( $persister, 'ConversationStoreFactory' ),
+	'persister writes through the Agents API conversation store'
 );
 
 $assert(
-	false !== strpos( $jobs_cli, 'metadata LIKE' ) && false !== strpos( $jobs_cli, 'Chat::get_prefixed_table_name()' ),
-	'metadata fallback searches pipeline transcript rows by job_id in the network chat sessions table'
+	false !== strpos( $jobs_cli, 'TranscriptStore::get()' ) && false === strpos( $jobs_cli, 'metadata LIKE' ),
+	'jobs transcript command reads the linked session from the Agents API store without a chat-table scan'
 );
 
 echo "\n";

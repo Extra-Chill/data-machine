@@ -49,7 +49,6 @@ if ( ! function_exists( 'datamachine_test_clear_runtime_rows' ) ) {
 			$agent_access_table,
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::PRINCIPAL_TABLE_NAME,
 			$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
-			$wpdb->base_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME,
 			$wpdb->prefix . \DataMachine\Core\Database\Pipelines\Pipelines::TABLE_NAME,
 			$wpdb->prefix . \DataMachine\Core\Database\Flows\Flows::TABLE_NAME,
 			$wpdb->prefix . \DataMachine\Core\Database\Jobs\Jobs::TABLE_NAME,
@@ -94,7 +93,6 @@ if ( ! function_exists( 'datamachine_test_reset_scheduler' ) ) {
 			'datamachine_cleanup_processed_items',
 			'datamachine_cleanup_as_actions',
 			'datamachine_cleanup_old_files',
-			'datamachine_cleanup_chat_sessions',
 		);
 
 		foreach ( $hooks as $hook ) {

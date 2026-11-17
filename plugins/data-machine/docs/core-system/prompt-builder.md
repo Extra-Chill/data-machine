@@ -86,10 +86,8 @@ add_filter('datamachine_directives', function($directives) {
 
 - `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
 - `AgentModeDirective` - Runtime mode guidance for chat, pipeline, system, and extension modes (priority 22)
-- `CallerContextDirective` - Authenticated cross-site caller identity (priority 25)
-- `AgentDailyMemoryDirective` and `ClientContextDirective` - Optional daily memory and client context (priority 35)
+- `AgentDailyMemoryDirective` - Optional daily memory (priority 35)
 - `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
-- `ChatPipelinesDirective` - Pipeline and flow inventory for chat (priority 45)
 
 ## Integration with RequestBuilder
 

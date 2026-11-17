@@ -37,11 +37,8 @@ Directives are applied in ascending priority order (lowest number = highest prio
 |----------|-----------|-------|--------|---------|
 | **20** | `CoreMemoryFilesDirective` | all | `inc/Engine/AI/Directives/CoreMemoryFilesDirective.php` | SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md, custom registered files |
 | **22** | `AgentModeDirective` | all | `inc/Engine/AI/Directives/AgentModeDirective.php` | Mode-specific guidance (chat / pipeline / system) injected as runtime directive |
-| **25** | `CallerContextDirective` | all (cross-site only) | `inc/Engine/AI/Directives/CallerContextDirective.php` | Authenticated A2A caller identity (peer agent slug, host, chain depth) |
 | **35** | `AgentDailyMemoryDirective` | chat, pipeline | `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Recent daily archives for agents that opt in via `agent_config.daily_memory` |
-| **35** | `ClientContextDirective` | all | `inc/Engine/AI/Directives/ClientContextDirective.php` | Free-form client-reported context (current screen, post being edited, etc.) |
 | **40** | `PipelineMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php` | Per-pipeline selectable memory files |
-| **45** | `ChatPipelinesDirective` | chat | `inc/Api/Chat/ChatPipelinesDirective.php` | Pipeline / flow / handler inventory for discovery |
 | **45** | `FlowMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php` | Per-flow selectable memory files (additive to pipeline memory) |
 | **50** | `PipelineSystemPromptDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php` | User-configured task instructions + workflow visualization |
 
@@ -87,23 +84,13 @@ Reads core memory files from three directory layers and injects them as system m
 Injects execution-mode guidance (chat, pipeline, system) as a runtime directive rather than per-agent disk files. Mode guidance is platform knowledge, not agent-specific state — shipping it as a directive removes per-agent disk clutter and enables hook-based composition.
 
 **Built-in modes**:
-- `chat` — Live chat session in the admin UI. Includes Data Machine architecture overview, configuration rules, scheduling rules, and execution protocol.
+- `chat` — Live interactive chat session run by a host chat runtime (Agents API owns chat). Short identity-first guidance.
 - `pipeline` — Automated pipeline step execution. Includes data packet structure and analysis-before-action principles.
-- `system` — Background system task execution. Includes session title generation rules and "return only what's asked" behavior.
+- `system` — Background system task execution. Includes "return only what's asked" behavior.
 
 **Extension hook**: `datamachine_agent_mode_{slug}` — extensions can append or modify mode-specific guidance for a given mode (e.g. the editor plugin appends diff workflow instructions when the `editor` mode is active).
 
 **Payload key**: Reads `agent_modes` from the request payload and composes guidance once for each active mode.
-
-### CallerContextDirective (Priority 25)
-
-**Source**: `inc/Engine/AI/Directives/CallerContextDirective.php`
-**Modes**: All — but only emits output during cross-site A2A calls
-**Since**: 0.72.0
-
-Renders authenticated agent-to-agent caller identity from the four cross-site headers (`X-Datamachine-Caller-Site`, `-Caller-Agent`, `-Chain-Id`, `-Chain-Depth`). The data is server-validated — it cannot be spoofed by the client because the headers are read from the incoming HTTP request and validated by middleware.
-
-When `PermissionHelper::in_cross_site_context()` returns false (local request, top of chain), the directive emits nothing. Distinct from `ClientContextDirective`: caller context is trusted server-side provenance; client context is untrusted frontend state.
 
 ### AgentDailyMemoryDirective (Priority 35)
 
@@ -133,18 +120,6 @@ When disabled or absent the directive emits nothing — a stateless pipeline age
 - One real file = one `system_text` block so the AI can distinguish dates rather than reasoning over a stitched-together blob.
 - Precise historical lookups still available via the `agent_daily_memory` tool.
 
-### ClientContextDirective (Priority 35)
-
-**Source**: `inc/Engine/AI/Directives/ClientContextDirective.php`
-
-Renders free-form context reported by the calling client. Examples:
-
-- `{ "tab": "compose", "post_id": 123, "post_title": "My Draft" }` — Gutenberg sidebar
-- `{ "screen": "socials", "platform": "instagram" }` — Socials admin page
-- `{ "page": "forum", "topic_id": 42 }` — community page
-
-The payload is **untrusted** — it represents what the frontend says it is showing. Pair it with `CallerContextDirective` (priority 25) when authoritative provenance matters.
-
 ### PipelineMemoryFilesDirective (Priority 40)
 
 **Source**: `inc/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php`
@@ -160,15 +135,6 @@ Reads the pipeline's `memory_files` configuration (an array of filenames) and in
 - Uses the shared `MemoryFilesReader` helper.
 
 **Configuration**: Select memory files per-pipeline via the "Agent Memory Files" section in the pipeline settings UI. SOUL.md is excluded from the picker — it's always injected by `CoreMemoryFilesDirective` (Priority 20).
-
-### ChatPipelinesDirective (Priority 45)
-
-**Source**: `inc/Api/Chat/ChatPipelinesDirective.php`
-**Modes**: Chat only
-
-Provides a lightweight JSON inventory of all pipelines, their steps, and flow summaries (active handlers), labeled `"DATAMACHINE PIPELINES INVENTORY"`.
-
-**Context awareness**: When `selected_pipeline_id` is provided (e.g. from the Integrated Chat Sidebar), the agent prioritizes context for that specific pipeline.
 
 ### FlowMemoryFilesDirective (Priority 45)
 
@@ -220,29 +186,22 @@ Two parts:
 
 1. P20 — CoreMemoryFilesDirective
 2. P22 — AgentModeDirective (chat guidance)
-3. P25 — CallerContextDirective (cross-site only)
-4. P35 — AgentDailyMemoryDirective (opt-in per agent)
-5. P35 — ClientContextDirective
-6. P45 — ChatPipelinesDirective
-7. (Tools are injected separately by RequestBuilder)
+3. P35 — AgentDailyMemoryDirective (opt-in per agent)
+4. (Tools are injected separately by RequestBuilder)
 
 **Pipeline agents** receive (in order):
 
 1. P20 — CoreMemoryFilesDirective
 2. P22 — AgentModeDirective (pipeline guidance)
-3. P25 — CallerContextDirective (cross-site only)
-4. P35 — AgentDailyMemoryDirective (opt-in per agent)
-5. P35 — ClientContextDirective
-6. P40 — PipelineMemoryFilesDirective
-7. P45 — FlowMemoryFilesDirective
-8. P50 — PipelineSystemPromptDirective
+3. P35 — AgentDailyMemoryDirective (opt-in per agent)
+4. P40 — PipelineMemoryFilesDirective
+5. P45 — FlowMemoryFilesDirective
+6. P50 — PipelineSystemPromptDirective
 
 **System agents** receive (in order):
 
 1. P20 — CoreMemoryFilesDirective
 2. P22 — AgentModeDirective (system guidance)
-3. P25 — CallerContextDirective (cross-site only)
-4. P35 — ClientContextDirective
 
 System agents do not receive `AgentDailyMemoryDirective` (its registered modes are `chat` and `pipeline` only) and do not receive any pipeline-only memory directives.
 

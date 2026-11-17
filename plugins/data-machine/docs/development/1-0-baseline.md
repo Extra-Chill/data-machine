@@ -5,7 +5,7 @@ Data Machine 1.0 supports one current schema and one current runtime contract. F
 ## Upgrade Boundary
 
 - The 1.0 package does not transform pre-1.0 flow, handler, queue, bundle, result, or import/export shapes.
-- Multisite chat-session convergence is the explicit `datamachine_converge_chat_sessions_to_network()` helper, not web `init`.
+- Data Machine no longer stores chat sessions; the legacy `datamachine_chat_sessions` tables are dropped on upgrade.
 - Pre-1.0 agent-owned flows that relied on the implicit default mailbox are not migrated seamlessly. Administrators must reset that mailbox configuration and explicitly reauthorize the named mailbox grant before the flow can run under 1.0. Runtime rejection of an absent or unauthorized mailbox is the canonical safety behavior.
 - An installation that did not cross that final pre-1.0 release must reset unsupported Data Machine configuration and runtime data, then recreate or import it using the canonical 1.0 contracts.
 - Current tables, columns, indexes, capabilities, defaults, memory scaffolding, and flow-schedule reconciliation remain idempotent bootstrap requirements. They are installation behavior, not compatibility migrations.

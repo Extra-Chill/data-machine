@@ -1,6 +1,6 @@
 # Data Machine Documentation
 
-Complete user and agent documentation for Data Machine, the WordPress automation product layer that combines pipelines, flows, jobs, chat agents, system tasks, policy-gated tools, REST/WP-CLI surfaces, and extension-owned handlers on top of the generic Agents API substrate.
+Complete user and agent documentation for Data Machine, the WordPress automation product layer that combines pipelines, flows, jobs, system tasks, policy-gated tools, REST/WP-CLI surfaces, and extension-owned handlers on top of the generic Agents API substrate.
 
 ## Agent Orientation
 
@@ -70,18 +70,17 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 
 ### AI Tools
 - **Tools Overview**: Static, ability-backed, and adjacent handler tools available to AI agents.
-- **Execute Workflow**: Modular execution of multi-step workflows from the chat toolset.
 - **Static Registry Tools**: Research, memory, workflow-management, and site-operation tools registered through `datamachine_tools`.
 - **Pipeline Handler Tools**: Runtime tools generated from adjacent fetch, publish, and upsert handlers.
 - **Policy-Gated Tools**: Tools are composed from sources and filtered by mode, memory, action, and handler policies before exposure.
 - **Global Tools**: Local Search, Web Fetch, WordPress Post Reader, daily memory, image generation, search-console/analytics, and others used across agents.
-- **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
+- **Chat**: Owned by Agents API (`agents/chat`) and host chat runtimes. Data Machine keeps the `chat` agent mode, chat identity linking, and the opt-in `consult_agent` tool.
 
 ### API Reference
 - **API Overview**: Canonical REST route inventory sourced from `inc/Api` registrations ([api/index.md](api/index.md)).
-- **Endpoints**: Agents, Agent Ping, Analytics, Auth, Chat, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, Pipelines, Settings, System, and other REST resources.
+- **Endpoints**: Agents, Agent Ping, Analytics, Auth, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, Pipelines, Settings, System, and other REST resources.
 - **Workflow Endpoints**: Execute, flows, queues, webhooks, jobs, logs, and processed items.
-- **Agent Endpoints**: Chat, chat sessions, agents, access, tokens, memory files, daily memory, Agent Ping callbacks, and pending-action resolution.
+- **Agent Endpoints**: Agents, access, tokens, memory files, daily memory, Agent Ping callbacks, and pending-action resolution.
 - **Discovery/Settings Endpoints**: Handlers, step types, providers, tools, settings, system tasks, auth, and users.
 
 ### Development

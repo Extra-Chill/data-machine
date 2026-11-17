@@ -84,7 +84,7 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/clear-processed-items',
 			'datamachine/check-processed-item',
 			'datamachine/has-processed-history',
-			// SettingsAbilities (8)
+			// SettingsAbilities (7)
 			'datamachine/get-settings',
 			'datamachine/update-settings',
 			'datamachine/get-scheduling-intervals',
@@ -92,7 +92,6 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/save-tool-config',
 			'datamachine/get-handler-defaults',
 			'datamachine/update-handler-defaults',
-			'datamachine/generate-ping-secret',
 			// HandlerAbilities (5)
 			'datamachine/get-handlers',
 			'datamachine/validate-handler',
@@ -161,7 +160,6 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine-auth',
 			'datamachine-logging',
 			'datamachine-system',
-			'datamachine-chat',
 		);
 
 		foreach ( $expected_categories as $slug ) {

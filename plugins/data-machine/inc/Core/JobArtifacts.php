@@ -9,8 +9,7 @@
 namespace DataMachine\Core;
 
 use DataMachine\Core\Database\Agents\Agents;
-use DataMachine\Core\Database\Chat\Chat;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Engine\AI\TranscriptStore;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\FilesRepository\AgentMemory as AgentMemoryFile;
 use DataMachine\Core\FilesRepository\DailyMemory;
@@ -220,7 +219,7 @@ class JobArtifacts {
 			'tool_resolution_evidence' => is_array( $engine_data['tool_resolution_evidence'] ?? null ) ? $engine_data['tool_resolution_evidence'] : array(),
 			'successful_tool_calls'    => $tool_calls,
 			'tool_trace'               => $this->tool_trace( $engine_data, $additional_tool_summaries ),
-			'transcript'               => $this->transcript_metadata( $job_id, $engine_data ),
+			'transcript'               => $this->transcript_metadata( $engine_data ),
 			'artifact_refs'            => $this->hashable_artifact_refs( $transcript_artifact, $tool_trace_artifact ),
 			'artifact_files'           => $this->artifact_files_metadata( $engine_data ),
 			'transcript_artifact'      => $transcript_artifact,
@@ -412,14 +411,11 @@ class JobArtifacts {
 	private function transcript_artifact( int $job_id, array $job, array $agent, array $engine_data ): ?array {
 		$session_id = (string) ( $engine_data['transcript_session_id'] ?? '' );
 		if ( '' === $session_id ) {
-			$session_id = $this->find_transcript_session_id_for_job( $job_id );
-		}
-
-		if ( '' === $session_id ) {
 			return null;
 		}
 
-		$session = ConversationStoreFactory::get()->get_session( $session_id );
+		$store   = TranscriptStore::get();
+		$session = null !== $store ? $store->get_session( $session_id ) : null;
 		if ( ! $session ) {
 			$payload = array(
 				'schema_version'  => self::TRANSCRIPT_ARTIFACT_SCHEMA_VERSION,
@@ -960,17 +956,14 @@ class JobArtifacts {
 	/**
 	 * @return array<string, mixed>|null
 	 */
-	private function transcript_metadata( int $job_id, array $engine_data ): ?array {
+	private function transcript_metadata( array $engine_data ): ?array {
 		$session_id = (string) ( $engine_data['transcript_session_id'] ?? '' );
-		if ( '' === $session_id ) {
-			$session_id = $this->find_transcript_session_id_for_job( $job_id );
-		}
-
 		if ( '' === $session_id ) {
 			return null;
 		}
 
-		$session = ConversationStoreFactory::get()->get_session( $session_id );
+		$store   = TranscriptStore::get();
+		$session = null !== $store ? $store->get_session( $session_id ) : null;
 		if ( ! $session ) {
 			return array(
 				'session_id' => $session_id,
@@ -994,23 +987,6 @@ class JobArtifacts {
 			),
 			static fn( $value ) => null !== $value && array() !== $value
 		);
-	}
-
-	private function find_transcript_session_id_for_job( int $job_id ): string {
-		global $wpdb;
-
-		$table = Chat::get_prefixed_table_name();
-		$like  = '%"job_id":' . $job_id . '%';
-		$row   = $wpdb->get_var(
-			$wpdb->prepare(
-				'SELECT session_id FROM %i WHERE mode = %s AND metadata LIKE %s ORDER BY created_at DESC LIMIT 1',
-				$table,
-				'pipeline',
-				$like
-			)
-		);
-
-		return is_string( $row ) ? $row : '';
 	}
 
 	/**

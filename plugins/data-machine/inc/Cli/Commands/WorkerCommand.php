@@ -613,7 +613,6 @@ class WorkerCommand extends BaseCommand {
 			'datamachine_recurring_wiki_timeline_materialize_wordpress_com',
 			'datamachine_recurring_job_reaper',
 			'datamachine_recurring_retention_as_actions',
-			'datamachine_recurring_retention_chat_sessions',
 			'datamachine_recurring_retention_completed_jobs',
 			'datamachine_recurring_retention_failed_jobs',
 			'datamachine_recurring_retention_files',

@@ -24,7 +24,6 @@
 		"yauzl": "^3.2.1"
 	},
 	"dependencies": {
-		"@extrachill/chat": "^0.11.0",
 		"@tanstack/react-query": "^5.90.12",
 		"@wordpress/api-fetch": "^7.36.0",
 		"@wordpress/components": "^35.0.1",
@@ -34,7 +33,6 @@
 		"@wordpress/hooks": "^4.36.0",
 		"@wordpress/i18n": "^6.9.0",
 		"@wordpress/notices": "^5.36.0",
-		"react-markdown": "^10.1.0",
 		"zustand": "^5.0.9"
 	}
 }

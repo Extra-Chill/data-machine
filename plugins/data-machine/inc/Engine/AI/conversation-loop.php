@@ -7,7 +7,7 @@
  * persistence, and event emission wired as options.
  *
  * This file replaces the former 748-LOC AIConversationLoop class. Both
- * ChatOrchestrator and AIStep call datamachine_run_conversation() directly.
+ * AIStep and other runtimes call datamachine_run_conversation() directly.
  *
  * @package DataMachine\Engine\AI
  */
@@ -1826,18 +1826,18 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 }
 
 /**
- * Store pending runtime tool request metadata on the owning chat session.
+ * Store pending runtime tool request metadata on the owning conversation session.
  *
  * @param array<string,mixed> $pending_request Pending request metadata.
  */
 function datamachine_store_runtime_tool_request_on_session( array $pending_request ): void {
 	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $pending_request );
 	$session_id           = (string) ( $datamachine_metadata['session_id'] ?? '' );
-	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
+	$chat_db              = TranscriptStore::get();
+	if ( '' === $session_id || null === $chat_db ) {
 		return;
 	}
 
-	$chat_db = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
 	$session = $chat_db->get_session( $session_id );
 	if ( ! is_array( $session ) ) {
 		return;
@@ -1984,12 +1984,15 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	}
 
 	$session_id = (string) ( $datamachine_metadata['session_id'] ?? '' );
-	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
+	$chat_db    = TranscriptStore::get();
+	if ( '' === $session_id || null === $chat_db ) {
 		return array( 'scheduled' => false );
 	}
 
-	$chat_db      = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
-	$session_lock = $chat_db->acquire_session_lock( $session_id, 60 );
+	$session_locker = $chat_db instanceof \AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock
+		? $chat_db
+		: new \AgentsAPI\Core\Database\Chat\WP_Agent_Null_Conversation_Lock();
+	$session_lock   = $session_locker->acquire_session_lock( $session_id, 60 );
 	if ( null === $session_lock ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
@@ -2000,7 +2003,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	}
 	$session = $chat_db->get_session( $session_id );
 	if ( ! is_array( $session ) ) {
-		$chat_db->release_session_lock( $session_id, $session_lock );
+		$session_locker->release_session_lock( $session_id, $session_lock );
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array( 'scheduled' => false );
 	}
@@ -2048,7 +2051,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		(string) ( $session['provider'] ?? '' ),
 		(string) ( $session['model'] ?? '' )
 	);
-	$chat_db->release_session_lock( $session_id, $session_lock );
+	$session_locker->release_session_lock( $session_id, $session_lock );
 	if ( ! $session_updated ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
@@ -2141,12 +2144,13 @@ function datamachine_schedule_runtime_tool_continuation_recovery( string $reques
 	return (bool) as_schedule_single_action( time() + 30, $hook, $args, $group );
 }
 
-/** Resume a deferred runtime tool conversation. */
+/**
+ * Resume a deferred runtime tool conversation.
+ *
+ * Data Machine restores the run state; the host chat runtime that owns the
+ * conversation continues it by listening to `datamachine_runtime_tool_continue`.
+ */
 function datamachine_resume_runtime_tool_request( string $request_id ): void {
-	if ( ! class_exists( \DataMachine\Api\Chat\ChatOrchestrator::class ) ) {
-		return;
-	}
-
 	$request = datamachine_runtime_tool_request_store()->get( $request_id );
 	if ( null === $request ) {
 		return;
@@ -2171,10 +2175,21 @@ function datamachine_resume_runtime_tool_request( string $request_id ): void {
 		}
 	}
 
-	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
+	/**
+	 * Fires when a deferred runtime tool result is ready for the owning
+	 * conversation to continue.
+	 *
+	 * @param string   $session_id      Conversation session ID.
+	 * @param int      $user_id         Runtime user ID.
+	 * @param int|null $calling_user_id Calling user ID, when recorded.
+	 * @param array    $request         Canonical runtime tool request.
+	 */
+	do_action(
+		'datamachine_runtime_tool_continue',
 		(string) ( $datamachine_metadata['session_id'] ?? '' ),
 		(int) ( $datamachine_metadata['user_id'] ?? 0 ),
-		array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : null
+		array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : null,
+		$request
 	);
 }
 

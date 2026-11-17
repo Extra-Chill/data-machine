@@ -9,7 +9,7 @@ Data Machine uses **WordPress itself as the memory layer.** Not a vector databas
 WordPress already solves persistent storage:
 
 - **Files on disk** — `wp-content/uploads` for markdown documents the agent reads
-- **MySQL** — custom tables for chat sessions, job history, agent registry, and logs
+- **MySQL** — custom tables for job history, agent registry, and logs
 - **REST API** — programmatic CRUD for memory files and daily memory
 - **Admin UI** — human-editable through the WordPress dashboard
 - **Action Scheduler** — cron-like cleanup, scheduled workflows, and daily memory generation
@@ -64,7 +64,7 @@ The **CoreMemoryFilesDirective** loads all files from the **MemoryFileRegistry**
 
 Daily memory files capture session-specific knowledge organized by date. Current lifecycle:
 
-1. **Activity context**: Data Machine gathers same-day jobs and chat sessions into the `{{activity_section}}` variable.
+1. **Activity context**: Data Machine gathers same-day jobs into the `{{activity_section}}` variable.
 2. **Deterministic overflow**: Very large `MEMORY.md` files are split by section and archived verbatim before any AI call.
 3. **AI compaction**: The single `daily_memory` prompt splits `MEMORY.md` into `===PERSISTENT===` and `===ARCHIVED===` sections when size or activity requires maintenance.
 4. **Conservation checks**: Safety gates prevent empty, suspiciously small, or lossy rewrites.
@@ -86,11 +86,9 @@ This keeps MEMORY.md lean while preserving the full temporal record in daily fil
 
 Historical date, range, and month queries are served on demand by the `agent_daily_memory` tool instead of pre-injecting large selector windows.
 
-### 3. Chat Sessions — Conversation Memory
+### 3. Conversation Memory — Owned by Agents API
 
-**Storage:** Custom MySQL table `{prefix}_datamachine_chat_sessions`
-
-Full conversation history persisted in the database. Sessions survive page reloads and browser restarts. Runtime context may carry both `agent_id` and `agent_slug`: the ID is the stable storage key, while the slug is the portable, human-readable identifier. Configurable retention runs automatically via Action Scheduler.
+Data Machine no longer stores chat sessions. Conversation history belongs to Agents API (`agents/chat`) and the host chat runtime, which register a conversation store through the `wp_agent_conversation_store` filter. Data Machine pipeline transcripts, when enabled, are written to that same store.
 
 ### 4. Pipeline and Flow Memory — Workflow Context
 
@@ -124,7 +122,6 @@ All major resources are scoped to an agent using a WordPress-shaped pair of iden
 - **Pipelines** — each pipeline belongs to an agent-scoped owner
 - **Flows** — each flow belongs to an agent-scoped owner
 - **Jobs** — each job runs under an agent-scoped owner
-- **Chat sessions** — each conversation is agent-scoped
 
 The `PermissionHelper` class provides methods for agent-level access checks:
 - `resolve_scoped_agent_id()` — determines which agent context applies
@@ -334,11 +331,8 @@ Data Machine uses a **directive system** — a priority-ordered chain that injec
 |----------|-----------|---------|-----------------|
 | **20** | **`CoreMemoryFilesDirective`** | **All** | **SITE.md, RULES.md (shared), SOUL.md, MEMORY.md (agent), USER.md (user) + custom registry files** |
 | **22** | **`AgentModeDirective`** | **All** | **Mode-specific guidance for chat, pipeline, and system** |
-| 25 | `CallerContextDirective` | All, cross-site only | Authenticated A2A caller identity |
 | 35 | `AgentDailyMemoryDirective` | Chat, pipeline | Recent daily archives when enabled |
-| 35 | `ClientContextDirective` | All | Client-reported context such as current screen or edited post |
 | 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline selected additional files |
-| **45** | **`ChatPipelinesDirective`** | **Chat** | **Pipeline/flow context for chat** |
 | **45** | **`FlowMemoryFilesDirective`** | **Pipeline** | **Per-flow selected additional files** |
 | 50 | `PipelineSystemPromptDirective` | Pipeline | Workflow instructions |
 
@@ -558,20 +552,16 @@ The most effective pattern is **agent writes, human reviews** — the agent appe
 - **USER.md**: Created per-user on plugin activation with starter template.
 - **Daily files**: Created automatically by DailyMemoryTask or daily memory write operations.
 - **Additional files**: Created via REST API, admin UI, or by the agent itself.
-- **Chat sessions**: Created on first message in a conversation.
 - **Job data**: Created during pipeline execution.
 
 ### Updates
 
 - **Agent files**: Updated via REST API, Abilities API, or admin UI. Changes take effect on the next AI request — no restart needed.
 - **Daily files**: Appended by DailyMemoryTask; writable via REST API and Abilities.
-- **Chat sessions**: Grow with each message exchange.
 - **Job data**: Accumulated during multi-step execution.
 
 ### Cleanup
 
-- **Chat sessions**: Retention-based (default 90 days) via Action Scheduler
-- **Orphaned sessions**: Auto-cleaned after 1 hour if empty
 - **Job data**: Cleaned by FileCleanup based on retention policies
 - **MEMORY.md**: Automatically pruned by DailyMemoryTask when oversized
 - **Agent files**: Manual only — no auto-cleanup (except MEMORY.md pruning)

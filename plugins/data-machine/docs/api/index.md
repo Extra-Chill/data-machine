@@ -20,7 +20,7 @@ Complete REST API reference for Data Machine.
 | Agent Ping | `/agent-ping/confirm`, `/agent-ping/callback/{callback_id}` | Bearer-token callback auth using the configured agent-ping callback token. No WordPress capability check. | `inc/Api/AgentPing.php` | [Agent Ping](endpoints/agent-ping.md) |
 | Analytics | Extension-provided analytics routes via `datamachine_analytics_ability_map` | `manage_flows` via `PermissionHelper::can( 'manage_flows' )`. | `inc/Api/Analytics.php` | [Analytics](endpoints/analytics.md) |
 | Auth | `/auth/providers`, `/auth/{handler_slug}`, `/auth/{handler_slug}/status`, `/auth/{handler_slug}/token`, `/auth/{handler_slug}/refresh` | `manage_settings` through `Auth::check_permission()`. | `inc/Api/Auth.php` | [Auth](endpoints/auth.md) |
-| Chat | `/chat`, `/chat/continue`, `/chat/{session_id}`, `/chat/sessions`, `/chat/sessions/{session_id}/read`; `/chat/ping` | Chat routes require `chat`. `/chat/ping` uses the chat ping token verifier. | `inc/Api/Chat/Chat.php` | [Chat](endpoints/chat.md), [Chat Sessions](endpoints/chat-sessions.md) |
+| Chat | Removed — chat sessions and the chat REST surface are owned by Agents API (`agents/chat`) and host chat runtimes, not Data Machine. | — | — | — |
 | Email | Retired in #3456 — email send/fetch/manage operations are REST-visible abilities run through `/wp-abilities/v1/abilities/datamachine/<slug>/run` (see [Email](endpoints/email.md)). | Each ability's permission callback (email family: `PermissionHelper::can( 'use_tools' )` or `PermissionHelper::can_manage()`, plus agent-token ability scopes). | `inc/Abilities/Email/`, `inc/Abilities/Fetch/FetchEmailAbility.php`, `inc/Abilities/Publish/SendEmailAbility.php` | [Email](endpoints/email.md) |
 | Execute | `/execute` | `manage_flows` through the execute controller. | `inc/Api/Execute.php` | [Execute](endpoints/execute.md) |
 | Files | `/files` (multipart upload) | Multipart upload is a retained transport route; it requires a logged-in user plus `PermissionHelper::can_manage()`. Flow-file and agent-file listing/reads/writes are REST-visible abilities run through `/wp-abilities/v1/abilities/datamachine/<slug>/run` (see [Files](endpoints/files.md)). | `inc/Api/FlowFiles.php`, `inc/Abilities/File/AgentFileAbilities.php`, `inc/Abilities/DailyMemoryAbilities.php` | [Files](endpoints/files.md) |
@@ -32,7 +32,7 @@ Complete REST API reference for Data Machine.
 | Pipelines | Retired in #3456 — pipeline CRUD, steps, and memory files are REST-visible abilities run through `/wp-abilities/v1/abilities/datamachine/<slug>/run` (see [Pipelines](endpoints/pipelines.md)). | Each ability's permission callback (pipeline family: `PermissionHelper::can_manage()`). | `inc/Abilities/Pipeline/`, `inc/Abilities/PipelineStepAbilities.php` | [Pipelines](endpoints/pipelines.md) |
 | Processed Items | Retired in #3456 — processed-items clearing is the REST-visible `datamachine/clear-processed-items` ability (see [Processed Items](endpoints/processed-items.md)). | Ability permission callback (`PermissionHelper::can_manage()`). | `inc/Abilities/ProcessedItemsAbilities.php` | [Processed Items](endpoints/processed-items.md) |
 | Providers | `/providers` | Public provider metadata endpoint. | `inc/Api/Providers.php` | [Providers](endpoints/providers.md) |
-| Settings | Retired in #3456 — settings, scheduling intervals, tool config, handler defaults, and ping-secret generation are REST-visible abilities run through `/wp-abilities/v1/abilities/datamachine/<slug>/run` (see [Settings](endpoints/settings.md)). | Each ability's permission callback (`PermissionHelper::can_manage()`). | `inc/Abilities/SettingsAbilities.php` | [Settings](endpoints/settings.md), [Scheduling Intervals](endpoints/intervals.md) |
+| Settings | Retired in #3456 — settings, scheduling intervals, tool config, and handler defaults are REST-visible abilities run through `/wp-abilities/v1/abilities/datamachine/<slug>/run` (see [Settings](endpoints/settings.md)). | Each ability's permission callback (`PermissionHelper::can_manage()`). | `inc/Abilities/SettingsAbilities.php` | [Settings](endpoints/settings.md), [Scheduling Intervals](endpoints/intervals.md) |
 | Step Types | Retired in #3456 — step-type discovery is the REST-visible `datamachine/get-step-types` ability (see [Step Types](endpoints/step-types.md)). | Ability permission callback (`PermissionHelper::can_manage()`); the public wrapper routes are gone. | `inc/Abilities/StepTypeAbilities.php` | [Step Types](endpoints/step-types.md) |
 | System | `/system/status`, `/system/tasks`, `/system/tasks/{task_type}/run`, `/system/tasks/prompts`, `/system/tasks/prompts/{task_type}/{prompt_key}` | `manage_settings` through inline `PermissionHelper::can( 'manage_settings' )` callbacks. | `inc/Api/System/System.php` | [System](endpoints/system.md) |
 | Tools | `/tools` | Public tool metadata endpoint. | `inc/Api/Tools.php` | [Tools](endpoints/tools.md) |
@@ -55,13 +55,11 @@ Complete REST API reference for Data Machine.
 - [Jobs](endpoints/jobs.md)
 - [Processed Items](endpoints/processed-items.md)
 
-### Agents, Memory & Chat
+### Agents & Memory
 
 - [Agents](endpoints/agents.md)
 - [Agent Ping](endpoints/agent-ping.md)
 - [Files](endpoints/files.md)
-- [Chat](endpoints/chat.md)
-- [Chat Sessions](endpoints/chat-sessions.md)
 
 ### Tools, Providers & Handlers
 

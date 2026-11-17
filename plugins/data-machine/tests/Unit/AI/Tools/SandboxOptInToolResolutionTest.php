@@ -45,7 +45,7 @@ class SandboxOptInToolResolutionTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The argument shape a sandbox run passes through ChatOrchestrator.
+	 * The argument shape a sandbox chat run passes to tool resolution.
 	 */
 	private function sandboxArgs(): array {
 		return array(

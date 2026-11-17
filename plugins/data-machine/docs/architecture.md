@@ -34,7 +34,7 @@ Data Machine intentionally maintains purpose-built adapters for its consumers:
 
 - REST controllers under `inc/Api/` provide stable `datamachine/v1` resources, HTTP permissions, request schemas, status codes, and response presentation.
 - WP-CLI commands under `inc/Cli/` provide a stable canonical `wp datamachine` operator namespace, command-oriented arguments, output formatting, and process exit behavior.
-- Chat tools under `inc/Api/Chat/Tools/` provide model-facing names, descriptions, schemas, and conversational result shapes.
+- AI tools under `inc/Engine/AI/Tools/` provide model-facing names, descriptions, schemas, and conversational result shapes.
 
 These adapters commonly execute abilities, but they are not accidental wrappers or duplicate infrastructure. They own consumer-specific semantics and preserve Data Machine's product namespaces while abilities remain reusable operations.
 

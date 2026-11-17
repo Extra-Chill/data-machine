@@ -128,25 +128,6 @@ Server-side operation failure.
 - Check application password is correct
 - Ensure WordPress user is active
 
-### session_access_denied
-
-**Status**: 403 Forbidden
-
-**Cause**: Attempting to access another user's chat session
-
-**Example**:
-```json
-{
-  "code": "session_access_denied",
-  "message": "Access denied to this session",
-  "data": {"status": 403}
-}
-```
-
-**Solution**:
-- Use correct session_id for current user
-- Create new session if previous session expired
-
 ## Resource Errors
 
 ### invalid_flow
@@ -226,25 +207,6 @@ Server-side operation failure.
 - Execute workflows to generate logs
 - Check file permissions
 - Verify upload directory is writable
-
-### session_not_found
-
-**Status**: 404 Not Found
-
-**Cause**: Chat session not found or expired
-
-**Example**:
-```json
-{
-  "code": "session_not_found",
-  "message": "Session not found or expired",
-  "data": {"status": 404}
-}
-```
-
-**Solution**:
-- Create new session (omit session_id parameter)
-- Check session hasn't expired (24-hour limit)
 
 ### processed_item_not_found
 

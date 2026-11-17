@@ -2,7 +2,7 @@
 /**
  * WP-CLI System Command
  *
- * Wraps SystemAbilities for health checks and session title generation.
+ * Wraps SystemAbilities for health checks and system task runs.
  *
  * @package DataMachine\Cli\Commands
  * @since 0.41.0
@@ -345,65 +345,6 @@ class SystemCommand extends BaseCommand {
 		}
 
 		WP_CLI::log( 'Dry run only. Re-run with --apply to execute the displayed online DDL.' );
-	}
-
-	/**
-	 * Generate a title for a chat session.
-	 *
-	 * ## OPTIONS
-	 *
-	 * <session_id>
-	 * : UUID of the chat session.
-	 *
-	 * [--force]
-	 * : Force regeneration even if title already exists.
-	 *
-	 * [--format=<format>]
-	 * : Output format.
-	 * ---
-	 * default: table
-	 * options:
-	 *   - table
-	 *   - json
-	 * ---
-	 *
-	 * ## EXAMPLES
-	 *
-	 *     wp datamachine system title abc123-def456
-	 *     wp datamachine system title abc123-def456 --force
-	 *
-	 * @subcommand title
-	 */
-	public function title( array $args, array $assoc_args ): void {
-		$session_id = $args[0] ?? '';
-		$force      = isset( $assoc_args['force'] );
-		$format     = $assoc_args['format'] ?? 'table';
-
-		if ( empty( $session_id ) ) {
-			WP_CLI::error( 'Session ID is required.' );
-			return;
-		}
-
-		$result = AbilityResult::normalize( SystemAbilities::generateSessionTitle(
-			array(
-				'session_id' => $session_id,
-				'force'      => $force,
-			)
-		) );
-
-		if ( ! $result['success'] ) {
-			WP_CLI::error( $result['error'] ?? $result['message'] ?? 'Title generation failed.' );
-			return;
-		}
-
-		if ( 'json' === $format ) {
-			WP_CLI::line( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
-			return;
-		}
-
-		WP_CLI::success( $result['message'] );
-		WP_CLI::log( sprintf( 'Title:  %s', $result['title'] ) );
-		WP_CLI::log( sprintf( 'Method: %s', $result['method'] ) );
 	}
 
 	/**

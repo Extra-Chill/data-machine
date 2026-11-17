@@ -53,8 +53,8 @@ namespace {
 	$assert( ! ActivationServiceProvider::validate_current_schema(), 'actual missing table fails setup validation' );
 	$GLOBALS['schema_tables'][ $missing_table ] = $saved_table;
 
-	$column_table = 'wp_datamachine_chat_sessions';
-	$column_key   = array_search( 'owner_key_hash', $GLOBALS['schema_tables'][ $column_table ]['columns'], true );
+	$column_table = 'wp_datamachine_agents';
+	$column_key   = array_search( 'instance_key_hash', $GLOBALS['schema_tables'][ $column_table ]['columns'], true );
 	unset( $GLOBALS['schema_tables'][ $column_table ]['columns'][ $column_key ] );
 	$assert( ! ActivationServiceProvider::validate_current_schema(), 'actual missing canonical column fails setup validation' );
 	$GLOBALS['schema_tables'][ $column_table ] = ActivationServiceProvider::current_schema_requirements()[ $column_table ];

@@ -27,7 +27,7 @@ This audit records which gated abilities have proven frontend-lite consumers. On
 | Handlers and step types | Handler discovery/test/defaults and step-type listing/validation | Admin/runtime discovery surface. No frontend-lite consumer found. | Keep gated. |
 | Local search | `datamachine/local-search` | Chat/runtime search surface. No frontend-lite consumer found. | Keep gated. |
 | Source inventory | `datamachine/source-inventory`, `datamachine/source-aggregate` | System-task/source coverage surface. No frontend-lite consumer found. | Keep gated. |
-| System | Session title, health, and system-task abilities | Admin/chat/system-task surface. No frontend-lite consumer found. | Keep gated. |
+| System | Health and system-task abilities | Admin/system-task surface. No frontend-lite consumer found. | Keep gated. |
 | Media | `datamachine/generate-alt-text`, `datamachine/diagnose-alt-text`, image generation, media upload/validation/video metadata | Admin/pipeline media surface. No frontend-lite consumer found. | Keep gated. |
 | Image templates | `datamachine/render-image-template`, `datamachine/list-image-templates` | Proven frontend-lite consumers: Extra Chill OG-card and event-roundup generation. | Already hoisted by #2291. |
 | SEO | Meta-description abilities | Pipeline/admin SEO surface. No frontend-lite consumer found. | Keep gated. |
@@ -35,7 +35,6 @@ This audit records which gated abilities have proven frontend-lite consumers. On
 | Taxonomy | Resolve, merge meta, get/create/update/delete term abilities | Admin/pipeline taxonomy surface. No frontend-lite consumer found. | Keep gated. |
 | Agent identity and tokens | Agent CRUD/import/export/access/token abilities | Admin/agent management surface. No frontend-lite consumer found. | Keep gated. |
 | Agent memory and daily memory | Agent memory and daily memory read/write/list/search/delete abilities | Chat/agent runtime surface. No frontend-lite consumer found. | Keep gated. |
-| Chat | Chat session and message abilities | REST/frontend-chat requests hit `/wp-json/` and load the full runtime. No lite page-render consumer found. | Keep gated. |
 | Internal linking | Diagnostics, audit, backlinks, broken links, opportunities | Admin/runtime content analysis surface. No frontend-lite consumer found. | Keep gated. |
 | Content/block editing | `datamachine/get-post-blocks`, `datamachine/edit-post-blocks`, `datamachine/replace-post-blocks`, `datamachine/insert-content`, `datamachine/upsert-post` | Local Extra Chill Events use of `upsert-post` is inside a Data Machine upsert step handler, which runs under the full runtime. | Keep gated. |
 | Pending actions | Pending-action inspection/sign/resolve abilities | Agent approval/runtime surface. No frontend-lite consumer found. | Keep gated. |

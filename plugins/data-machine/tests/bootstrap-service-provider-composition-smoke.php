@@ -53,7 +53,7 @@ $order   = array(
 	'new \\DataMachine\\Core\\Steps\\Fetch\\FetchStep();',
 	'new \\DataMachine\\Core\\Steps\\Publish\\Handlers\\WordPress\\WordPress();',
 	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\AgentDailyMemory();',
-	'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\ConsultAgent();',
 	'\\DataMachine\\Api\\Execute::register();',
 	'AbilityServiceProvider::register_full_runtime();',
 );
@@ -80,7 +80,7 @@ foreach ( $controllers as $controller ) {
 	$registration = '\\' . $namespace[1] . '\\' . $class[1] . '::register();';
 	$position     = strpos( $runtime, $registration );
 	$assert( 1 === substr_count( $runtime, $registration ), "runtime registers {$registration} exactly once" );
-	$assert( false !== $position && $position > strpos( $runtime, 'new \\DataMachine\\Api\\Chat\\Tools\\ConsultAgent();' ) && $position < strpos( $runtime, 'AbilityServiceProvider::register_full_runtime();' ), "{$registration} follows tools and precedes abilities" );
+	$assert( false !== $position && $position > strpos( $runtime, 'new \\DataMachine\\Engine\\AI\\Tools\\Global\\ConsultAgent();' ) && $position < strpos( $runtime, 'AbilityServiceProvider::register_full_runtime();' ), "{$registration} follows tools and precedes abilities" );
 	++$rest_count;
 }
 $assert( $rest_count > 0, 'REST controller discovery is non-empty' );

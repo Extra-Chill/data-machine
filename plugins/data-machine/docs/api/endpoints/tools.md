@@ -49,7 +49,7 @@ curl https://example.com/wp-json/datamachine/v1/tools \
 
 Notes:
 - The response payload is under `data`.
-- This endpoint returns global tools (UI discovery). Chat-only tools are registered on the chat agent and are not guaranteed to appear here.
+- This endpoint returns global tools (UI discovery). Tools registered only for other modes (such as `chat` or `system`) are not guaranteed to appear here.
 
 **Response Fields**:
 - `success` (boolean): Request success status
@@ -129,70 +129,6 @@ Available to all AI agents via `datamachine_global_tools` filter.
 - Extract metadata
 - Reference existing content
 
-### Chat-Only Tools
-
-Available only to chat AI agents via `datamachine_chat_tools` filter. Since v0.4.3, these are specialized operation-specific tools:
-
-#### execute_workflow (@since v0.3.0)
-**Tool ID**: `execute_workflow`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Execute complete multi-step workflows with automatic provider/model defaults injection
-
-#### add_pipeline_step (@since v0.4.3)
-**Tool ID**: `add_pipeline_step`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Add steps to existing pipelines
-
-#### api_query (@since v0.4.3)
-**Tool ID**: `api_query`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: REST API query tool for discovery operations
-
-#### configure_flow_step (@since v0.4.2)
-**Tool ID**: `configure_flow_step`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Configure handler settings and AI messages for flow steps
-
-#### configure_pipeline_step (@since v0.4.4)
-**Tool ID**: `configure_pipeline_step`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Configure pipeline-level AI settings (system prompts)
-
-#### create_flow (@since v0.4.2)
-**Tool ID**: `create_flow`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Create flow instances from existing pipelines
-
-#### create_pipeline (@since v0.4.3)
-**Tool ID**: `create_pipeline`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Create pipelines with optional initial steps
-
-#### run_flow (@since v0.4.4)
-**Tool ID**: `run_flow`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Execute or schedule flows for execution
-
-#### update_flow (@since v0.4.4)
-**Tool ID**: `update_flow`
-**Configuration Required**: No
-**Chat Enabled**: Yes
-**Purpose**: Update flow properties (name, schedule, settings)
-
-**Use Cases**:
-- Create pipelines via chat
-- Manage flows through conversation
-- Execute workflows from chat
-- Configure settings via natural language
-
 ## Tool Configuration
 
 ### Configuration Status
@@ -224,22 +160,6 @@ add_filter('datamachine_global_tools', function($tools) {
         'parameters' => [
             'param1' => ['type' => 'string', 'required' => true]
         ]
-    ];
-    return $tools;
-});
-```
-
-### Chat Tools
-
-Registered via `datamachine_chat_tools` filter:
-
-```php
-add_filter('datamachine_chat_tools', function($tools) {
-    $tools['chat_tool'] = [
-        'class' => 'MyNamespace\\ChatTool',
-        'method' => 'execute',
-        'description' => 'Chat-specific tool',
-        'parameters' => [/* ... */]
     ];
     return $tools;
 });
@@ -341,14 +261,6 @@ curl https://example.com/wp-json/datamachine/v1/tools \
   -u username:application_password | jq '.tools | to_entries | map(select(.value.configured == false))'
 ```
 
-### List Chat Tools
-
-```bash
-# Get chat-enabled tools
-curl https://example.com/wp-json/datamachine/v1/tools \
-  -u username:application_password | jq '.tools | to_entries | map(select(.value.chat_enabled == true)) | map(.key)'
-```
-
 ## Use Cases
 
 ### Tool Configuration UI
@@ -367,18 +279,6 @@ const unconfigured = Object.entries(tools)
   }));
 ```
 
-### Chat Interface Initialization
-
-Determine available tools for chat interface:
-
-```javascript
-const chatTools = await getChatTools();
-
-if (chatTools.includes('create_pipeline')) {
-  enableAdvancedChatFeatures();
-}
-```
-
 ### Tool Availability Check
 
 Verify tool configuration before use:
@@ -392,7 +292,6 @@ async function canUseLocalSearch() {
 
 ## Related Documentation
 
-- [Chat](chat.md)
 - [Settings](settings.md)
 - [Providers](providers.md)
 
@@ -401,4 +300,4 @@ async function canUseLocalSearch() {
 **Base URL**: `/wp-json/datamachine/v1/tools`
 **Permission**: `manage_options` capability required
 **Implementation**: `inc/Api/Tools.php`
-**Tool Registration**: Via `datamachine_global_tools` and `datamachine_chat_tools` filters
+**Tool Registration**: Via `datamachine_global_tools` and the `datamachine_tools` registry

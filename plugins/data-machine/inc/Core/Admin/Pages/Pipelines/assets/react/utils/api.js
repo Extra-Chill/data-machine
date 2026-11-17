@@ -720,7 +720,7 @@ export const getStepTypes = async () => {
 /**
  * Get available tools
  *
- * @param {string|null} context - Optional context filter ('pipeline', 'chat', 'system')
+ * @param {string|null} context - Optional context filter ('pipeline', 'system')
  * @return {Promise<Object>} Tools configuration
  */
 export const getTools = async ( context = null ) => {

@@ -1,6 +1,6 @@
 # Data Machine User Documentation
 
-**AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, conversational chat agent, REST API, and extensibility through handlers and tools.**
+**AI-first WordPress plugin for automating and orchestrating content workflows with a visual pipeline builder, REST API, and extensibility through handlers and tools.**
 
 ## Canonical Model
 
@@ -115,7 +115,7 @@ The ability classes under `inc/Abilities/` provide direct method calls for core 
 - `LogAbilities` and the `LogRepository` aggregate log entries in the `wp_datamachine_logs` table for filtering in the admin UI.
 - Cache invalidation is handled by ability-level `clearCache()` methods to ensure dynamic handler and step type registrations are immediately reflected across the system.
 
-Abilities own reusable business operations. Purpose-built REST controllers, WP-CLI commands, and chat tools commonly delegate to them while retaining stable Data Machine namespaces and consumer-specific request, permission, response, output, and conversational semantics. These adapters are intentional product boundaries, not wrappers scheduled for removal.
+Abilities own reusable business operations. Purpose-built REST controllers, WP-CLI commands, and AI tools commonly delegate to them while retaining stable Data Machine namespaces and consumer-specific request, permission, response, output, and conversational semantics. These adapters are intentional product boundaries, not wrappers scheduled for removal.
 
 ## System Tasks Framework
 
@@ -182,11 +182,10 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 ## Admin Interface
 
 - **React-First Architecture**: Admin pages are React apps built with `@wordpress/components` and TanStack Query for server state.
-- **Client UI state**: The Pipelines page uses a small Zustand store for UI state (pipeline selection, modals, chat sidebar). Other pages may use local React state.
+- **Client UI state**: The Pipelines page uses a small Zustand store for UI state (pipeline selection, modals). Other pages may use local React state.
 - **Pipeline Builder**: Visual pipeline/flow configuration with modal-driven step and handler settings.
 - **Job Management**: React dashboard for job history with server-driven pagination and admin cleanup modal.
 - **Logs Interface**: React logs viewer with filtering controls and REST-backed content loading.
-- **Integrated Chat**: Collapsible sidebar for context-aware pipeline automation and AI-driven workflow assistance, using specialized tools to manage the entire ecosystem.
 - **Agent Management**: Agent creation, configuration, and access control UI.
 
 ## Key Capabilities

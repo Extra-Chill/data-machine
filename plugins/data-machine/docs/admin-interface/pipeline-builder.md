@@ -1,6 +1,6 @@
 # Pipeline Builder Interface
 
-The Pipelines admin page is a React builder for Data Machine pipelines, flows, flow-step handlers, prompt queues, memory/context files, and the integrated chat sidebar. The current client source lives under `inc/Core/Admin/Pages/Pipelines/assets/react/` and all server operations are routed through `utils/api.js` unless noted.
+The Pipelines admin page is a React builder for Data Machine pipelines, flows, flow-step handlers, prompt queues, and memory/context files. The current client source lives under `inc/Core/Admin/Pages/Pipelines/assets/react/` and all server operations are routed through `utils/api.js` unless noted.
 
 ## Source Map
 
@@ -13,17 +13,14 @@ The Pipelines admin page is a React builder for Data Machine pipelines, flows, f
 | Handler data | `queries/handlers.js`, `components/modals/HandlerSettingsModal.jsx`, `components/flows/FlowStepHandler.jsx` |
 | Config data | `queries/config.js`, `components/modals/StepSelectionModal.jsx`, `components/modals/HandlerSelectionModal.jsx` |
 | UI state | `stores/uiStore.js`, `components/shared/ModalSwitch.jsx`, `components/shared/ModalManager.jsx` |
-| Chat sidebar | `components/chat/`, `queries/chat.js` |
 
 ## State Model
 
-**TanStack Query** owns server state and cache invalidation for pipelines, flows, handlers, queues, config, memory files, and chat data.
+**TanStack Query** owns server state and cache invalidation for pipelines, flows, handlers, queues, config, and memory files.
 
 **Zustand** owns local UI state in `stores/uiStore.js`. The persisted keys are intentionally small:
 
 - `selectedPipelineId`
-- `isChatOpen`
-- `chatSessionId`
 
 Modal state (`activeModal`, `modalData`) stays in the store but is not persisted.
 

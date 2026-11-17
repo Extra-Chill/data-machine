@@ -150,8 +150,7 @@ if ( ! function_exists( 'DataMachine\\Engine\\AI\\datamachine_conversation_metad
 }
 
 use DataMachine\Cli\Commands\JobsCommand;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
-use DataMachine\Core\Database\Chat\ConversationStoreInterface;
+use AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Store;
 use DataMachine\Engine\AI\DataMachinePipelineTranscriptPersister;
 use DataMachine\Engine\AI\Directives\DirectiveInterface;
 use DataMachine\Engine\AI\RequestBuilder;
@@ -169,52 +168,26 @@ class RequestMetadataSmokeDirective implements DirectiveInterface {
 	}
 }
 
-class RequestMetadataSmokeStore implements ConversationStoreInterface {
+class RequestMetadataSmokeStore implements WP_Agent_Conversation_Store {
 	public array $sessions = array();
 	public array $updated  = array();
 
-	public function create_session( ...$args ): string {
-		$workspace  = $args[0];
-		$user_id    = (int) ( $args[1] ?? 0 );
-		$agent      = $args[2] ?? '';
-		$agent_slug = is_string( $agent ) ? $agent : '';
-		$metadata   = is_array( $args[3] ?? null ) ? $args[3] : array();
-		$context    = (string) ( $args[4] ?? 'chat' );
+	public function create_session( WP_Agent_Workspace_Scope $workspace, int $user_id, string $agent_slug = '', array $metadata = array(), string $context = 'chat' ): string {
 		$metadata['workspace'] = $workspace->to_array();
 		$this->sessions['smoke-session'] = compact( 'user_id', 'agent_slug', 'metadata', 'context' );
 		return 'smoke-session';
 	}
 
-	public function get_session( string $session_id ): ?array { return null; }
 	public function list_sessions( WP_Agent_Workspace_Scope $workspace, int $user_id, array $args = array() ): array { return array(); }
+	public function get_session( string $session_id ): ?array { return null; }
 	public function update_session( string $session_id, array $messages, array $metadata = array(), string $provider = '', string $model = '', ?string $provider_response_id = null ): bool {
 		unset( $provider_response_id );
 		$this->updated[ $session_id ] = compact( 'messages', 'metadata', 'provider', 'model' );
 		return true;
 	}
 	public function delete_session( string $session_id ): bool { return true; }
-	public function acquire_session_lock( string $session_id, int $ttl_seconds = 300 ): ?string { return 'smoke-lock'; }
-	public function release_session_lock( string $session_id, string $lock_token ): bool { return true; }
-	public function get_user_sessions( int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null ): array { return array(); }
-	public function get_user_session_count( int $user_id, ?string $context = null, ?int $agent_id = null ): int { return 0; }
-	public function get_user_sessions_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, int $limit = 20, int $offset = 0, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): array { return array(); }
-	public function get_user_session_count_for_workspace( WP_Agent_Workspace_Scope $workspace, int $user_id, ?string $context = null, ?int $agent_id = null, ?array $transcript_owner = null ): int { return 0; }
-	public function get_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): ?array { return null; }
-	public function delete_session_for_transcript_owner( WP_Agent_Workspace_Scope $workspace, int $user_id, array $owner, string $session_id ): bool { return false; }
 	public function get_recent_pending_session( WP_Agent_Workspace_Scope $workspace, int $user_id, int $seconds = 600, string $context = 'chat', ?int $token_id = null ): ?array { return null; }
 	public function update_title( string $session_id, string $title ): bool { return true; }
-	public function count_unread( array $messages, ?string $last_read_at ): int { return 0; }
-	public function mark_session_read( string $session_id, int $user_id ) { return gmdate( 'Y-m-d H:i:s' ); }
-	public function mark_session_read_for_workspace( WP_Agent_Workspace_Scope $workspace, string $session_id, int $user_id, array $transcript_owner ) { return false; }
-	public function cleanup_expired_sessions(): int { return 0; }
-	public function count_old_sessions( int $retention_days, bool $exclude_pipeline_transcripts = false ): int { return 0; }
-	public function cleanup_old_sessions( int $retention_days ): int { return 0; }
-	public function count_old_pipeline_transcripts( int $retention_days ): int { return 0; }
-	public function cleanup_pipeline_transcripts( int $retention_days ): int { return 0; }
-	public function cleanup_orphaned_sessions( int $hours = 1 ): int { return 0; }
-	public function list_sessions_for_day( string $date ): array { return array(); }
-	public function list_sessions_for_day_scoped( string $date, array $scope ): array { return array(); }
-	public function get_storage_metrics(): ?array { return array( 'rows' => 0, 'size_mb' => '0.0' ); }
 }
 
 $failures = array();
@@ -354,9 +327,8 @@ build_smoke_request();
 assert_true( 0 === count_guardrail_warnings(), 'small request does not emit guardrail warning' );
 
 // 3. Simulated persisted pipeline transcript stores request_metadata in session metadata.
-$store    = new RequestMetadataSmokeStore();
-$property = new ReflectionProperty( ConversationStoreFactory::class, 'instance' );
-$property->setValue( null, $store );
+$store = new RequestMetadataSmokeStore();
+add_filter( 'wp_agent_conversation_store', static fn() => $store );
 
 $transcript_request = new WP_Agent_Conversation_Request(
 	array( array( 'role' => 'user', 'content' => 'hello' ) ),

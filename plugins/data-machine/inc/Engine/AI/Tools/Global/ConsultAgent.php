@@ -5,10 +5,14 @@
  * Lets an agent consult another registered agent through the canonical Agents
  * API `agents/chat` ability.
  *
- * @package DataMachine\Api\Chat\Tools
+ * Registered for chat and system modes. It stays opt-in (`requires_opt_in`),
+ * so it only resolves when a step or session names it in `enabled_tools`, as
+ * the Intelligence wiki graph maintenance system task does.
+ *
+ * @package DataMachine\Engine\AI\Tools\Global
  */
 
-namespace DataMachine\Api\Chat\Tools;
+namespace DataMachine\Engine\AI\Tools\Global;
 
 use DataMachine\Core\Database\Agents\Agents;
 use DataMachine\Engine\AI\Tools\BaseTool;
@@ -21,7 +25,7 @@ class ConsultAgent extends BaseTool {
 		$this->registerTool(
 			'consult_agent',
 			array( $this, 'getToolDefinition' ),
-			array( 'chat' ),
+			array( 'chat', 'system' ),
 			array(
 				'access_level'    => 'public',
 				'requires_opt_in' => true,
@@ -41,20 +45,22 @@ class ConsultAgent extends BaseTool {
 			'backing_ability' => 'agents/chat',
 			'description'     => 'Consult another registered agent through the canonical agents/chat ability and return its answer. Use this when a peer agent owns the needed context. Do not call yourself.',
 			'parameters'      => array(
-				'agent'           => array(
-					'type'        => 'string',
-					'description' => 'Target registered agent slug to consult, for example woocommerce-wiki.',
-					'required'    => true,
+				'type'       => 'object',
+				'properties' => array(
+					'agent'           => array(
+						'type'        => 'string',
+						'description' => 'Target registered agent slug to consult, for example woocommerce-wiki.',
+					),
+					'question'        => array(
+						'type'        => 'string',
+						'description' => 'Focused question or request to send to the peer agent.',
+					),
+					'peer_session_id' => array(
+						'type'        => 'string',
+						'description' => 'Optional peer-agent session ID to continue. Omit to start a fresh peer turn.',
+					),
 				),
-				'question'        => array(
-					'type'        => 'string',
-					'description' => 'Focused question or request to send to the peer agent.',
-					'required'    => true,
-				),
-				'peer_session_id' => array(
-					'type'        => 'string',
-					'description' => 'Optional peer-agent session ID to continue. Omit to start a fresh peer turn.',
-				),
+				'required'   => array( 'agent', 'question' ),
 			),
 			'runtime'         => array(
 				'duplicate_policy' => 'repeatable',

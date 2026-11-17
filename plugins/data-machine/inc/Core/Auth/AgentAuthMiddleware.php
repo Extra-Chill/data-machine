@@ -186,7 +186,7 @@ class AgentAuthMiddleware {
 		PermissionHelper::set_agent_context( $agent_id, $owner_id, $token_scope, $token_id );
 		PermissionHelper::set_execution_principal( $principal );
 
-		// Expose the caller context for downstream code (ChatOrchestrator,
+		// Expose the caller context for downstream code (host chat runtimes,
 		// abilities, logging) that wants to know who's calling and where
 		// in the chain this request lives.
 		PermissionHelper::set_caller_context( $inbound_ctx );
