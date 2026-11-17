@@ -190,7 +190,8 @@ class QueueTopicValidator {
 		$best_match  = null;
 		$best_score  = 0.0;
 
-		foreach ( $query->posts as $post_id ) {
+		foreach ( $query->posts as $post ) {
+			$post_id     = $post instanceof \WP_Post ? $post->ID : (int) $post;
 			$title       = get_the_title( $post_id );
 			$title_words = SimilarityEngine::tokenize( $title );
 			$score       = SimilarityEngine::jaccard( $topic_words, $title_words );
@@ -198,7 +199,7 @@ class QueueTopicValidator {
 			if ( $score > $best_score ) {
 				$best_score = $score;
 				$best_match = array(
-					'post_id'    => (int) $post_id,
+					'post_id'    => $post_id,
 					'title'      => $title,
 					'url'        => get_permalink( $post_id ),
 					'similarity' => round( $score, 3 ),

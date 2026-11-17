@@ -40,6 +40,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	// ============================================
 	// ACCESS LEVELS
 	// ============================================
+	// Access levels gate interactive (request-user scoped) resolution only.
+	// Pipeline and system resolution run as product automation.
 
 	public function test_removed_admin_tools_do_not_resolve_in_any_mode(): void {
 		// The interactive pipeline-editing tools were removed with the Data
@@ -94,7 +96,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
@@ -128,7 +131,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
@@ -160,7 +164,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
@@ -191,7 +196,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_SYSTEM,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
