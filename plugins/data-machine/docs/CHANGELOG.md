@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.0] - 2026-11-17
+
+### Changed
+- remove chat from Data Machine; agents-api owns chat
+
 ## [0.204.0] - 2026-11-17
 
 ### Added
