@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.86.5] - 2026-11-17
+
+### Changed
+- delegate test-event-scraper to datamachine/test-handler
+
 ## [0.86.4] - 2026-11-15
 
 ### Fixed
