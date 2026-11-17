@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.0] - 2026-11-17
+
+### Added
+- explicit allow_past_create opt-in for upsert-event backfills
+
 ## [0.87.0] - 2026-11-17
 
 ### Changed
