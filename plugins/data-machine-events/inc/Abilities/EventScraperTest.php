@@ -27,18 +27,46 @@
  * counts collapse repeated packet identifiers, while raw sections and flyer
  * candidates have separate counters. None represent production eligibility.
  *
+ * Issue #3869: generic handler execution is delegated to core's
+ * `datamachine/test-handler` ability in lossless `raw` output mode. This
+ * ability keeps only the events-domain interpretation of the returned packet
+ * envelopes. Raw mode is bounded (at most 100 packets / 5 MiB), so the
+ * ability requests the maximum bounds by default and surfaces a truncation
+ * diagnostic whenever packets were capped or omitted.
+ *
  * @package DataMachineEvents\Abilities
  */
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\UniversalWebScraper;
+use DataMachine\Abilities\PermissionHelper;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
 class EventScraperTest {
+
+	/**
+	 * Core ability that performs the generic handler dry-run.
+	 */
+	public const TEST_HANDLER_ABILITY = 'datamachine/test-handler';
+
+	/**
+	 * Handler slug executed through the test-handler ability.
+	 */
+	public const HANDLER_SLUG = 'universal_web_scraper';
+
+	/**
+	 * Raw-mode packet bound enforced by datamachine/test-handler.
+	 */
+	public const MAX_PACKET_LIMIT = 100;
+
+	/**
+	 * Raw-mode response byte bounds enforced by datamachine/test-handler.
+	 */
+	public const MIN_BYTE_LIMIT = 4096;
+	public const MAX_BYTE_LIMIT = 5242880;
 
 	private static bool $registered = false;
 
@@ -85,6 +113,26 @@ class EventScraperTest {
 										'max_items'        => array( 'type' => array( 'integer', 'string' ) ),
 									),
 								),
+								'output_mode'    => array(
+									'type'        => 'string',
+									'enum'        => array( 'compact', 'raw' ),
+									'default'     => 'compact',
+									'description' => 'Compact (default) returns the event diagnostics. Raw additionally returns raw_events, the test-handler packet envelopes, and the packet omission count from the same single handler execution.',
+								),
+								'limit'          => array(
+									'type'        => 'integer',
+									'minimum'     => 0,
+									'maximum'     => self::MAX_PACKET_LIMIT,
+									'default'     => self::MAX_PACKET_LIMIT,
+									'description' => 'Maximum packets materialized and returned, forwarded to datamachine/test-handler raw mode (1-100). Defaults to 100 so diagnostics do not undercount; 0 also means the default.',
+								),
+								'byte_limit'     => array(
+									'type'        => 'integer',
+									'minimum'     => self::MIN_BYTE_LIMIT,
+									'maximum'     => self::MAX_BYTE_LIMIT,
+									'default'     => self::MAX_BYTE_LIMIT,
+									'description' => 'Maximum serialized bytes for the delegated raw test-handler response (4096-5242880, default 5242880). Whole packets are omitted rather than partially truncated.',
+								),
 							),
 						),
 						'output_schema'       => array(
@@ -92,16 +140,16 @@ class EventScraperTest {
 							'additionalProperties' => false,
 							'required'             => array( 'success', 'status', 'target_url', 'event_data', 'extraction_info', 'coverage_issues', 'warnings', 'logs' ),
 							'properties'           => array(
-								'success'         => array( 'type' => 'boolean' ),
-								'status'          => array(
+								'success'              => array( 'type' => 'boolean' ),
+								'status'               => array(
 									'type' => 'string',
 									'enum' => array( 'ok', 'warning', 'error' ),
 								),
-								'target_url'      => array(
+								'target_url'           => array(
 									'type'   => 'string',
 									'format' => 'uri',
 								),
-								'event_data'      => array(
+								'event_data'           => array(
 									'type'                 => 'object',
 									'additionalProperties' => false,
 									'properties'           => array(
@@ -139,7 +187,7 @@ class EventScraperTest {
 										'page_url'     => array( 'type' => 'string' ),
 									),
 								),
-								'extraction_info' => array(
+								'extraction_info'      => array(
 									'type'                 => 'object',
 									'additionalProperties' => false,
 									'required'             => array(
@@ -174,7 +222,7 @@ class EventScraperTest {
 										'extracted_packet_count' => array(
 											'type'        => 'integer',
 											'minimum'     => 0,
-											'description' => 'All packets returned by direct handler execution before stable-identifier deduplication.',
+											'description' => 'All packets returned by the delegated test-handler execution before stable-identifier deduplication.',
 										),
 										'unique_source_event_count' => array(
 											'type'        => 'integer',
@@ -207,6 +255,16 @@ class EventScraperTest {
 											'description' => 'Vision flyer candidates requiring downstream interpretation.',
 										),
 										'context_supplied' => array( 'type' => 'boolean' ),
+										'omitted_packet_count' => array(
+											'type'        => 'integer',
+											'minimum'     => 0,
+											'description' => 'Packets materialized by the handler but omitted from the delegated raw response. Present only when output was truncated.',
+										),
+										'truncation_reasons' => array(
+											'type'        => 'array',
+											'items'       => array( 'type' => 'string' ),
+											'description' => 'test-handler truncation reasons (packet_limit, byte_limit, ...). Present only when output was truncated.',
+										),
 										'requires_ai_step' => array( 'type' => 'boolean' ),
 										'image_file_stored' => array( 'type' => 'boolean' ),
 										'enrichment'       => array(
@@ -228,7 +286,7 @@ class EventScraperTest {
 										),
 									),
 								),
-								'coverage_issues' => array(
+								'coverage_issues'      => array(
 									'type'                 => 'object',
 									'additionalProperties' => false,
 									'properties'           => array(
@@ -240,11 +298,11 @@ class EventScraperTest {
 										'vision_flyer'  => array( 'type' => 'boolean' ),
 									),
 								),
-								'warnings'        => array(
+								'warnings'             => array(
 									'type'  => 'array',
 									'items' => array( 'type' => 'string' ),
 								),
-								'logs'            => array(
+								'logs'                 => array(
 									'type'  => 'array',
 									'items' => array(
 										'type'       => 'object',
@@ -254,6 +312,46 @@ class EventScraperTest {
 											'context' => array( 'type' => 'object' ),
 										),
 									),
+								),
+								'output_mode'          => array(
+									'type' => 'string',
+									'enum' => array( 'compact', 'raw' ),
+								),
+								'raw_events'           => array(
+									'type'        => 'array',
+									'description' => 'Raw mode only: complete decoded event object of each unique structured packet, after stable-identifier deduplication.',
+									'items'       => array(
+										'type' => 'object',
+										'additionalProperties' => true,
+									),
+								),
+								'packets'              => array(
+									'type'        => 'array',
+									'description' => 'Raw mode only: raw packet envelopes returned by datamachine/test-handler.',
+									'items'       => array(
+										'type' => 'object',
+										'additionalProperties' => true,
+									),
+								),
+								'packet_count'         => array(
+									'type'        => 'integer',
+									'minimum'     => 0,
+									'description' => 'Raw mode only: packets materialized by the handler.',
+								),
+								'omitted_packet_count' => array(
+									'type'        => 'integer',
+									'minimum'     => 0,
+									'description' => 'Raw mode only: test-handler omitted packet count.',
+								),
+								'limits'               => array(
+									'type'                 => 'object',
+									'additionalProperties' => true,
+									'description'          => 'Raw mode only: packet and byte bounds applied by test-handler.',
+								),
+								'truncation'           => array(
+									'type'                 => 'object',
+									'additionalProperties' => true,
+									'description'          => 'Raw mode only: test-handler truncation report.',
 								),
 							),
 						),
@@ -283,30 +381,46 @@ class EventScraperTest {
 			? $input['handler_config']
 			: null;
 
-		return $this->test( $target_url, $handler_config );
+		$options = array();
+		foreach ( array( 'output_mode', 'limit', 'byte_limit' ) as $option ) {
+			if ( array_key_exists( $option, $input ) ) {
+				$options[ $option ] = $input[ $option ];
+			}
+		}
+
+		return $this->test( $target_url, $handler_config, $options );
 	}
 
-	public function test( string $target_url, ?array $handler_config = null ): array|\WP_Error {
-		$logs = array();
-		add_action(
-			'datamachine_log',
-			static function ( string $level, string $message, array $context = array() ) use ( &$logs ): void {
-				$logs[] = array(
-					'level'   => $level,
-					'message' => $message,
-					'context' => $context,
-				);
-			},
-			10,
-			3
-		);
+	/**
+	 * Run the universal web scraper against a URL and interpret its packets.
+	 *
+	 * The handler executes exactly once, through `datamachine/test-handler`
+	 * in raw output mode. Compact and raw results are projections of that
+	 * single execution.
+	 *
+	 * @param string     $target_url     Target URL.
+	 * @param array|null $handler_config Optional persisted handler config.
+	 * @param array      $options        Optional output_mode (compact|raw), limit, byte_limit.
+	 * @return array|\WP_Error
+	 */
+	public function test( string $target_url, ?array $handler_config = null, array $options = array() ): array|\WP_Error {
+		$output_mode = 'raw' === ( $options['output_mode'] ?? 'compact' ) ? 'raw' : 'compact';
+		$limits      = self::normalizeLimits( $options );
+
+		$logs         = array();
+		$log_listener = static function ( string $level, string $message, array $context = array() ) use ( &$logs ): void {
+			$logs[] = array(
+				'level'   => $level,
+				'message' => $message,
+				'context' => $context,
+			);
+		};
+		add_action( 'datamachine_log', $log_listener, 10, 3 );
 
 		$config               = array_merge(
 			$handler_config ?? array(),
 			array(
-				'source_url'   => $target_url,
-				'flow_step_id' => 'test_' . wp_generate_uuid4(),
-				'flow_id'      => 'direct',
+				'source_url' => $target_url,
 			)
 		);
 		$production_max_items = null;
@@ -315,42 +429,63 @@ class EventScraperTest {
 			unset( $config['max_items'] );
 		}
 
-		$handler = new UniversalWebScraper();
 		try {
-			$results = $handler->get_fetch_data( 'direct', $config, null );
-		} catch ( \RuntimeException $e ) {
-			return new \WP_Error( 'scraper_failed', $e->getMessage(), array( 'status' => 502 ) );
+			$response = $this->runTestHandler( $config, $limits );
+		} finally {
+			remove_action( 'datamachine_log', $log_listener, 10 );
 		}
 
-		if ( empty( $results ) ) {
-			$failures         = array_values(
-				array_filter(
-					$logs,
-					static function ( array $entry ): bool {
-						return in_array( $entry['level'], array( 'warning', 'error' ), true );
-					}
-				)
-			);
-			$failure_messages = array_map(
-				static fn( array $entry ): string => (string) ( $entry['context']['error'] ?? $entry['message'] ),
-				$failures
-			);
-
-			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', array_unique( $failure_messages ) ), array( 'status' => 500 ) );
+		if ( is_wp_error( $response ) ) {
+			if ( 'handler_execution_failed' === $response->get_error_code() ) {
+				$failure_messages = $this->failureMessages( $logs );
+				$message          = empty( $failure_messages ) ? $response->get_error_message() : implode( '; ', $failure_messages );
+				return new \WP_Error( 'scraper_failed', $message, array( 'status' => 502 ) );
+			}
+			return $response;
 		}
 
-		// Walk every packet returned by get_fetch_data(). One packet per extracted
+		$packet_count = (int) ( $response['packet_count'] ?? 0 );
+		$raw_packets  = is_array( $response['packets'] ?? null ) ? array_values( $response['packets'] ) : array();
+		$truncation   = is_array( $response['truncation'] ?? null ) ? $response['truncation'] : array();
+		$omitted      = (int) ( $truncation['omitted_packet_count'] ?? max( 0, $packet_count - count( $raw_packets ) ) );
+
+		if ( 0 === $packet_count ) {
+			return new \WP_Error( 'scraper_failed', 'Scraper returned no results. ' . implode( '; ', $this->failureMessages( $logs ) ), array( 'status' => 500 ) );
+		}
+
+		// Walk every packet returned by the handler. One packet per extracted
 		// event — multi-event calendars (Bandzoogle, JSON-LD lists, Tribe REST,
 		// etc.) produce N packets and we must surface the full count to the
 		// qualify path (#265).
 		$packet_entries = array();
-		foreach ( $results as $packet_obj ) {
-			$packet_array = $packet_obj->addTo( array() );
-			$packet_entry = $packet_array[0] ?? array();
-			if ( ! empty( $packet_entry ) ) {
+		foreach ( $raw_packets as $packet_entry ) {
+			if ( is_array( $packet_entry ) && ! empty( $packet_entry ) ) {
 				$packet_entries[] = $packet_entry;
 			}
 		}
+
+		if ( empty( $packet_entries ) ) {
+			return new \WP_Error(
+				'scraper_output_truncated',
+				sprintf(
+					'Scraper materialized %d packets but all were omitted from the bounded test-handler response (reasons: %s). Raise byte_limit.',
+					$packet_count,
+					implode( ', ', (array) ( $truncation['reasons'] ?? array() ) )
+				),
+				array(
+					'status'     => 500,
+					'truncation' => $truncation,
+				)
+			);
+		}
+
+		$context = array(
+			'output_mode' => $output_mode,
+			'response'    => $response,
+			'raw_packets' => $raw_packets,
+			'omitted'     => $omitted,
+			'truncation'  => $truncation,
+		);
 
 		$inventory       = $this->analyzePacketEntries( $packet_entries, null !== $handler_config, $production_max_items );
 		$packet_entries  = $inventory['packet_entries'];
@@ -376,7 +511,7 @@ class EventScraperTest {
 		$extraction_info['enrichment']        = $this->enrichmentSummary( $logs );
 
 		if ( is_array( $payload ) && isset( $payload['raw_html'] ) && is_string( $payload['raw_html'] ) ) {
-			return array(
+			return $this->finalizeResult( array(
 				'success'         => true,
 				'status'          => 'warning',
 				'target_url'      => $target_url,
@@ -396,12 +531,12 @@ class EventScraperTest {
 				),
 				'warnings'        => array( 'No structured venue fields. Set venue override for reliable address/geocoding.' ),
 				'logs'            => array_slice( $logs, -20 ),
-			);
+			), $packet_entries, $context );
 		}
 
 		// Vision flyer extraction - image stored for AI step processing.
 		if ( is_array( $payload ) && ( $payload['source_type'] ?? '' ) === 'vision_flyer' ) {
-			return array(
+			return $this->finalizeResult( array(
 				'success'         => true,
 				'status'          => 'ok',
 				'target_url'      => $target_url,
@@ -427,7 +562,7 @@ class EventScraperTest {
 				),
 				'warnings'        => array( 'Vision flyer detected. Image stored in engine data. Pipeline requires AI step for event extraction.' ),
 				'logs'            => array_slice( $logs, -20 ),
-			);
+			), $packet_entries, $context );
 		}
 
 		if ( ! is_array( $event ) ) {
@@ -512,7 +647,7 @@ class EventScraperTest {
 			$warnings[] = $warning['message'];
 		}
 
-		return array(
+		return $this->finalizeResult( array(
 			'success'         => true,
 			'status'          => $coverage_warning ? 'warning' : 'ok',
 			'target_url'      => $target_url,
@@ -526,7 +661,163 @@ class EventScraperTest {
 			),
 			'warnings'        => $warnings,
 			'logs'            => array_slice( $logs, -20 ),
+		), $packet_entries, $context );
+	}
+
+	/**
+	 * Clamp caller-supplied limits to the datamachine/test-handler raw bounds.
+	 *
+	 * Defaults request the maximum bounds so a diagnostic scrape does not
+	 * undercount events relative to walking every packet.
+	 *
+	 * @param array $options Caller options (limit, byte_limit).
+	 * @return array{limit:int,byte_limit:int}
+	 */
+	public static function normalizeLimits( array $options ): array {
+		$limit      = (int) ( $options['limit'] ?? 0 );
+		$byte_limit = (int) ( $options['byte_limit'] ?? self::MAX_BYTE_LIMIT );
+
+		return array(
+			'limit'      => $limit > 0 ? min( self::MAX_PACKET_LIMIT, $limit ) : self::MAX_PACKET_LIMIT,
+			'byte_limit' => max( self::MIN_BYTE_LIMIT, min( self::MAX_BYTE_LIMIT, $byte_limit ) ),
 		);
+	}
+
+	/**
+	 * Execute the scraper once through core's generic test-handler ability.
+	 *
+	 * The caller of test-event-scraper has already passed this ability's own
+	 * manage_options gate (or is trusted server code: CLI, chat tool, tests).
+	 * The nested call runs through the Abilities API so test-handler input and
+	 * output validation still apply, inside PermissionHelper::run_as_system()
+	 * so its Data Machine permission check does not re-authorize a delegation
+	 * the outer gate already approved. Agent-token contexts keep their own
+	 * capability ceiling because PermissionHelper evaluates agents first.
+	 *
+	 * @param array $config Handler config (source_url plus optional overrides).
+	 * @param array $limits Normalized limit/byte_limit.
+	 * @return array|\WP_Error Raw test-handler response.
+	 */
+	private function runTestHandler( array $config, array $limits ): array|\WP_Error {
+		$ability = function_exists( 'wp_get_ability' ) ? wp_get_ability( self::TEST_HANDLER_ABILITY ) : null;
+		if ( ! $ability ) {
+			return new \WP_Error( 'test_handler_unavailable', 'The datamachine/test-handler ability is unavailable; Data Machine core with raw test-handler output is required.', array( 'status' => 500 ) );
+		}
+
+		$input = array(
+			'handler_slug' => self::HANDLER_SLUG,
+			'config'       => $config,
+			'output_mode'  => 'raw',
+			'limit'        => $limits['limit'],
+			'byte_limit'   => $limits['byte_limit'],
+		);
+
+		$execute = static fn() => $ability->execute( $input );
+		$result  = class_exists( PermissionHelper::class )
+			? PermissionHelper::run_as_system( $execute )
+			: $execute();
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		if ( ! is_array( $result ) || 'raw' !== ( $result['output_mode'] ?? '' ) ) {
+			return new \WP_Error( 'test_handler_invalid_response', 'datamachine/test-handler did not return a raw packet response.', array( 'status' => 500 ) );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Collect warning/error log messages for failure reporting.
+	 *
+	 * @param array $logs Captured datamachine_log entries.
+	 * @return string[]
+	 */
+	private function failureMessages( array $logs ): array {
+		$messages = array();
+		foreach ( $logs as $entry ) {
+			if ( in_array( $entry['level'], array( 'warning', 'error' ), true ) ) {
+				$messages[] = (string) ( $entry['context']['error'] ?? $entry['message'] );
+			}
+		}
+
+		return array_values( array_unique( $messages ) );
+	}
+
+	/**
+	 * Apply truncation diagnostics and the raw projection to a result.
+	 *
+	 * Compact results are unchanged unless test-handler capped or omitted
+	 * packets, in which case the omission is surfaced as a warning plus
+	 * extraction_info counters so event_count is never silently low.
+	 *
+	 * @param array $result         Compact result.
+	 * @param array $packet_entries Unique (deduplicated) packet entries.
+	 * @param array $context        Delegation context from test().
+	 * @return array
+	 */
+	private function finalizeResult( array $result, array $packet_entries, array $context ): array {
+		$truncation = $context['truncation'];
+		$reasons    = array_values( array_filter( (array) ( $truncation['reasons'] ?? array() ), 'is_string' ) );
+		$omitted    = (int) $context['omitted'];
+		$limits     = is_array( $context['response']['limits'] ?? null ) ? $context['response']['limits'] : array();
+
+		$packet_capped = in_array( 'packet_limit', $reasons, true );
+		if ( $omitted > 0 || $packet_capped ) {
+			$result['extraction_info']['omitted_packet_count'] = $omitted;
+			$result['extraction_info']['truncation_reasons']   = $reasons;
+
+			if ( $packet_capped ) {
+				$result['warnings'][] = sprintf(
+					'PACKET LIMIT: Handler output was capped at %d packets; the source may contain more events than event_count reports.',
+					(int) ( $limits['packet_count'] ?? self::MAX_PACKET_LIMIT )
+				);
+			}
+			if ( $omitted > 0 ) {
+				$result['warnings'][] = sprintf(
+					'BYTE LIMIT: %d of %d packets were omitted from the bounded test-handler response (reasons: %s); counts reflect returned packets only.',
+					$omitted,
+					(int) ( $context['response']['packet_count'] ?? 0 ),
+					implode( ', ', $reasons )
+				);
+			}
+			if ( 'ok' === ( $result['status'] ?? '' ) ) {
+				$result['status'] = 'warning';
+			}
+		}
+
+		if ( 'raw' !== $context['output_mode'] ) {
+			return $result;
+		}
+
+		$result['output_mode']          = 'raw';
+		$result['raw_events']           = $this->rawEventsFromPackets( $packet_entries );
+		$result['packets']              = $context['raw_packets'];
+		$result['packet_count']         = (int) ( $context['response']['packet_count'] ?? 0 );
+		$result['omitted_packet_count'] = $omitted;
+		$result['limits']               = $limits;
+		$result['truncation']           = $truncation;
+
+		return $result;
+	}
+
+	/**
+	 * Decode the complete event object of each structured packet.
+	 *
+	 * @param array $packet_entries Unique packet entries.
+	 * @return array<int, array>
+	 */
+	private function rawEventsFromPackets( array $packet_entries ): array {
+		$events = array();
+		foreach ( $packet_entries as $entry ) {
+			$decoded = json_decode( (string) ( $entry['data']['body'] ?? '' ), true );
+			if ( is_array( $decoded ) && is_array( $decoded['event'] ?? null ) ) {
+				$events[] = $decoded['event'];
+			}
+		}
+
+		return $events;
 	}
 
 	/**
