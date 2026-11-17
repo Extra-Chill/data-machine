@@ -39,26 +39,26 @@ final class PlatformBootstrapTest extends WP_UnitTestCase {
 
 	public function test_misconfigured_optional_component_does_not_suppress_another_platform(): void {
 		$order = array();
-		$broken_tools = $this->provider(
-			'broken-tools',
+		$broken_cli = $this->provider(
+			'broken-cli',
 			$order,
 			array(),
 			null,
 			static function (): void {
-				throw new InvalidArgumentException( 'Invalid tool configuration.' );
+				throw new InvalidArgumentException( 'Invalid CLI configuration.' );
 			}
 		);
 		$healthy = $this->provider( 'healthy', $order, array(), null, static function () use ( &$order ): void {
-			$order[] = 'healthy-tools';
+			$order[] = 'healthy-cli';
 		} );
-		$bootstrap = new PlatformBootstrap( array( $broken_tools, $healthy ) );
+		$bootstrap = new PlatformBootstrap( array( $broken_cli, $healthy ) );
 
 		$bootstrap->register();
-		$bootstrap->register_tools();
+		$bootstrap->register_cli();
 
-		$this->assertSame( 'tools_registration_failed', $broken_tools->availability()['reason'] );
-		$this->assertSame( 'registered', $healthy->availability()['components']['tools'] );
-		$this->assertContains( 'healthy-tools', $order );
+		$this->assertSame( 'cli_registration_failed', $broken_cli->availability()['reason'] );
+		$this->assertSame( 'registered', $healthy->availability()['components']['cli'] );
+		$this->assertContains( 'healthy-cli', $order );
 	}
 
 	public function test_misconfigured_provider_is_unavailable_without_running_registration(): void {
@@ -95,7 +95,6 @@ final class PlatformBootstrapTest extends WP_UnitTestCase {
 		$capabilities = array(
 			'abilities' => array( 'datamachine/example-publish' ),
 			'handler'   => 'example_publish',
-			'tools'     => array( 'PublishExample' ),
 			'cli'       => 'datamachine-socials example',
 		);
 		$provider     = new PlatformProvider( 'example', array(), $capabilities, static function () use ( &$order ): void {
@@ -117,19 +116,19 @@ final class PlatformBootstrapTest extends WP_UnitTestCase {
 		$bootstrap = new PlatformBootstrap( array( $provider ) );
 
 		$bootstrap->register();
-		$bootstrap->register_tools();
+		$bootstrap->register_cli();
 
 		$this->assertTrue( $provider->availability()['available'] );
-		$this->assertSame( 'unavailable', $provider->availability()['components']['tools'] );
+		$this->assertSame( 'unavailable', $provider->availability()['components']['cli'] );
 	}
 
 	/**
 	 * @param array<int,string>                 $order         Registration log.
 	 * @param array<int,class-string>           $prerequisites Required classes.
 	 * @param callable|null                     $core           Core callback override.
-	 * @param callable|null                     $tools          Tools callback.
+	 * @param callable|null                     $cli            CLI callback.
 	 */
-	private function provider( string $id, array &$order, array $prerequisites = array(), ?callable $core = null, ?callable $tools = null ): PlatformProvider {
+	private function provider( string $id, array &$order, array $prerequisites = array(), ?callable $core = null, ?callable $cli = null ): PlatformProvider {
 		$core = $core ?? static function () use ( $id, &$order ): void {
 			$order[] = $id;
 		};
@@ -139,7 +138,7 @@ final class PlatformBootstrapTest extends WP_UnitTestCase {
 			$prerequisites,
 			array( 'abilities' => array( 'datamachine/' . $id ) ),
 			$core,
-			$tools
+			$cli
 		);
 	}
 }

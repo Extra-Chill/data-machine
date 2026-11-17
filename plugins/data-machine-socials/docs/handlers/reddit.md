@@ -84,11 +84,11 @@ Each eligible item contains:
 - `wp datamachine-socials reddit fetch <subreddit> --limit=25` — bounded subreddit fetch
 - `wp datamachine-socials reddit fetch --query="live music" --limit=10` — bounded global search
 
-## Chat Tools
+## Abilities
 
-- `VoteReddit` — upvote/downvote Reddit posts
-- `ReplyReddit` — reply to Reddit posts or comments
-- `SubmitReddit` — submit new posts to subreddits
+- `datamachine/vote-reddit` — upvote/downvote Reddit posts (`wp datamachine-socials reddit vote`)
+- `datamachine/reply-reddit` — reply to Reddit posts or comments (`wp datamachine-socials reddit reply`)
+- `datamachine/submit-reddit` — submit new posts to subreddits (`wp datamachine-socials reddit submit`)
 
 ## Error Handling
 

@@ -23,9 +23,6 @@ final class PlatformProvider {
 	private $register_core;
 
 	/** @var callable|null */
-	private $register_tools;
-
-	/** @var callable|null */
 	private $register_cli;
 
 	/** @var array<string, mixed> */
@@ -36,16 +33,14 @@ final class PlatformProvider {
 	 * @param array<int, class-string> $prerequisites Classes required by the platform runtime.
 	 * @param array<string, mixed>     $capabilities  Public capabilities exposed by the platform.
 	 * @param callable                 $register_core Core ability and handler registration.
-	 * @param callable|null            $register_tools Optional chat tool registration.
 	 * @param callable|null            $register_cli  Optional CLI registration.
 	 */
-	public function __construct( string $id, array $prerequisites, array $capabilities, callable $register_core, ?callable $register_tools = null, ?callable $register_cli = null ) {
-		$this->id             = $id;
-		$this->prerequisites  = $prerequisites;
-		$this->register_core  = $register_core;
-		$this->register_tools = $register_tools;
-		$this->register_cli   = $register_cli;
-		$this->availability   = array(
+	public function __construct( string $id, array $prerequisites, array $capabilities, callable $register_core, ?callable $register_cli = null ) {
+		$this->id            = $id;
+		$this->prerequisites = $prerequisites;
+		$this->register_core = $register_core;
+		$this->register_cli  = $register_cli;
+		$this->availability  = array(
 			'id'                    => $id,
 			'available'             => false,
 			'state'                 => 'pending',
@@ -54,9 +49,8 @@ final class PlatformProvider {
 			'missing_prerequisites' => array(),
 			'capabilities'          => $capabilities,
 			'components'            => array(
-				'core'  => 'pending',
-				'tools' => null === $register_tools ? 'not_applicable' : 'pending',
-				'cli'   => null === $register_cli ? 'not_applicable' : 'pending',
+				'core' => 'pending',
+				'cli'  => null === $register_cli ? 'not_applicable' : 'pending',
 			),
 		);
 	}
@@ -108,13 +102,6 @@ final class PlatformProvider {
 		} catch ( \Throwable $throwable ) {
 			$this->fail( 'core', $throwable );
 		}
-	}
-
-	/**
-	 * Register optional chat tools exactly once.
-	 */
-	public function register_tools(): void {
-		$this->register_optional_component( 'tools', $this->register_tools );
 	}
 
 	/**

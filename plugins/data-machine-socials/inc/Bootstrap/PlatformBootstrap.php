@@ -56,15 +56,6 @@ final class PlatformBootstrap {
 	}
 
 	/**
-	 * Register chat tools for every available platform.
-	 */
-	public function register_tools(): void {
-		foreach ( $this->ordered_providers( array( 'reddit', 'instagram', 'tiktok', 'twitter', 'facebook', 'bluesky', 'threads', 'pinterest', 'youtube', 'linkedin', 'tumblr', 'mastodon' ) ) as $provider ) {
-			$provider->register_tools();
-		}
-	}
-
-	/**
 	 * Register CLI commands for every available platform.
 	 */
 	public function register_cli(): void {
@@ -127,18 +118,18 @@ final class PlatformBootstrap {
 	 */
 	private static function platform_providers(): array {
 		return array(
-			self::provider( 'twitter', 'Twitter', array( 'TwitterPublishAbility', 'TwitterReadAbility', 'TwitterUpdateAbility', 'TwitterDeleteAbility' ), array( 'datamachine/twitter-publish', 'datamachine/twitter-account', 'datamachine/twitter-read', 'datamachine/twitter-update', 'datamachine/twitter-delete' ), array( 'PublishTwitter', 'ReadTwitter', 'UpdateTwitter', 'DeleteTwitter' ) ),
-			self::provider( 'facebook', 'Facebook', array( 'FacebookPublishAbility', 'FacebookReadAbility', 'FacebookUpdateAbility', 'FacebookDeleteAbility', 'FacebookCommentReplyAbility', 'FacebookAdsReadAbility', 'FacebookAdsPromoteAbility', 'FacebookAdsUpdateAbility' ), array( 'datamachine/facebook-publish', 'datamachine/facebook-pages', 'datamachine/facebook-read', 'datamachine/facebook-update', 'datamachine/facebook-delete', 'datamachine/facebook-comment-reply', 'datamachine/facebook-ad-accounts', 'datamachine/facebook-ads-interests', 'datamachine/facebook-ads-report', 'datamachine/facebook-ads-promote', 'datamachine/facebook-ads-update' ), array( 'PublishFacebook', 'ReadFacebook', 'UpdateFacebook', 'DeleteFacebook', 'ReplyFacebookComment' ) ),
-			self::provider( 'threads', 'Threads', array( 'ThreadsPublishAbility', 'ThreadsReadAbility', 'ThreadsUpdateAbility', 'ThreadsDeleteAbility' ), array( 'datamachine/threads-publish', 'datamachine/threads-account', 'datamachine/threads-read', 'datamachine/threads-update', 'datamachine/threads-delete' ), array( 'PublishThreads', 'ReadThreads', 'UpdateThreads', 'DeleteThreads' ) ),
-			self::provider( 'bluesky', 'Bluesky', array( 'BlueskyPublishAbility', 'BlueskyReadAbility', 'BlueskyUpdateAbility', 'BlueskyDeleteAbility' ), array( 'datamachine/bluesky-publish', 'datamachine/bluesky-account', 'datamachine/bluesky-read', 'datamachine/bluesky-update', 'datamachine/bluesky-delete' ), array( 'PublishBluesky', 'ReadBluesky', 'UpdateBluesky', 'DeleteBluesky' ) ),
-			self::provider( 'mastodon', 'Mastodon', array( 'MastodonPublishAbility', 'MastodonReadAbility', 'MastodonUpdateAbility', 'MastodonDeleteAbility' ), array( 'datamachine/mastodon-publish', 'datamachine/mastodon-account', 'datamachine/mastodon-read', 'datamachine/mastodon-update', 'datamachine/mastodon-delete' ), array() ),
-			self::provider( 'pinterest', 'Pinterest', array( 'PinterestBoardsAbility', 'PinterestPublishAbility', 'PinterestReadAbility', 'PinterestUpdateAbility', 'PinterestDeleteAbility', 'PinterestAnalyticsAbility' ), array( 'datamachine/pinterest-sync-boards', 'datamachine/pinterest-list-boards', 'datamachine/pinterest-status', 'datamachine/pinterest-publish', 'datamachine/pinterest-read', 'datamachine/pinterest-update', 'datamachine/pinterest-delete', 'datamachine/pinterest-analytics' ), array( 'PublishPinterest', 'ReadPinterest', 'UpdatePinterest', 'DeletePinterest' ) ),
-			self::provider( 'instagram', 'Instagram', array( 'FetchInstagramAccountAbility', 'InstagramPublishAbility', 'InstagramReadAbility', 'InstagramInsightsAbility', 'InstagramAccountInsightsAbility', 'InstagramUpdateAbility', 'InstagramDeleteAbility', 'InstagramCommentReplyAbility', 'InstagramMessageSendAbility' ), array( 'datamachine-socials/fetch-instagram-account', 'datamachine/instagram-publish', 'datamachine/instagram-account', 'datamachine/instagram-read', 'datamachine/instagram-insights', 'datamachine/instagram-account-insights', 'datamachine/instagram-update', 'datamachine/instagram-delete', 'datamachine/instagram-comment-reply', 'datamachine/instagram-message-send' ), array( 'ReadInstagram', 'UpdateInstagram', 'ReplyInstagramComment', 'PublishInstagram', 'PublishReelInstagram', 'PublishStoryInstagram', 'DeleteInstagram', 'ReadInstagramMessages', 'SendInstagramMessage' ) ),
-			self::provider( 'tiktok', 'TikTok', array( 'TikTokPublishAbility', 'TikTokReadAbility' ), array( 'datamachine/tiktok-publish', 'datamachine/tiktok-account', 'datamachine/tiktok-read' ), array( 'PublishTikTok' ) ),
-			self::provider( 'linkedin', 'LinkedIn', array( 'LinkedInPublishAbility', 'LinkedInReadAbility', 'LinkedInUpdateAbility', 'LinkedInDeleteAbility' ), array( 'datamachine/linkedin-publish', 'datamachine/linkedin-account', 'datamachine/linkedin-read', 'datamachine/linkedin-update', 'datamachine/linkedin-delete' ), array( 'PublishLinkedIn', 'ReadLinkedIn', 'UpdateLinkedIn', 'DeleteLinkedIn' ) ),
-			self::provider( 'tumblr', 'Tumblr', array( 'TumblrPublishAbility', 'TumblrReadAbility', 'TumblrUpdateAbility', 'TumblrDeleteAbility', 'TumblrEngageAbility' ), array( 'datamachine/tumblr-publish', 'datamachine/tumblr-read', 'datamachine/tumblr-update', 'datamachine/tumblr-delete', 'datamachine/tumblr-engage' ), array( 'PublishTumblr', 'ReadTumblr' ) ),
-			self::provider( 'reddit', 'Reddit', array( 'FetchRedditAbility', 'RedditDomainMentionsAbility', 'RedditCommentDomainMonitorAbility', 'ReplyRedditAbility', 'SubmitRedditAbility', 'VoteRedditAbility' ), array( 'datamachine/fetch-reddit', 'datamachine/reddit-domain-mentions', 'datamachine/reddit-comment-mentions-poll', 'datamachine/reddit-comment-mentions-report', 'datamachine/reddit-comment-mentions-cleanup', 'datamachine/reply-reddit', 'datamachine/submit-reddit', 'datamachine/vote-reddit' ), array( 'FetchReddit', 'ReplyReddit', 'SubmitReddit', 'VoteReddit' ) ),
-			self::provider( 'youtube', 'YouTube', array( 'YouTubeUploadAbility', 'YouTubeSearchAbility', 'YouTubeAccountAbility' ), array( 'datamachine/youtube-upload', 'datamachine/youtube-search', 'datamachine/youtube-account' ), array( 'PublishYouTube', 'SearchYouTube' ) ),
+			self::provider( 'twitter', 'Twitter', array( 'TwitterPublishAbility', 'TwitterReadAbility', 'TwitterUpdateAbility', 'TwitterDeleteAbility' ), array( 'datamachine/twitter-publish', 'datamachine/twitter-account', 'datamachine/twitter-read', 'datamachine/twitter-update', 'datamachine/twitter-delete' ) ),
+			self::provider( 'facebook', 'Facebook', array( 'FacebookPublishAbility', 'FacebookReadAbility', 'FacebookUpdateAbility', 'FacebookDeleteAbility', 'FacebookCommentReplyAbility', 'FacebookAdsReadAbility', 'FacebookAdsPromoteAbility', 'FacebookAdsUpdateAbility' ), array( 'datamachine/facebook-publish', 'datamachine/facebook-pages', 'datamachine/facebook-read', 'datamachine/facebook-update', 'datamachine/facebook-delete', 'datamachine/facebook-comment-reply', 'datamachine/facebook-ad-accounts', 'datamachine/facebook-ads-interests', 'datamachine/facebook-ads-report', 'datamachine/facebook-ads-promote', 'datamachine/facebook-ads-update' ) ),
+			self::provider( 'threads', 'Threads', array( 'ThreadsPublishAbility', 'ThreadsReadAbility', 'ThreadsUpdateAbility', 'ThreadsDeleteAbility' ), array( 'datamachine/threads-publish', 'datamachine/threads-account', 'datamachine/threads-read', 'datamachine/threads-update', 'datamachine/threads-delete' ) ),
+			self::provider( 'bluesky', 'Bluesky', array( 'BlueskyPublishAbility', 'BlueskyReadAbility', 'BlueskyUpdateAbility', 'BlueskyDeleteAbility' ), array( 'datamachine/bluesky-publish', 'datamachine/bluesky-account', 'datamachine/bluesky-read', 'datamachine/bluesky-update', 'datamachine/bluesky-delete' ) ),
+			self::provider( 'mastodon', 'Mastodon', array( 'MastodonPublishAbility', 'MastodonReadAbility', 'MastodonUpdateAbility', 'MastodonDeleteAbility' ), array( 'datamachine/mastodon-publish', 'datamachine/mastodon-account', 'datamachine/mastodon-read', 'datamachine/mastodon-update', 'datamachine/mastodon-delete' ) ),
+			self::provider( 'pinterest', 'Pinterest', array( 'PinterestBoardsAbility', 'PinterestPublishAbility', 'PinterestReadAbility', 'PinterestUpdateAbility', 'PinterestDeleteAbility', 'PinterestAnalyticsAbility' ), array( 'datamachine/pinterest-sync-boards', 'datamachine/pinterest-list-boards', 'datamachine/pinterest-status', 'datamachine/pinterest-publish', 'datamachine/pinterest-read', 'datamachine/pinterest-update', 'datamachine/pinterest-delete', 'datamachine/pinterest-analytics' ) ),
+			self::provider( 'instagram', 'Instagram', array( 'FetchInstagramAccountAbility', 'InstagramPublishAbility', 'InstagramReadAbility', 'InstagramInsightsAbility', 'InstagramAccountInsightsAbility', 'InstagramUpdateAbility', 'InstagramDeleteAbility', 'InstagramCommentReplyAbility', 'InstagramMessageSendAbility' ), array( 'datamachine-socials/fetch-instagram-account', 'datamachine/instagram-publish', 'datamachine/instagram-account', 'datamachine/instagram-read', 'datamachine/instagram-insights', 'datamachine/instagram-account-insights', 'datamachine/instagram-update', 'datamachine/instagram-delete', 'datamachine/instagram-comment-reply', 'datamachine/instagram-message-send' ) ),
+			self::provider( 'tiktok', 'TikTok', array( 'TikTokPublishAbility', 'TikTokReadAbility' ), array( 'datamachine/tiktok-publish', 'datamachine/tiktok-account', 'datamachine/tiktok-read' ) ),
+			self::provider( 'linkedin', 'LinkedIn', array( 'LinkedInPublishAbility', 'LinkedInReadAbility', 'LinkedInUpdateAbility', 'LinkedInDeleteAbility' ), array( 'datamachine/linkedin-publish', 'datamachine/linkedin-account', 'datamachine/linkedin-read', 'datamachine/linkedin-update', 'datamachine/linkedin-delete' ) ),
+			self::provider( 'tumblr', 'Tumblr', array( 'TumblrPublishAbility', 'TumblrReadAbility', 'TumblrUpdateAbility', 'TumblrDeleteAbility', 'TumblrEngageAbility' ), array( 'datamachine/tumblr-publish', 'datamachine/tumblr-read', 'datamachine/tumblr-update', 'datamachine/tumblr-delete', 'datamachine/tumblr-engage' ) ),
+			self::provider( 'reddit', 'Reddit', array( 'FetchRedditAbility', 'RedditDomainMentionsAbility', 'RedditCommentDomainMonitorAbility', 'ReplyRedditAbility', 'SubmitRedditAbility', 'VoteRedditAbility' ), array( 'datamachine/fetch-reddit', 'datamachine/reddit-domain-mentions', 'datamachine/reddit-comment-mentions-poll', 'datamachine/reddit-comment-mentions-report', 'datamachine/reddit-comment-mentions-cleanup', 'datamachine/reply-reddit', 'datamachine/submit-reddit', 'datamachine/vote-reddit' ) ),
+			self::provider( 'youtube', 'YouTube', array( 'YouTubeUploadAbility', 'YouTubeSearchAbility', 'YouTubeAccountAbility' ), array( 'datamachine/youtube-upload', 'datamachine/youtube-search', 'datamachine/youtube-account' ) ),
 		);
 	}
 
@@ -149,9 +140,8 @@ final class PlatformBootstrap {
 	 * @param string            $namespace_part PSR-4 platform namespace segment.
 	 * @param array<int,string> $ability_names Ability class basenames.
 	 * @param array<int,string> $ability_slugs Public ability slugs.
-	 * @param array<int,string> $tool_names    Chat tool class basenames.
 	 */
-	private static function provider( string $id, string $namespace_part, array $ability_names, array $ability_slugs, array $tool_names ): PlatformProvider {
+	private static function provider( string $id, string $namespace_part, array $ability_names, array $ability_slugs ): PlatformProvider {
 		$ability_classes = array_map(
 			static function ( string $class_name ) use ( $namespace_part ): string {
 				return 'DataMachineSocials\\Abilities\\' . $namespace_part . '\\' . $class_name;
@@ -161,13 +151,7 @@ final class PlatformBootstrap {
 		/** @var array<int, class-string> $ability_classes */
 		$handler_class = 'DataMachineSocials\\Handlers\\' . $namespace_part . '\\' . $namespace_part;
 		/** @var class-string $handler_class */
-		$tool_classes = array_map(
-			static function ( string $class_name ): string {
-				return 'DataMachineSocials\\Chat\\Tools\\' . $class_name;
-			},
-			$tool_names
-		);
-		$command      = 'datamachine-socials ' . $id;
+		$command = 'datamachine-socials ' . $id;
 
 		return new PlatformProvider(
 			$id,
@@ -180,11 +164,9 @@ final class PlatformBootstrap {
 			array(
 				'abilities'    => $ability_slugs,
 				'handler'      => 'reddit' === $id ? 'reddit' : $id . '_publish',
-				'tools'        => $tool_names,
 				'cli'          => $command,
 				'requirements' => array(
-					'tools' => 'DataMachine\\Engine\\AI\\Tools\\BaseTool',
-					'cli'   => 'WP_CLI',
+					'cli' => 'WP_CLI',
 				),
 			),
 			static function () use ( $ability_classes, $handler_class ): void {
@@ -197,17 +179,6 @@ final class PlatformBootstrap {
 					new \DataMachineSocials\Handlers\Instagram\InstagramMessages();
 				}
 			},
-			$tool_classes ? static function () use ( $tool_classes ): bool {
-				if ( ! class_exists( 'DataMachine\\Engine\\AI\\Tools\\BaseTool' ) ) {
-					return false;
-				}
-
-				foreach ( $tool_classes as $tool_class ) {
-					new $tool_class();
-				}
-
-				return true;
-			} : null,
 			static function () use ( $command ): bool {
 				if ( ! defined( 'WP_CLI' ) ) {
 					return false;
