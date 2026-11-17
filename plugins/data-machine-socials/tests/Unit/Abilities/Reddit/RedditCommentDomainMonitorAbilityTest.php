@@ -25,7 +25,7 @@ class RedditCommentDomainMonitorAbilityTest extends WP_UnitTestCase {
 		global $wpdb;
 		$wpdb->query( "DELETE FROM {$wpdb->prefix}datamachine_socials_reddit_comment_mentions" );
 		$this->ability = new class() extends RedditCommentDomainMonitorAbility {
-			protected function getRedditAccessToken(): string|\WP_Error {
+			protected function resolveAccessToken( string $platform, string $label ): string|\WP_Error {
 				return 'test-token';
 			}
 		};

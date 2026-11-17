@@ -203,8 +203,8 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 		if ( array_diff( array_keys( $input ), $allowed ) || ! is_array( $input['domains'] ?? null ) || ! is_array( $input['subreddits'] ?? null ) || ( isset( $input['known_owners'] ) && ! is_array( $input['known_owners'] ) ) ) {
 			return new \WP_Error( 'invalid_param', 'Poll input contains an unknown property or invalid list.', array( 'status' => 400 ) );
 		}
-		$domains    = $this->normalizeDomains( $input['domains'] ?? array() );
-		$subreddits = $this->normalizeSubreddits( $input['subreddits'] ?? array() );
+		$domains    = $this->normalizeDomains( $input['domains'] );
+		$subreddits = $this->normalizeSubreddits( $input['subreddits'] );
 		$owners     = $this->normalizeOwners( $input['known_owners'] ?? array() );
 		if ( empty( $domains ) || empty( $subreddits ) ) {
 			return new \WP_Error( 'missing_param', 'Poll requires at least one valid domain and subreddit.', array( 'status' => 400 ) );
@@ -213,7 +213,7 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'invalid_param', 'Poll supports at most 25 domains, 25 subreddits, and 100 known owners.', array( 'status' => 400 ) );
 		}
 
-		$token = $this->getRedditAccessToken();
+		$token = $this->resolveAccessToken( 'reddit', 'Reddit' );
 		if ( is_wp_error( $token ) ) {
 			return $token;
 		}
@@ -265,7 +265,7 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 	/** Poll one subreddit with resumable traversal from a captured head. */
 	private function pollScope( string $subreddit, array $domains, bool $include_subdomains, array $owners, string $token, int $page_size, int $max_pages, string $lock ): array|\WP_Error {
 		$scope            = RedditCommentDomainStore::getScope( $subreddit );
-		$config_signature = hash( 'sha256', wp_json_encode( array( $domains, $include_subdomains, $owners ) ) );
+		$config_signature = hash( 'sha256', (string) wp_json_encode( array( $domains, $include_subdomains, $owners ) ) );
 		$pending          = is_array( $scope['pending'] ?? null ) ? $scope['pending'] : array();
 		if ( ! empty( $pending ) && ( $pending['config_signature'] ?? '' ) !== $config_signature ) {
 			$pending = array();
@@ -320,7 +320,7 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 				}
 				if ( '' === $target_head ) {
 					$target_head         = $fullname;
-					$target_head_created = (int) ( $comment['created_utc'] ?? 0 );
+					$target_head_created = (int) $comment['created_utc'];
 				}
 				if ( '' !== $checkpoint && $fullname === $checkpoint ) {
 					$reached_checkpoint = true;
@@ -333,7 +333,7 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 				foreach ( RedditCommentUrlMatcher::match( (string) ( $comment['body'] ?? '' ), $domains, $include_subdomains ) as $match ) {
 					$author         = trim( (string) ( $comment['author'] ?? '[deleted]' ) );
 					$author         = '' !== $author ? $author : '[deleted]';
-					$comment_id     = (string) ( $comment['id'] ?? preg_replace( '/^t1_/', '', $fullname ) );
+					$comment_id     = (string) $comment['id'];
 					$parent_post_id = preg_replace( '/^t3_/', '', (string) ( $comment['link_id'] ?? '' ) );
 					$page_records[] = array(
 						'comment_id'          => $comment_id,
@@ -342,7 +342,7 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 						'parent_post_title'   => (string) ( $comment['link_title'] ?? '' ),
 						'subreddit'           => (string) ( $comment['subreddit'] ?? $subreddit ),
 						'author'              => $author,
-						'comment_created_utc' => (int) ( $comment['created_utc'] ?? 0 ),
+						'comment_created_utc' => (int) $comment['created_utc'],
 						'score'               => (int) ( $comment['score'] ?? 0 ),
 						'permalink'           => $this->redditPermalink( (string) ( $comment['permalink'] ?? '' ) ),
 						'domain'              => $match['domain'],
@@ -444,8 +444,9 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 			$data   = array( 'status' => $status );
 			foreach ( array( 'retry-after', 'x-ratelimit-remaining', 'x-ratelimit-reset' ) as $header ) {
 				$value = isset( $response['response'] ) ? wp_remote_retrieve_header( $response['response'], $header ) : '';
-				if ( '' !== (string) $value ) {
-					$data['rate_limit'][ str_replace( array( 'x-ratelimit-', '-' ), array( '', '_' ), $header ) ] = (string) $value;
+				$value = is_array( $value ) ? implode( ', ', $value ) : $value;
+				if ( '' !== $value ) {
+					$data['rate_limit'][ str_replace( array( 'x-ratelimit-', '-' ), array( '', '_' ), $header ) ] = $value;
 				}
 			}
 			return new \WP_Error( 429 === $status ? 'reddit_rate_limited' : 'reddit_api_error', (string) ( $response['error'] ?? 'Reddit comment request failed.' ), $data );
@@ -787,15 +788,5 @@ class RedditCommentDomainMonitorAbility extends AbstractSocialAbility {
 			return '';
 		}
 		return str_starts_with( $permalink, 'http' ) ? esc_url_raw( $permalink ) : 'https://www.reddit.com' . $permalink;
-	}
-
-	/** Resolve and refresh credentials entirely server-side. */
-	protected function getRedditAccessToken(): string|\WP_Error {
-		$provider = $this->resolveProvider( 'reddit', 'Reddit' );
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
-		}
-		$token = $provider->get_valid_access_token();
-		return empty( $token ) ? new \WP_Error( 'missing_auth', 'Could not obtain a valid Reddit access token.', array( 'status' => 401 ) ) : $token;
 	}
 }

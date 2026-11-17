@@ -47,20 +47,16 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 					'category'            => 'datamachine-socials',
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'thing_id', 'text', 'access_token' ),
+						'required'   => array( 'thing_id', 'text' ),
 						'properties' => array(
-							'thing_id'     => array(
+							'thing_id' => array(
 								'type'        => 'string',
 								'description' => __( 'Reddit fullname of the post (t3_xxx) or comment (t1_xxx) to reply to.', 'data-machine-socials' ),
 							),
-							'text'         => array(
+							'text'     => array(
 								'type'        => 'string',
 								'maxLength'   => self::MAX_COMMENT_LENGTH,
 								'description' => __( 'Reply text in markdown format.', 'data-machine-socials' ),
-							),
-							'access_token' => array(
-								'type'        => 'string',
-								'description' => __( 'Reddit OAuth access token.', 'data-machine-socials' ),
 							),
 						),
 					),
@@ -92,9 +88,8 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 	 * @return array Result with reply data or error.
 	 */
 	public function execute( array $input ): array|\WP_Error {
-		$thing_id     = sanitize_text_field( $input['thing_id'] ?? '' );
-		$text         = trim( $input['text'] ?? '' );
-		$access_token = $input['access_token'] ?? '';
+		$thing_id = sanitize_text_field( $input['thing_id'] ?? '' );
+		$text     = trim( $input['text'] ?? '' );
 
 		if ( empty( $thing_id ) ) {
 			return new \WP_Error( 'missing_param', 'thing_id is required (e.g. t3_abc123 for post, t1_abc123 for comment)', array( 'status' => 400 ) );
@@ -113,8 +108,9 @@ class ReplyRedditAbility extends AbstractSocialAbility {
 			$text = mb_substr( $text, 0, self::MAX_COMMENT_LENGTH );
 		}
 
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_param', 'access_token is required.', array( 'status' => 400 ) );
+		$access_token = $this->resolveAccessToken( 'reddit', 'Reddit' );
+		if ( is_wp_error( $access_token ) ) {
+			return $access_token;
 		}
 
 		return $this->postComment( $access_token, $thing_id, $text );

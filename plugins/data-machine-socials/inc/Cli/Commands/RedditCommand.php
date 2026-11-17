@@ -16,6 +16,7 @@ namespace DataMachineSocials\Cli\Commands;
 use WP_CLI;
 use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Handlers\Reddit\RedditAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -116,7 +117,7 @@ class RedditCommand {
 		);
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $info, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -211,7 +212,7 @@ class RedditCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -343,7 +344,7 @@ class RedditCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -356,9 +357,10 @@ class RedditCommand {
 		$scores = array_column( $rows, 'score' );
 		sort( $scores );
 		$count  = count( $scores );
+		$half   = intdiv( $count, 2 );
 		$median = 0 === $count % 2
-			? ( $scores[ $count / 2 - 1 ] + $scores[ $count / 2 ] ) / 2
-			: $scores[ intval( $count / 2 ) ];
+			? ( ( $scores[ $half - 1 ] ?? 0 ) + ( $scores[ $half ] ?? 0 ) ) / 2
+			: ( $scores[ $half ] ?? 0 );
 
 		WP_CLI::success( count( $rows ) . " posts from r/{$subreddit}" );
 		WP_CLI::log( sprintf(
@@ -438,7 +440,7 @@ class RedditCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -553,13 +555,12 @@ class RedditCommand {
 			WP_CLI::error( 'Provide a subreddit name or --query (or both).' );
 		}
 
+		$limit_input = array();
 		try {
 			$limit_input = $this->applyFetchLimit( array(), $assoc_args );
 		} catch ( \InvalidArgumentException $exception ) {
 			WP_CLI::error( $exception->getMessage() );
 		}
-
-		$access_token = $this->get_access_token();
 
 		// Default sort to 'relevance' for search queries.
 		$default_sort = ! empty( $query ) ? 'relevance' : 'hot';
@@ -568,7 +569,6 @@ class RedditCommand {
 		$input = array(
 			'subreddit'         => $subreddit,
 			'query'             => $query,
-			'access_token'      => $access_token,
 			'sort_by'           => $assoc_args['sort'] ?? $default_sort,
 			'timeframe_limit'   => $assoc_args['timeframe'] ?? 'all_time',
 			'min_upvotes'       => absint( $assoc_args['min-upvotes'] ?? 0 ),
@@ -611,7 +611,7 @@ class RedditCommand {
 		$format = $assoc_args['format'] ?? 'table';
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $items, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -715,7 +715,7 @@ class RedditCommand {
 
 		$report = $result['report'];
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -808,7 +808,7 @@ class RedditCommand {
 	 * @subcommand monitor-comments
 	 */
 	public function monitor_comments( $args, $assoc_args ) {
-		$args;
+		unset( $args );
 		$domains    = $this->csv_values( (string) ( $assoc_args['domains'] ?? '' ) );
 		$subreddits = $this->csv_values( (string) ( $assoc_args['subreddits'] ?? '' ) );
 		if ( empty( $domains ) || empty( $subreddits ) ) {
@@ -836,7 +836,7 @@ class RedditCommand {
 			WP_CLI::error( $result->get_error_message() );
 		}
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -902,7 +902,7 @@ class RedditCommand {
 	 * @subcommand comment-mentions
 	 */
 	public function comment_mentions( $args, $assoc_args ) {
-		$args;
+		unset( $args );
 		$format    = $this->format_arg( $assoc_args, array( 'table', 'json', 'csv' ) );
 		$limit     = $this->bounded_integer_arg( $assoc_args, 'limit', 100, 1, 500 );
 		$min_score = $this->signed_integer_arg( $assoc_args, 'min-score', PHP_INT_MIN );
@@ -927,7 +927,7 @@ class RedditCommand {
 		}
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 		$rows = array_map(
@@ -960,8 +960,7 @@ class RedditCommand {
 	 * @subcommand cleanup-comment-mentions
 	 */
 	public function cleanup_comment_mentions( $args, $assoc_args ) {
-		$args;
-		$assoc_args;
+		unset( $args, $assoc_args );
 		$ability = wp_get_ability( 'datamachine/reddit-comment-mentions-cleanup' );
 		if ( ! $ability ) {
 			WP_CLI::error( 'datamachine/reddit-comment-mentions-cleanup ability not registered.' );
@@ -1036,15 +1035,14 @@ class RedditCommand {
 	 *     wp datamachine-socials reddit status
 	 */
 	public function status( $args, $assoc_args ) {
-		$args;
-		$assoc_args;
+		unset( $args, $assoc_args );
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'reddit' );
 
 		WP_CLI::log( 'Reddit Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider ) {
+		if ( ! $provider instanceof RedditAuth ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			WP_CLI::log( 'Authenticated: No' );
 			return;
@@ -1114,10 +1112,9 @@ class RedditCommand {
 	 *     wp datamachine-socials reddit reply t3_abc123 "Here's a [link](https://example.com)" --format=json
 	 */
 	public function reply( $args, $assoc_args ) {
-		$thing_id     = $args[0];
-		$text         = $args[1];
-		$format       = $assoc_args['format'] ?? 'table';
-		$access_token = $this->get_access_token();
+		$thing_id = $args[0];
+		$text     = $args[1];
+		$format   = $assoc_args['format'] ?? 'table';
 
 		$type_label = str_starts_with( $thing_id, 't3_' ) ? 'post' : 'comment';
 		WP_CLI::log( "Replying to {$type_label} {$thing_id}..." );
@@ -1128,9 +1125,8 @@ class RedditCommand {
 		}
 
 		$result = $ability->execute( array(
-			'thing_id'     => $thing_id,
-			'text'         => $text,
-			'access_token' => $access_token,
+			'thing_id' => $thing_id,
+			'text'     => $text,
 		) );
 
 		if ( is_wp_error( $result ) || ! $result['success'] ) {
@@ -1140,7 +1136,7 @@ class RedditCommand {
 		$data = $result['data'] ?? array();
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -1208,12 +1204,11 @@ class RedditCommand {
 	 *     wp datamachine-socials reddit submit festivals --title="Festival Guide" --text="Here's our guide..." --format=json
 	 */
 	public function submit( $args, $assoc_args ) {
-		$subreddit    = $args[0];
-		$title        = $assoc_args['title'] ?? '';
-		$text         = $assoc_args['text'] ?? '';
-		$url          = $assoc_args['url'] ?? '';
-		$format       = $assoc_args['format'] ?? 'table';
-		$access_token = $this->get_access_token();
+		$subreddit = $args[0];
+		$title     = $assoc_args['title'] ?? '';
+		$text      = $assoc_args['text'] ?? '';
+		$url       = $assoc_args['url'] ?? '';
+		$format    = $assoc_args['format'] ?? 'table';
 
 		if ( empty( $title ) ) {
 			WP_CLI::error( '--title is required.' );
@@ -1232,15 +1227,14 @@ class RedditCommand {
 		}
 
 		$result = $ability->execute( array(
-			'subreddit'    => $subreddit,
-			'title'        => $title,
-			'text'         => $text,
-			'url'          => $url,
-			'flair_id'     => $assoc_args['flair-id'] ?? '',
-			'flair_text'   => $assoc_args['flair-text'] ?? '',
-			'nsfw'         => isset( $assoc_args['nsfw'] ),
-			'spoiler'      => isset( $assoc_args['spoiler'] ),
-			'access_token' => $access_token,
+			'subreddit'  => $subreddit,
+			'title'      => $title,
+			'text'       => $text,
+			'url'        => $url,
+			'flair_id'   => $assoc_args['flair-id'] ?? '',
+			'flair_text' => $assoc_args['flair-text'] ?? '',
+			'nsfw'       => isset( $assoc_args['nsfw'] ),
+			'spoiler'    => isset( $assoc_args['spoiler'] ),
 		) );
 
 		if ( is_wp_error( $result ) || ! $result['success'] ) {
@@ -1250,7 +1244,7 @@ class RedditCommand {
 		$data = $result['data'] ?? array();
 
 		if ( 'json' === $format ) {
-			WP_CLI::log( wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
+			WP_CLI::log( (string) wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) );
 			return;
 		}
 
@@ -1298,8 +1292,7 @@ class RedditCommand {
 	 *     wp datamachine-socials reddit vote t1_def456 --unvote
 	 */
 	public function vote( $args, $assoc_args ) {
-		$thing_id     = $args[0];
-		$access_token = $this->get_access_token();
+		$thing_id = $args[0];
 
 		// Determine direction.
 		if ( isset( $assoc_args['down'] ) ) {
@@ -1321,9 +1314,8 @@ class RedditCommand {
 		}
 
 		$result = $ability->execute( array(
-			'thing_id'     => $thing_id,
-			'direction'    => $direction,
-			'access_token' => $access_token,
+			'thing_id'  => $thing_id,
+			'direction' => $direction,
 		) );
 
 		if ( is_wp_error( $result ) || ! $result['success'] ) {
@@ -1343,17 +1335,22 @@ class RedditCommand {
 		$auth_abilities = new AuthAbilities();
 		$provider       = $auth_abilities->getProvider( 'reddit' );
 
-		if ( ! $provider ) {
-			WP_CLI::error( 'Reddit auth provider not found. Is data-machine-socials active?' );
+		$access_token = '';
+		$error        = '';
+
+		if ( ! $provider instanceof RedditAuth ) {
+			$error = 'Reddit auth provider not found. Is data-machine-socials active?';
+		} elseif ( ! $provider->is_authenticated() ) {
+			$error = 'Reddit is not authenticated. Connect via Settings > Data Machine > Auth.';
+		} else {
+			$access_token = (string) $provider->get_valid_access_token();
+			if ( '' === $access_token ) {
+				$error = 'Failed to obtain a valid Reddit access token (expired and refresh failed).';
+			}
 		}
 
-		if ( ! $provider->is_authenticated() ) {
-			WP_CLI::error( 'Reddit is not authenticated. Connect via Settings > Data Machine > Auth.' );
-		}
-
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			WP_CLI::error( 'Failed to obtain a valid Reddit access token (expired and refresh failed).' );
+		if ( '' !== $error ) {
+			WP_CLI::error( $error );
 		}
 
 		return $access_token;

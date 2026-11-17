@@ -179,17 +179,6 @@ class RedditDomainMentionsAbility extends AbstractSocialAbility {
 			return $domain;
 		}
 
-		$provider = $this->resolveProvider( 'reddit', 'Reddit' );
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
-		}
-
-		$access_token = $provider->get_valid_access_token();
-		if ( ! is_string( $access_token ) || '' === trim( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Reddit access token expired and refresh failed', array( 'status' => 401 ) );
-		}
-		$access_token = trim( $access_token );
-
 		$owners = self::normalizeOwners( $input['owners'] ?? array() );
 		if ( is_wp_error( $owners ) ) {
 			return $owners;
@@ -220,7 +209,6 @@ class RedditDomainMentionsAbility extends AbstractSocialAbility {
 			$result = $fetch->execute(
 				array(
 					'query'            => $query,
-					'access_token'     => $access_token,
 					'sort_by'          => 'relevance',
 					'timeframe_limit'  => $timeframe,
 					'fetch_batch_size' => 100,

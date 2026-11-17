@@ -7,18 +7,38 @@
 
 namespace DataMachineSocials\Tests\Unit\Abilities\Reddit;
 
+use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Abilities\Reddit\RedditDomainMentionsAbility;
 use WP_UnitTestCase;
 
 class RedditDomainMentionsAbilityTest extends WP_UnitTestCase {
+	/**
+	 * Stub Reddit auth provider filter callback.
+	 *
+	 * @var callable|null
+	 */
+	private $provider_filter = null;
+
 	public function set_up(): void {
 		parent::set_up();
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		$this->stubRedditProvider( true );
 	}
 
 	public function tear_down(): void {
 		remove_all_filters( 'pre_http_request' );
+		remove_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
 		parent::tear_down();
+	}
+
+	public function test_returns_missing_auth_when_reddit_is_unauthenticated(): void {
+		$this->stubRedditProvider( false );
+
+		$result = $this->ability()->execute( $this->input() );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
 	}
 
 	public function test_registered_contract_keeps_oauth_server_side_and_describes_report_rows(): void {
@@ -213,24 +233,32 @@ class RedditDomainMentionsAbilityTest extends WP_UnitTestCase {
 	}
 
 	private function ability(): RedditDomainMentionsAbility {
-		$provider = new class() {
+		return new RedditDomainMentionsAbility();
+	}
+
+	private function stubRedditProvider( bool $authenticated ): void {
+		if ( null !== $this->provider_filter ) {
+			remove_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		}
+
+		$provider = new class( $authenticated ) {
+			public function __construct( private bool $authenticated ) {}
+
+			public function is_authenticated(): bool {
+				return $this->authenticated;
+			}
+
 			public function get_valid_access_token(): string {
 				return 'reddit-token';
 			}
 		};
 
-		return new class( $provider ) extends RedditDomainMentionsAbility {
-			private object $provider;
-
-			public function __construct( object $provider ) {
-				$this->provider = $provider;
-				parent::__construct();
-			}
-
-			protected function resolveProvider( string $platform, string $label, bool $require_authenticated = true ) {
-				return $this->provider;
-			}
+		$this->provider_filter = static function ( $providers ) use ( $provider ) {
+			$providers['reddit'] = $provider;
+			return $providers;
 		};
+		add_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
 	}
 
 	private function redditPost( string $id, array $overrides = array() ): array {
