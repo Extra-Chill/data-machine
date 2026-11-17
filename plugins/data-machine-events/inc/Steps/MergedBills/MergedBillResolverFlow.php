@@ -8,9 +8,10 @@
  *   1. A recurring scheduled action runs the detector daily, persisting
  *      candidate pairs to datamachine_pending_actions with kind
  *      'merged_bill_resolve'.
- *   2. The chat agent (or any orchestrator listening on
- *      `datamachine_events_merged_bill_pair_queued`) drains the queue by
- *      calling merged_bill_inspect → merged_bill_decide for each pending
+ *   2. Any orchestrator listening on
+ *      `datamachine_events_merged_bill_pair_queued` drains the queue by
+ *      calling the data-machine-events/merged-bill-inspect and
+ *      data-machine-events/merged-bill-decide abilities for each pending
  *      pair.
  *
  * We do NOT auto-merge from the cron hook. The decision step is always
@@ -108,9 +109,8 @@ class MergedBillResolverFlow {
 	/**
 	 * Run the detector ability and announce any newly-queued pairs.
 	 *
-	 * Listeners on `datamachine_events_merged_bill_pair_queued` (e.g. the
-	 * chat orchestrator) can pick up each new pair_id and dispatch an
-	 * agent to inspect+decide.
+	 * Listeners on `datamachine_events_merged_bill_pair_queued` can pick up
+	 * each new pair_id and dispatch an agent to inspect+decide.
 	 */
 	public static function runDetector(): void {
 		/**
@@ -158,8 +158,8 @@ class MergedBillResolverFlow {
 			 * Fired for each merged-bill pair that has just been queued
 			 * (or was already queued and re-detected this run).
 			 *
-			 * Listeners should resolve the pair by dispatching a chat
-			 * agent or REST call to inspect+decide.
+			 * Listeners should resolve the pair by dispatching an agent
+			 * or REST call to inspect+decide.
 			 *
 			 * @since 0.34.0
 			 *

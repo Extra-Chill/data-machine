@@ -5,15 +5,13 @@
  * Soft-deletes (trashes) one or more event posts so they can be recovered
  * from the trash if the action was wrong. Designed for the agent flow:
  *
- *   1. get_venue_events finds duplicates at the wrong venue
- *   2. delete_event trashes the stale post
- *   3. (optional) update_event corrects the kept one
+ *   1. data-machine-events/get-venue-events finds duplicates at the wrong venue
+ *   2. data-machine-events/delete-event trashes the stale post
+ *   3. (optional) data-machine-events/update-event corrects the kept one
  *
  * Uses wp_trash_post() — never wp_delete_post() — so the dedupe/upsert
  * system can still find the post if it reappears in a scrape, and so an
  * operator can restore from wp-admin if the agent picked the wrong one.
- *
- * Chat tool wrapper lives in inc/Api/Chat/Tools/DeleteEvent.php.
  *
  * @package DataMachineEvents\Abilities
  * @since   0.39.0

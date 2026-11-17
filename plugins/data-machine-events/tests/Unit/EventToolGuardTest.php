@@ -126,9 +126,9 @@ class EventToolGuardTest extends WP_UnitTestCase {
 	}
 
 	public function test_ignores_non_pipeline_mode(): void {
-		$args = $this->eventsAiArgs( array( 'modes' => array( 'chat' ) ) );
+		$args = $this->eventsAiArgs( array( 'modes' => array( 'system' ) ) );
 
-		// Chat/system resolution must never be narrowed by this pipeline guard.
+		// System resolution must never be narrowed by this pipeline guard.
 		$this->assertFalse( is_event_upsert_ai_step( $args ) );
 	}
 

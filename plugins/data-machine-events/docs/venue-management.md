@@ -34,7 +34,7 @@ Venues support automatic timezone detection through multiple mechanisms:
 
 - **Source Data**: Import handlers (Ticketmaster, Eventbrite, DiceFm, ICS calendars, web scrapers) extract and store timezone data when available from the source.
 - **GeoNames Fallback**: When a venue is created or updated with valid coordinates but no timezone, the `GeoNamesService` automatically fetches the correct IANA timezone identifier. Requires `geonames_username` configured in Event Settings.
-- **AI Chat Tools**: Use `venue_health_check` to identify venues missing timezone data, `update_venue` to fix them, and `get_venue_events` to retrieve upcoming events for a specific venue. The update triggers automatic timezone derivation via GeoNames when coordinates are available.
+- **Abilities**: Use `data-machine-events/venue-health-check` to identify venues missing timezone data, `data-machine-events/update-venue` to fix them, and `data-machine-events/get-venue-events` to retrieve upcoming events for a specific venue. The update triggers automatic timezone derivation via GeoNames when coordinates are available.
 - **Calendar Integration**: `Calendar_Query` and `DateTimeParser` respect venue-specific timezones for accurate date grouping and display.
 
 ### Admin Interface
