@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.25.0] - 2026-11-17
+
+### Changed
+- remove chat from Data Machine; agents-api owns chat
+
 ## [0.24.0] - 2026-11-16
 
 ### Added
