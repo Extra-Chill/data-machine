@@ -163,7 +163,7 @@ class MetaDescriptionTask extends SystemTask {
 			'description'     => 'Generate SEO meta descriptions and save to post excerpt.',
 			'setting_key'     => 'meta_description_auto_generate_enabled',
 			'default_enabled' => true,
-			'trigger'         => 'On demand via CLI or chat',
+			'trigger'         => 'On demand via CLI or ability',
 			'trigger_type'    => 'manual',
 			'supports_run'    => false,
 		);

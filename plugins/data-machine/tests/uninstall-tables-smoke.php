@@ -50,7 +50,6 @@ $network_tables = array(
 	'AgentAccess::TABLE_NAME'                => 'AgentAccess::create_table',
 	'AgentAccess::PRINCIPAL_TABLE_NAME'      => 'AgentAccess::create_table',
 	'AgentTokens::TABLE_NAME'                => 'AgentTokens::create_table',
-	'Chat::get_prefixed_table_name'          => 'Chat::create_table',
 );
 
 foreach ( $site_tables as $cleanup_name => $create_call ) {
@@ -64,7 +63,9 @@ foreach ( $network_tables as $cleanup_name => $create_call ) {
 }
 
 datamachine_uninstall_assert( 12 === count( $site_tables ), 'inventory contains all 12 site tables' );
-datamachine_uninstall_assert( 5 === count( $network_tables ), 'inventory contains all 5 network tables' );
+datamachine_uninstall_assert( 4 === count( $network_tables ), 'inventory contains all 4 network tables' );
+datamachine_uninstall_assert( ! str_contains( $activation, 'Chat::create_table' ), 'schema setup no longer creates the retired chat-session table' );
+datamachine_uninstall_assert( str_contains( $uninstall, "\$wpdb->base_prefix . 'datamachine_chat_sessions'" ) && str_contains( $uninstall, "\$wpdb->prefix . 'datamachine_chat_sessions'" ), 'uninstall still drops retired chat-session tables left by unupgraded installs' );
 datamachine_uninstall_assert( str_contains( $uninstall, 'try {' ) && str_contains( $uninstall, '} finally {' ), 'multisite cleanup restores switched blogs with try/finally' );
 
 // Model nested WordPress blog switching to lock the restoration invariant: an

@@ -21,7 +21,7 @@ defined( 'ABSPATH' ) || exit;
  * access-store contract, while Data Machine's internal path applies the
  * `datamachine_can_access_agent` filter. The two paths silently disagree:
  * host plugins that widen access via the filter are invisible to every
- * ability-driven consumer (chat widgets, MCP, REST).
+ * ability-driven consumer (frontend agents, MCP, REST).
  *
  * The bridge forwards the substrate's final store-derived decision — which
  * already includes the effective-agent short-circuit — into Data Machine's

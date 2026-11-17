@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Modes | chat, pipeline |
+| Modes | pipeline |
 | Mutation risk | Read-only |
 | Registered in | Data Machine Business via `DataMachineBusiness\Tools\AmazonAffiliateLink` |
 | Access | Admin |

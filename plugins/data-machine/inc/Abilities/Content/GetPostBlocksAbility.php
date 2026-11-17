@@ -27,7 +27,6 @@ class GetPostBlocksAbility {
 		}
 
 		$this->registerAbility();
-		$this->registerChatTool();
 		self::$registered = true;
 	}
 
@@ -94,88 +93,6 @@ class GetPostBlocksAbility {
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	private function registerChatTool(): void {
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['get_post_blocks'] = array(
-					'_callable' => array( self::class, 'getChatTool' ),
-					'modes'     => array( 'chat' ),
-					'ability'   => 'datamachine/get-post-blocks',
-				);
-				return $tools;
-			}
-		);
-	}
-
-	/**
-	 * Chat tool definition.
-	 *
-	 * @return array
-	 */
-	public static function getChatTool(): array {
-		return array(
-			'class'       => self::class,
-			'method'      => 'handleChatToolCall',
-			'description' => 'Parse a WordPress post into its Gutenberg blocks. Optionally filter by block type or text content. Returns block index, type, and innerHTML for each matching block.',
-			'parameters'  => array(
-				'post_id'         => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Post ID to parse',
-				),
-				'blog_id'         => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
-				),
-				'block_types'     => array(
-					'type'        => 'array',
-					'items'       => array( 'type' => 'string' ),
-					'required'    => false,
-					'description' => 'Filter to specific block types (e.g. ["core/paragraph"])',
-				),
-				'search'          => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Filter to blocks containing this text (case-insensitive)',
-				),
-				'prefer_autosave' => array(
-					'type'        => 'boolean',
-					'required'    => false,
-					'description' => 'When true (default), read the caller\'s latest autosave revision if newer than the saved post, so an in-flight draft is proofread instead of the stale saved version.',
-				),
-			),
-		);
-	}
-
-	/**
-	 * Chat tool handler — wraps the ability execute.
-	 *
-	 * @param array $parameters Tool parameters.
-	 * @param array $tool_def   Tool definition.
-	 * @return array
-	 */
-	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
-		$tool_def;
-		$result = self::execute( $parameters );
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'    => false,
-				'error'      => $result->get_error_message(),
-				'error_code' => $result->get_error_code(),
-				'error_data' => $result->get_error_data(),
-				'tool_name'  => 'get_post_blocks',
-			);
-		}
-
-		return array(
-			'success'   => $result['success'],
-			'data'      => $result,
-			'tool_name' => 'get_post_blocks',
-		);
 	}
 
 	/**

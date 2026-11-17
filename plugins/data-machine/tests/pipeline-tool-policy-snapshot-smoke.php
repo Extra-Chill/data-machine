@@ -227,9 +227,9 @@ class SnapshotPolicyToolManager extends ToolManager {
 			'alpha_tool'         => array( 'modes' => array( 'pipeline' ) ),
 			'beta_tool'          => array( 'modes' => array( 'pipeline' ) ),
 			'danger_tool'        => array( 'modes' => array( 'pipeline' ) ),
-			'agent_daily_memory' => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
-			'agent_memory'       => array( 'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
-			'chat_only'          => array( 'modes' => array( 'chat' ) ),
+			'agent_daily_memory' => array( 'modes' => array( ToolPolicyResolver::MODE_SYSTEM, ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
+			'agent_memory'       => array( 'modes' => array( ToolPolicyResolver::MODE_SYSTEM, ToolPolicyResolver::MODE_PIPELINE ), 'requires_opt_in' => true ),
+			'system_only'        => array( 'modes' => array( ToolPolicyResolver::MODE_SYSTEM ) ),
 		);
 	}
 

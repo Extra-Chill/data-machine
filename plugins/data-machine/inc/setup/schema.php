@@ -145,6 +145,124 @@ function datamachine_run_deferred_site_setup(): void {
 	// (wordpress/agents-api v0.11.1). delete_option() on an already-absent
 	// row is a cheap no-op, so this is safe to run on every version bump.
 	delete_option( 'datamachine_routine_schedule_hashes' );
+
+	datamachine_drop_legacy_chat_sessions();
+	datamachine_migrate_legacy_mode_models();
+}
+
+/**
+ * Move stored `chat` model overrides to the neutral `agent` model key.
+ *
+ * Data Machine no longer has a `chat` agent mode (Extra-Chill/data-machine#3973).
+ * The model override that used to be stored under `mode_models['chat']` now
+ * lives under `mode_models['agent']`, the default model for agents that Data
+ * Machine provisions. This pass rewrites the three stores that can hold
+ * `mode_models`:
+ *
+ * - the per-site `datamachine_settings` option,
+ * - the network `datamachine_network_settings` site option,
+ * - each agent's `agent_config` row in the agents table.
+ *
+ * An existing `agent` entry wins over the legacy one, so the copy never
+ * overwrites a value an operator already set. The legacy `chat` key is removed
+ * after the copy. Stores without a `chat` entry are left untouched, which makes
+ * re-running on later version bumps or on other subsites a no-op.
+ *
+ * @return void
+ */
+function datamachine_migrate_legacy_mode_models(): void {
+	$site_settings = get_option( 'datamachine_settings', array() );
+	$migrated      = datamachine_migrate_legacy_mode_models_config( is_array( $site_settings ) ? $site_settings : array() );
+	if ( null !== $migrated ) {
+		update_option( 'datamachine_settings', $migrated );
+	}
+
+	if ( function_exists( 'get_site_option' ) && function_exists( 'update_site_option' ) ) {
+		$network_settings = get_site_option( 'datamachine_network_settings', array() );
+		$migrated         = datamachine_migrate_legacy_mode_models_config( is_array( $network_settings ) ? $network_settings : array() );
+		if ( null !== $migrated ) {
+			update_site_option( 'datamachine_network_settings', $migrated );
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		foreach ( $agents_repo->get_all() as $agent ) {
+			$config   = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+			$migrated = datamachine_migrate_legacy_mode_models_config( $config );
+			if ( null !== $migrated && ! empty( $agent['agent_id'] ) ) {
+				$agents_repo->update_agent( (int) $agent['agent_id'], array( 'agent_config' => $migrated ) );
+			}
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
+		\DataMachine\Core\PluginSettings::clearCache();
+	}
+}
+
+/**
+ * Rewrite one settings or agent-config array's legacy `chat` model override.
+ *
+ * @param array<string,mixed> $config Settings or agent config containing `mode_models`.
+ * @return array<string,mixed>|null Migrated config, or null when nothing changed.
+ */
+function datamachine_migrate_legacy_mode_models_config( array $config ): ?array {
+	$mode_models = $config['mode_models'] ?? null;
+	if ( ! is_array( $mode_models ) || ! array_key_exists( 'chat', $mode_models ) ) {
+		return null;
+	}
+
+	$legacy  = $mode_models['chat'];
+	$current = $mode_models['agent'] ?? null;
+	unset( $mode_models['chat'] );
+
+	$has_current = is_array( $current ) && ( ! empty( $current['provider'] ) || ! empty( $current['model'] ) );
+	if ( ! $has_current && is_array( $legacy ) ) {
+		$mode_models['agent'] = $legacy;
+	}
+
+	$config['mode_models'] = $mode_models;
+	return $config;
+}
+
+/**
+ * Drop the retired Data Machine chat-session storage.
+ *
+ * Chat moved to Agents API (Extra-Chill/data-machine#3973). Data Machine no
+ * longer reads or writes `datamachine_chat_sessions`, so the version-bump
+ * pass removes the canonical network table, any legacy per-site table from
+ * before the network convergence, the convergence marker, and the retired
+ * chat retention schedules. Every step is idempotent: `DROP TABLE IF EXISTS`
+ * and unscheduling absent actions are no-ops, so re-running on later version
+ * bumps or on other subsites is safe.
+ *
+ * @return void
+ */
+function datamachine_drop_legacy_chat_sessions(): void {
+	global $wpdb;
+
+	$tables = array_unique(
+		array(
+			$wpdb->base_prefix . 'datamachine_chat_sessions',
+			$wpdb->prefix . 'datamachine_chat_sessions',
+		)
+	);
+
+	foreach ( $tables as $table ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
+	}
+
+	if ( function_exists( 'delete_site_option' ) ) {
+		delete_site_option( 'datamachine_chat_sessions_network_migrated' );
+	}
+	delete_option( 'datamachine_pipeline_transcript_retention_days' );
+
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'datamachine_recurring_retention_chat_sessions' );
+		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions' );
+	}
 }
 
 // Ensure schema early in plugins_loaded (priority 5) so that

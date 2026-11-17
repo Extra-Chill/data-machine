@@ -17,7 +17,7 @@ This audit records which gated abilities have proven frontend-lite consumers. On
 | Flow steps | `datamachine/get-flow-steps`, `datamachine/update-flow-step`, `datamachine/configure-flow-steps`, `datamachine/validate-flow-steps-config` | Flow-builder/API surface. No frontend-lite consumer found. | Keep gated. |
 | Jobs | `datamachine/get-jobs`, `datamachine/delete-jobs`, `datamachine/execute-workflow`, `datamachine/flow-health`, `datamachine/problem-flows`, `datamachine/recover-stuck-jobs`, `datamachine/jobs-summary`, `datamachine/run-metrics`, `datamachine/fail-job`, `datamachine/retry-job` | Local Data Machine consumers are CLI, REST, cron, admin, or tests. Issue #2303 noted Extra Chill Events references to `execute-workflow`, but those are REST-shaped ability classes rather than page-render helpers. | Keep gated. |
 | Logs | `datamachine/write-to-log`, `datamachine/clear-logs`, `datamachine/read-logs`, `datamachine/get-log-metadata`, `datamachine/read-debug-log` | Runtime diagnostics/admin surface. No frontend-lite consumer found. | Keep gated. |
-| Post queries | `datamachine/query-posts`, `datamachine/list-posts` | Admin/chat/runtime query surface. No frontend-lite consumer found. | Keep gated. |
+| Post queries | `datamachine/query-posts`, `datamachine/list-posts` | Admin/runtime query surface. No frontend-lite consumer found. | Keep gated. |
 | Pipeline | `datamachine/get-pipelines`, `datamachine/create-pipeline`, `datamachine/update-pipeline`, `datamachine/delete-pipeline`, `datamachine/duplicate-pipeline`, import/export pipeline abilities | Local Data Machine consumers are REST/CLI/tests. Issue #2303 noted Extra Chill Events references to `create-pipeline`, but those are REST-shaped ability classes rather than page-render helpers. | Keep gated. |
 | Pipeline steps | `datamachine/get-pipeline-steps`, `datamachine/add-pipeline-step`, `datamachine/update-pipeline-step`, `datamachine/delete-pipeline-step`, `datamachine/reorder-pipeline-steps` | Flow-builder/API surface. No frontend-lite consumer found. | Keep gated. |
 | Duplicate checks | `datamachine/check-duplicate`, duplicate title matching | Local Extra Chill Events use is inside a Data Machine upsert step handler, which runs under the full runtime. | Keep gated. |
@@ -25,17 +25,16 @@ This audit records which gated abilities have proven frontend-lite consumers. On
 | Tracked items | `datamachine/upsert-tracked-item`, `datamachine/get-tracked-item`, `datamachine/list-tracked-items`, `datamachine/tracked-items-summary` | Pipeline/system-task coverage surface. No frontend-lite consumer found. | Keep gated. |
 | Settings | Settings and handler-default abilities | Admin/CLI/settings surface. No frontend-lite consumer found. | Keep gated. |
 | Handlers and step types | Handler discovery/test/defaults and step-type listing/validation | Admin/runtime discovery surface. No frontend-lite consumer found. | Keep gated. |
-| Local search | `datamachine/local-search` | Chat/runtime search surface. No frontend-lite consumer found. | Keep gated. |
+| Local search | `datamachine/local-search` | Runtime search surface. No frontend-lite consumer found. | Keep gated. |
 | Source inventory | `datamachine/source-inventory`, `datamachine/source-aggregate` | System-task/source coverage surface. No frontend-lite consumer found. | Keep gated. |
-| System | Session title, health, and system-task abilities | Admin/chat/system-task surface. No frontend-lite consumer found. | Keep gated. |
+| System | Health and system-task abilities | Admin/system-task surface. No frontend-lite consumer found. | Keep gated. |
 | Media | `datamachine/generate-alt-text`, `datamachine/diagnose-alt-text`, image generation, media upload/validation/video metadata | Admin/pipeline media surface. No frontend-lite consumer found. | Keep gated. |
 | Image templates | `datamachine/render-image-template`, `datamachine/list-image-templates` | Proven frontend-lite consumers: Extra Chill OG-card and event-roundup generation. | Already hoisted by #2291. |
 | SEO | Meta-description abilities | Pipeline/admin SEO surface. No frontend-lite consumer found. | Keep gated. |
 | Agent calls | `datamachine/agent-call`, `datamachine/agent-remote-call` | Agent/runtime surface. No frontend-lite consumer found. | Keep gated. |
 | Taxonomy | Resolve, merge meta, get/create/update/delete term abilities | Admin/pipeline taxonomy surface. No frontend-lite consumer found. | Keep gated. |
 | Agent identity and tokens | Agent CRUD/import/export/access/token abilities | Admin/agent management surface. No frontend-lite consumer found. | Keep gated. |
-| Agent memory and daily memory | Agent memory and daily memory read/write/list/search/delete abilities | Chat/agent runtime surface. No frontend-lite consumer found. | Keep gated. |
-| Chat | Chat session and message abilities | REST/frontend-chat requests hit `/wp-json/` and load the full runtime. No lite page-render consumer found. | Keep gated. |
+| Agent memory and daily memory | Agent memory and daily memory read/write/list/search/delete abilities | Agent runtime surface. No frontend-lite consumer found. | Keep gated. |
 | Internal linking | Diagnostics, audit, backlinks, broken links, opportunities | Admin/runtime content analysis surface. No frontend-lite consumer found. | Keep gated. |
 | Content/block editing | `datamachine/get-post-blocks`, `datamachine/edit-post-blocks`, `datamachine/replace-post-blocks`, `datamachine/insert-content`, `datamachine/upsert-post` | Local Extra Chill Events use of `upsert-post` is inside a Data Machine upsert step handler, which runs under the full runtime. | Keep gated. |
 | Pending actions | Pending-action inspection/sign/resolve abilities | Agent approval/runtime surface. No frontend-lite consumer found. | Keep gated. |

@@ -185,7 +185,7 @@ namespace {
 	wf_check( W::is_public_ip( '8.8.8.8' ) && W::is_public_ip( '2606:4700::1111' ), 'public IPs allowed' );
 	wf_check( ! W::is_public_ip( 'not-an-ip' ) && ! W::is_public_ip( '0.0.0.0' ) && ! W::is_public_ip( 'fe80::1' ), 'invalid/unspecified/link-local refused' );
 
-	/* The chat tool delegates to the ability implementation. */
+	/* The web_fetch tool delegates to the ability implementation. */
 	$tool = (string) file_get_contents( dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Global/WebFetch.php' );
 	wf_check( false !== strpos( $tool, 'WebFetchAbilities::fetch(' ) && false === strpos( $tool, 'HttpClient::get' ), 'web_fetch tool uses the shared, validated fetch' );
 

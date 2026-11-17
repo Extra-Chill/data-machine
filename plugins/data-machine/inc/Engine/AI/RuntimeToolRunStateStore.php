@@ -13,13 +13,12 @@ use DataMachine\Core\Database\Jobs\Jobs;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Stores deterministic runtime-tool pause/resume state on the request job.
+ * Stores deterministic runtime-tool request state on the request job.
  */
 class RuntimeToolRunStateStore {
 
 	public const STATUS_PENDING   = 'pending';
 	public const STATUS_FINALIZED = 'finalized';
-	public const STATUS_RESUMED   = 'resumed';
 	public const STATUS_TIMED_OUT = 'timed_out';
 
 	/**
@@ -64,12 +63,10 @@ class RuntimeToolRunStateStore {
 					'status'                  => self::STATUS_PENDING,
 					'timeout_seconds'         => max( 0, (int) ( $state['timeout_seconds'] ?? 0 ) ),
 					'deadline_at'             => (string) ( $state['deadline_at'] ?? '' ),
-					'resume_payload'          => null,
 					'finalize_payload'        => null,
 					'created_at'              => $created_at,
 					'updated_at'              => $created_at,
 					'finalized_at'            => null,
-					'resumed_at'              => null,
 				);
 
 				$engine_data['runtime_tool_run_state'] = $run_state;
@@ -125,12 +122,10 @@ class RuntimeToolRunStateStore {
 			'status'                  => self::STATUS_PENDING,
 			'timeout_seconds'         => max( 0, (int) ( $metadata['timeout_seconds'] ?? 0 ) ),
 			'deadline_at'             => (string) ( $request['timeout_at'] ?? $metadata['expires_at'] ?? '' ),
-			'resume_payload'          => null,
 			'finalize_payload'        => null,
 			'created_at'              => $created_at,
 			'updated_at'              => $created_at,
 			'finalized_at'            => null,
-			'resumed_at'              => null,
 		);
 	}
 
@@ -161,17 +156,6 @@ class RuntimeToolRunStateStore {
 	}
 
 	/**
-	 * Persist a deterministic resume payload once.
-	 *
-	 * @param int                 $job_id  Request job ID.
-	 * @param array<string,mixed> $payload Resume payload.
-	 * @return array<string,mixed>|null
-	 */
-	public function resume( int $job_id, array $payload ): ?array {
-		return $this->transition_once( $job_id, 'resumed_at', 'resume_payload', $payload, self::STATUS_RESUMED, false );
-	}
-
-	/**
 	 * Apply a one-time state transition.
 	 *
 	 * @param int                 $job_id      Request job ID.
@@ -181,19 +165,18 @@ class RuntimeToolRunStateStore {
 	 * @param string              $status      New status.
 	 * @return array<string,mixed>|null
 	 */
-	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status, bool $return_existing = true ): ?array {
+	private function transition_once( int $job_id, string $timestamp_key, string $payload_key, array $payload, string $status ): ?array {
 		$this->assert_job_id( $job_id );
 
 		$state        = null;
 		$transitioned = $this->mutate_engine_data(
 			$job_id,
-			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, $return_existing, &$state ): array {
+			function ( array $engine_data ) use ( $timestamp_key, $payload_key, $payload, $status, &$state ): array {
 				$state = $this->normalize_existing( $engine_data['runtime_tool_run_state'] ?? null );
 				if ( empty( $state ) ) {
 					return $engine_data;
 				}
 				if ( ! empty( $state[ $timestamp_key ] ) ) {
-					$state = $return_existing ? $state : null;
 					return $engine_data;
 				}
 

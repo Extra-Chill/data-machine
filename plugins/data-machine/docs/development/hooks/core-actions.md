@@ -184,7 +184,7 @@ do_action('datamachine_fail_job', $job_id, 'step_execution_failure', [
 
 ## Configuration Hooks
 
-Pipeline and flow-step configuration writes are ability-backed, not action-backed. Use `datamachine/update-pipeline-step`, `datamachine/update-flow-step`, or `datamachine/configure-flow-steps` through the Abilities API, REST API, WP-CLI, or chat tools.
+Pipeline and flow-step configuration writes are ability-backed, not action-backed. Use `datamachine/update-pipeline-step`, `datamachine/update-flow-step`, or `datamachine/configure-flow-steps` through the Abilities API, REST API, or WP-CLI.
 
 Tool configuration uses the `datamachine_save_tool_config` **filter** from `BaseTool`; see [Core Filters](core-filters.md) for filter-oriented extension points.
 

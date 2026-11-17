@@ -7,7 +7,7 @@
  *   2. Per-agent tool override beats per-agent category override.
  *   3. Per-agent category override beats tool-declared default.
  *   4. Tool-declared default beats mode preset.
- *   5. Mode preset can upgrade a direct tool default to preview in chat.
+ *   5. Mode preset can upgrade a direct tool default to preview for one mode.
  *   6. Global default is 'direct'.
  *   + External filter always runs last and can override anything.
  *
@@ -46,7 +46,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'some_tool',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 			)
 		);
 
@@ -57,7 +57,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'preview' ),
 			)
 		);
@@ -65,14 +65,14 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
-	public function test_mode_preset_upgrades_direct_tool_to_preview_in_chat(): void {
+	public function test_mode_preset_upgrades_direct_tool_to_preview_for_matching_mode(): void {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_tweet',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array(
-					'action_policy'      => 'direct',
-					'action_policy_chat' => 'preview',
+					'action_policy'        => 'direct',
+					'action_policy_system' => 'preview',
 				),
 			)
 		);
@@ -80,14 +80,14 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertSame( WP_Agent_Action_Policy::PREVIEW, $policy );
 	}
 
-	public function test_mode_preset_does_not_affect_pipeline(): void {
+	public function test_mode_preset_does_not_affect_other_modes(): void {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_tweet',
 				'mode'      => ActionPolicyResolver::MODE_PIPELINE,
 				'tool_def'  => array(
-					'action_policy'      => 'direct',
-					'action_policy_chat' => 'preview',
+					'action_policy'        => 'direct',
+					'action_policy_system' => 'preview',
 				),
 			)
 		);
@@ -99,7 +99,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'direct' ),
 				'deny'      => array( 'publish_instagram' ),
 			)
@@ -118,7 +118,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'preview' ),
 				'agent_id'  => $agent_id,
 			)
@@ -137,7 +137,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'preview' ),
 				'agent_id'  => $agent_id,
 			)
@@ -156,7 +156,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'preview' ),
 				'agent_id'  => $agent_id,
 			)
@@ -179,7 +179,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'publish_instagram',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'direct' ),
 			)
 		);
@@ -200,14 +200,14 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$read_policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'records',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'input'     => array( 'operation' => 'read' ),
 			)
 		);
 		$write_policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'records',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'input'     => array( 'operation' => 'write' ),
 			)
 		);
@@ -231,13 +231,13 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'records',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 			)
 		);
 		$this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'records',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'input'     => 'invalid',
 			)
 		);
@@ -254,7 +254,7 @@ class ActionPolicyResolverTest extends WP_UnitTestCase {
 		$policy = $this->resolver->resolveForTool(
 			array(
 				'tool_name' => 'some_tool',
-				'mode'      => ActionPolicyResolver::MODE_CHAT,
+				'mode'      => ActionPolicyResolver::MODE_SYSTEM,
 				'tool_def'  => array( 'action_policy' => 'preview' ),
 			)
 		);

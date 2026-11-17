@@ -4,7 +4,6 @@
  *
  * Query events by venue with filtering options.
  * Provides abilities for CLI/REST/MCP consumption.
- * Chat tool wrapper lives in inc/Api/Chat/Tools/GetVenueEvents.php.
  *
  * @package DataMachineEvents\Abilities
  */

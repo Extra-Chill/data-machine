@@ -230,6 +230,10 @@ namespace {
 			public function add_cap( string $capability ): void {
 				unset( $capability );
 			}
+
+			public function remove_cap( string $capability ): void {
+				unset( $capability );
+			}
 		};
 	}
 
@@ -324,10 +328,6 @@ namespace DataMachine\Core\Database\BundleArtifacts {
 
 namespace DataMachine\Core\Database\RunMetadata {
 	class RunMetadata extends \DataMachineTestRepository {}
-}
-
-namespace DataMachine\Core\Database\Chat {
-	class Chat extends \DataMachineTestRepository {}
 }
 
 namespace DataMachine\Engine\AI\Actions {

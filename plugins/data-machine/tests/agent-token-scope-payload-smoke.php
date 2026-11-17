@@ -69,12 +69,12 @@ namespace {
 		'ability_categories' => array( 'datamachine-content', '' ),
 		'ability_allow'      => array( 'datamachine/wiki' ),
 		'ability_deny'       => array( 'datamachine/delete-post' ),
-		'capabilities'       => array( 'read', 'datamachine_chat', 'read' ),
+		'capabilities'       => array( 'read', 'datamachine_use_tools', 'read' ),
 	);
 
 	$normalized = AgentTokens::normalize_capability_payload( $scope );
 
-	$assert( array( 'read', 'datamachine_chat' ) === $normalized['allowed_capabilities'], 'structured scope extracts raw capability ceiling' );
+	$assert( array( 'read', 'datamachine_use_tools' ) === $normalized['allowed_capabilities'], 'structured scope extracts raw capability ceiling' );
 	$assert( 'read_only' === $normalized['stored_payload']['scope'], 'structured scope keeps scope key for storage' );
 	$assert( array( 'datamachine-content' ) === $normalized['stored_payload']['ability_categories'], 'structured scope normalizes categories' );
 	$assert( 'Read-only' === AgentTokens::scope_label( $normalized['stored_payload'] ), 'structured scope reports audit label' );

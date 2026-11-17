@@ -29,7 +29,6 @@ class EditPostBlocksAbility {
 		}
 
 		$this->registerAbility();
-		$this->registerChatTool();
 		self::$registered = true;
 	}
 
@@ -102,90 +101,6 @@ class EditPostBlocksAbility {
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	private function registerChatTool(): void {
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['edit_post_blocks'] = array(
-					'_callable' => array( self::class, 'getChatTool' ),
-					'modes'     => array( 'chat' ),
-					'ability'   => 'datamachine/edit-post-blocks',
-				);
-				return $tools;
-			}
-		);
-	}
-
-	/**
-	 * Chat tool definition.
-	 *
-	 * @return array
-	 */
-	public static function getChatTool(): array {
-		return array(
-			'class'       => self::class,
-			'method'      => 'handleChatToolCall',
-			'description' => 'Surgical find/replace within specific Gutenberg blocks by index. Use get_post_blocks first to identify target blocks and indices. Set preview=true to return a diff preview without applying changes.',
-			'parameters'  => array(
-				'post_id' => array(
-					'type'        => 'integer',
-					'required'    => true,
-					'description' => 'Post ID to edit',
-				),
-				'blog_id' => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Optional multisite blog ID the post lives on. Omit for the current site.',
-				),
-				'edits'   => array(
-					'type'        => 'array',
-					'items'       => array(
-						'type'       => 'object',
-						'required'   => array( 'block_index', 'find', 'replace' ),
-						'properties' => array(
-							'block_index' => array( 'type' => 'integer' ),
-							'find'        => array( 'type' => 'string' ),
-							'replace'     => array( 'type' => 'string' ),
-						),
-					),
-					'required'    => true,
-					'description' => 'Array of { block_index, find, replace } operations',
-				),
-				'preview' => array(
-					'type'        => 'boolean',
-					'description' => 'When true, return diff preview data without applying changes. The user can then accept or reject.',
-				),
-			),
-		);
-	}
-
-	/**
-	 * Chat tool handler.
-	 *
-	 * @param array $parameters Tool parameters.
-	 * @param array $tool_def   Tool definition.
-	 * @return array
-	 */
-	public static function handleChatToolCall( array $parameters, array $tool_def = array() ): array {
-		$tool_def;
-		$result = self::execute( $parameters );
-		if ( is_wp_error( $result ) ) {
-			return array(
-				'success'    => false,
-				'error'      => $result->get_error_message(),
-				'error_code' => $result->get_error_code(),
-				'error_data' => $result->get_error_data(),
-				'tool_name'  => 'edit_post_blocks',
-			);
-		}
-
-		return array(
-			'success'   => $result['success'],
-			'data'      => $result,
-			'tool_name' => 'edit_post_blocks',
-		);
 	}
 
 	/**

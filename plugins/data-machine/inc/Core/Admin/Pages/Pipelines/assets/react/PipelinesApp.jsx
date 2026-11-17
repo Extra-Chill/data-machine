@@ -33,13 +33,11 @@ import { useFlows } from './queries/flows';
 import { useUIStore } from './stores/uiStore';
 import PipelineCard from './components/pipelines/PipelineCard';
 import PipelineSelector from './components/pipelines/PipelineSelector';
-import ChatToggle from './components/chat/ChatToggle';
 import AgentSwitcher from '@shared/components/AgentSwitcher';
 import { MODAL_TYPES } from './utils/constants';
 import { isSameId } from './utils/ids';
 
 const ModalManager = lazy( () => import( './components/shared/ModalManager' ) );
-const ChatSidebar = lazy( () => import( './components/chat/ChatSidebar' ) );
 
 const getErrorMessage = ( error ) => {
 	if ( ! error ) {
@@ -60,7 +58,6 @@ export default function PipelinesApp() {
 		selectedPipelineId,
 		setSelectedPipelineId,
 		openModal,
-		isChatOpen,
 		activeModal,
 	} = useUIStore();
 
@@ -255,7 +252,7 @@ export default function PipelinesApp() {
 					<Notice status="info" isDismissible={ false }>
 						<p>
 							{ __(
-								'No pipelines found. Create your first pipeline to get started, or ask the chat to help you build one.',
+								'No pipelines found. Create your first pipeline to get started.',
 								'data-machine'
 							) }
 						</p>
@@ -308,12 +305,12 @@ export default function PipelinesApp() {
 	};
 
 	/**
-	 * Main render - layout wrapper always present for chat access
+	 * Main render - layout wrapper
 	 */
 	return (
 		<div className="datamachine-pipelines-layout">
 			<div className="datamachine-pipelines-main">
-				{ /* Header with Add Pipeline, Import/Export, and Chat toggle */ }
+				{ /* Header with Add Pipeline and Import/Export */ }
 				<div className="datamachine-header--flex-space-between">
 					<Button
 						variant="primary"
@@ -333,18 +330,11 @@ export default function PipelinesApp() {
 						>
 							{ __( 'Import / Export', 'data-machine' ) }
 						</Button>
-						<ChatToggle />
 					</div>
 				</div>
 
 				{ renderMainContent() }
 			</div>
-
-			{ isChatOpen && (
-				<Suspense fallback={ null }>
-					<ChatSidebar />
-				</Suspense>
-			) }
 		</div>
 	);
 }

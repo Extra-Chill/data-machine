@@ -38,66 +38,29 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	// ============================================
-	// CHAT CONTEXT
+	// ACCESS LEVELS
 	// ============================================
+	// Access levels gate interactive (request-user scoped) resolution only.
+	// Pipeline and system resolution run as product automation.
 
-	public function test_chat_includes_global_tools(): void {
-		$tools = $this->resolver->resolve(
-			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
-			)
-		);
+	public function test_removed_admin_tools_do_not_resolve_in_any_mode(): void {
+		// The interactive pipeline-editing tools were removed with the Data
+		// Machine chat mode (data-machine#3973). Pipeline editing is reached
+		// through the datamachine/* abilities instead.
+		foreach ( array( ToolPolicyResolver::MODE_PIPELINE, ToolPolicyResolver::MODE_SYSTEM ) as $mode ) {
+			$tools = $this->resolver->resolve( array( 'mode' => $mode ) );
 
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
+			$this->assertIsArray( $tools );
+			$this->assertArrayNotHasKey( 'update_flow', $tools );
+			$this->assertArrayNotHasKey( 'create_pipeline', $tools );
+			$this->assertArrayNotHasKey( 'run_flow', $tools );
+		}
 	}
 
-	public function test_chat_excludes_pipeline_editing_tools(): void {
-		// Pipeline-editing tools moved to the pipeline_editor mode (data-machine#2425),
-		// so generic chat no longer surfaces them. Portable chat surfaces stay clean.
+	public function test_resolved_tools_have_array_configs(): void {
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
-			)
-		);
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayNotHasKey( 'update_flow', $tools );
-		$this->assertArrayNotHasKey( 'create_pipeline', $tools );
-		$this->assertArrayNotHasKey( 'run_flow', $tools );
-	}
-
-	public function test_pipeline_editor_includes_pipeline_editing_tools(): void {
-		// The DM admin pipeline chat opts into [chat, pipeline_editor]; the
-		// pipeline-editing tools resolve under the pipeline_editor mode.
-		$tools = $this->resolver->resolve(
-			array(
-				'mode' => 'pipeline_editor',
-			)
-		);
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'update_flow', $tools );
-	}
-
-	public function test_composed_chat_pipeline_editor_unions_tools(): void {
-		// Mode composition is additive: the admin surface sends both modes and
-		// gets the union — generic chat tools plus pipeline-editing tools.
-		$tools = $this->resolver->resolve(
-			array(
-				'modes' => array( ToolPolicyResolver::MODE_CHAT, 'pipeline_editor' ),
-			)
-		);
-
-		$this->assertIsArray( $tools );
-		$this->assertArrayHasKey( 'update_flow', $tools );
-		$this->assertArrayHasKey( 'web_fetch', $tools );
-	}
-
-	public function test_chat_tools_pass_availability_check(): void {
-		$tools = $this->resolver->resolve(
-			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
@@ -106,13 +69,9 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		}
 	}
 
-	public function test_chat_does_not_require_use_tools_cap_by_default(): void {
-		// The semantic being tested: a subscriber who lacks datamachine_use_tools
-		// but retains the baseline datamachine_chat cap should still see tools
-		// whose access_level is 'authenticated'. The legacy all-or-nothing gate
-		// (which required use_tools for ANY chat tool) is disabled by default
-		// and is only restored via the datamachine_require_use_tools_for_chat_tools
-		// filter. Only the use_tools cap is stripped here — chat remains.
+	public function test_authenticated_access_level_does_not_require_use_tools_cap(): void {
+		// 'authenticated' tools need only a logged-in user with `read`. A
+		// subscriber without datamachine_use_tools still sees them.
 		add_filter( 'user_has_cap', array( $this, 'deny_use_tools_cap' ), 10, 4 );
 
 		$tools_filter = function ( $tools ) {
@@ -122,7 +81,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 				'class'        => 'NonExistentClass',
 				'method'       => 'handle_tool_call',
 				'parameters'   => array(),
-				'modes'        => array( 'chat' ),
+				'modes'        => array( 'system' ),
 				'access_level' => 'authenticated',
 			);
 
@@ -137,7 +96,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
@@ -149,9 +109,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		ToolManager::clearCache();
 	}
 
-	public function test_chat_can_restore_legacy_use_tools_gate_via_filter(): void {
-		add_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10, 4 );
-		add_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
+	public function test_authenticated_access_level_hides_tools_from_anonymous_users(): void {
+		wp_set_current_user( 0 );
 
 		$tools_filter = function ( $tools ) {
 			$tools['test_authenticated_tool'] = array(
@@ -160,7 +119,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 				'class'        => 'NonExistentClass',
 				'method'       => 'handle_tool_call',
 				'parameters'   => array(),
-				'modes'        => array( 'chat' ),
+				'modes'        => array( 'system' ),
 				'access_level' => 'authenticated',
 			);
 
@@ -170,25 +129,20 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		ToolManager::clearCache();
 
-		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
-		wp_set_current_user( $user_id );
-
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
-		$this->assertEmpty( $tools );
+		$this->assertArrayNotHasKey( 'test_authenticated_tool', $tools );
 
-		remove_filter( 'user_has_cap', array( $this, 'deny_all_datamachine_caps' ), 10 );
-		remove_filter( 'datamachine_require_use_tools_for_chat_tools', '__return_true' );
 		remove_filter( 'datamachine_tools', $tools_filter );
-		wp_set_current_user( 0 );
 		ToolManager::clearCache();
 	}
 
-	public function test_chat_allows_public_tools_for_anonymous_users(): void {
+	public function test_public_tools_resolve_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
 		$tools_filter = function ( $tools ) {
@@ -198,7 +152,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 				'class'        => 'NonExistentClass',
 				'method'       => 'handle_tool_call',
 				'parameters'   => array(),
-				'modes'        => array( 'chat' ),
+				'modes'        => array( 'system' ),
 				'access_level' => 'public',
 			);
 
@@ -210,7 +164,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
@@ -220,7 +175,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		ToolManager::clearCache();
 	}
 
-	public function test_chat_keeps_untagged_tools_admin_only_for_anonymous_users(): void {
+	public function test_untagged_tools_stay_admin_only_for_anonymous_users(): void {
 		wp_set_current_user( 0 );
 
 		$tools_filter = function ( $tools ) {
@@ -230,7 +185,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 				'class'       => 'NonExistentClass',
 				'method'      => 'handle_tool_call',
 				'parameters'  => array(),
-				'modes'       => array( 'chat' ),
+				'modes'       => array( 'system' ),
 			);
 
 			return $tools;
@@ -241,11 +196,38 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode'        => ToolPolicyResolver::MODE_SYSTEM,
+				'interactive' => true,
 			)
 		);
 
 		$this->assertArrayNotHasKey( 'test_untagged_tool', $tools );
+
+		remove_filter( 'datamachine_tools', $tools_filter );
+		ToolManager::clearCache();
+	}
+
+	public function test_tools_without_declared_modes_do_not_resolve(): void {
+		$tools_filter = function ( $tools ) {
+			$tools['test_modeless_tool'] = array(
+				'label'        => 'Test Modeless Tool',
+				'description'  => 'Declares no modes.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'access_level' => 'public',
+			);
+
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
+
+		ToolManager::clearCache();
+
+		foreach ( array( ToolPolicyResolver::MODE_PIPELINE, ToolPolicyResolver::MODE_SYSTEM ) as $mode ) {
+			$tools = $this->resolver->resolve( array( 'mode' => $mode ) );
+			$this->assertArrayNotHasKey( 'test_modeless_tool', $tools, "Modeless tool must not resolve in {$mode} mode." );
+		}
 
 		remove_filter( 'datamachine_tools', $tools_filter );
 		ToolManager::clearCache();
@@ -266,7 +248,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'web_fetch', $tools );
 	}
 
-	public function test_pipeline_excludes_chat_tools(): void {
+	public function test_pipeline_excludes_removed_admin_tools(): void {
 		$tools = $this->resolver->resolve(
 			array(
 				'mode' => ToolPolicyResolver::MODE_PIPELINE,
@@ -362,7 +344,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_deny_list_removes_tools(): void {
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 				'deny' => array( 'web_fetch' ),
 			)
 		);
@@ -373,7 +355,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_deny_list_overrides_allowlist(): void {
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'mode'       => ToolPolicyResolver::MODE_PIPELINE,
 				'allow_only' => array( 'web_fetch' ),
 				'deny'       => array( 'web_fetch' ),
 			)
@@ -389,7 +371,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_allowlist_narrows_tools(): void {
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'mode'       => ToolPolicyResolver::MODE_PIPELINE,
 				'allow_only' => array( 'web_fetch' ),
 			)
 		);
@@ -401,7 +383,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_allowlist_with_nonexistent_tool_returns_empty(): void {
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'       => ToolPolicyResolver::MODE_CHAT,
+				'mode'       => ToolPolicyResolver::MODE_PIPELINE,
 				'allow_only' => array( 'completely_fake_tool_xyz' ),
 			)
 		);
@@ -432,7 +414,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
@@ -458,11 +440,11 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
-		$this->assertSame( ToolPolicyResolver::MODE_CHAT, $captured_mode );
+		$this->assertSame( ToolPolicyResolver::MODE_PIPELINE, $captured_mode );
 		$this->assertIsArray( $captured_args );
 
 		remove_all_filters( 'datamachine_resolved_tools' );
@@ -527,13 +509,12 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		ToolManager::clearCache();
 	}
 
-	public function test_getModes_returns_all_three_presets(): void {
+	public function test_getModes_returns_pipeline_and_system_presets(): void {
 		$modes = ToolPolicyResolver::getModes();
 
 		$this->assertArrayHasKey( ToolPolicyResolver::MODE_PIPELINE, $modes );
-		$this->assertArrayHasKey( ToolPolicyResolver::MODE_CHAT, $modes );
 		$this->assertArrayHasKey( ToolPolicyResolver::MODE_SYSTEM, $modes );
-		$this->assertCount( 3, $modes );
+		$this->assertCount( 2, $modes );
 	}
 
 	// ============================================
@@ -560,24 +541,34 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Deny all Data Machine caps while leaving normal login intact.
+	 * Register a public pipeline tool so deny-policy tests can prove that
+	 * unlisted tools survive.
+	 *
+	 * @return callable The registered datamachine_tools filter.
 	 */
-	public function deny_all_datamachine_caps( array $allcaps, array $caps, array $args, $user ): array {
-		unset( $args, $user );
+	private function addPipelineProbeTool(): callable {
+		$tools_filter = function ( $tools ) {
+			$tools['test_pipeline_probe_tool'] = array(
+				'label'        => 'Test Pipeline Probe Tool',
+				'description'  => 'Probe tool for policy tests.',
+				'class'        => 'NonExistentClass',
+				'method'       => 'handle_tool_call',
+				'parameters'   => array(),
+				'modes'        => array( 'pipeline' ),
+				'access_level' => 'public',
+			);
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
+		ToolManager::clearCache();
 
-		foreach ( array_keys( $allcaps ) as $cap ) {
-			if ( str_starts_with( $cap, 'datamachine_' ) ) {
-				$allcaps[ $cap ] = false;
-			}
-		}
-
-		return $allcaps;
+		return $tools_filter;
 	}
 
 	/**
 	 * Deny only the datamachine_use_tools cap, leaving other datamachine
-	 * caps (chat, view_logs, etc.) intact. Used to test that the default
-	 * chat tool resolution path no longer gates on use_tools.
+	 * caps (view_logs, etc.) intact. Used to test that the authenticated
+	 * access level does not gate on use_tools.
 	 */
 	public function deny_use_tools_cap( array $allcaps, array $caps, array $args, $user ): array {
 		unset( $caps, $args, $user );
@@ -588,13 +579,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_no_agent_id_means_no_restrictions(): void {
 		$tools_without = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_with_zero = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => 0,
 			)
 		);
@@ -607,13 +598,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools_no_agent = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_with_agent = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -622,6 +613,8 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_agent_deny_mode_removes_listed_tools(): void {
+		$tools_filter = $this->addPipelineProbeTool();
+
 		$agent_id = $this->createAgentWithPolicy(
 			array(
 				'mode'  => 'deny',
@@ -631,14 +624,17 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
 
 		$this->assertArrayNotHasKey( 'web_fetch', $tools );
 		// Other tools should still be present.
-		$this->assertNotEmpty( $tools );
+		$this->assertArrayHasKey( 'test_pipeline_probe_tool', $tools );
+
+		remove_filter( 'datamachine_tools', $tools_filter );
+		ToolManager::clearCache();
 	}
 
 	public function test_agent_allow_mode_keeps_only_listed_tools(): void {
@@ -651,7 +647,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -670,7 +666,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -688,13 +684,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools_no_agent = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_with_agent = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -705,13 +701,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 	public function test_nonexistent_agent_id_no_restrictions(): void {
 		$tools_no_agent = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_bad_id = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => 999999,
 			)
 		);
@@ -730,7 +726,7 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 				'deny'     => array( 'web_fetch' ),
 			)
@@ -739,28 +735,43 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertEmpty( $tools );
 	}
 
-	public function test_agent_policy_applies_to_chat_context(): void {
-		// Deny a tool that genuinely resolves under chat mode (send_ping is a
-		// portable chat tool) and confirm other chat tools survive. update_flow
-		// is no longer a chat tool post data-machine#2425, so it can't prove the
-		// deny policy here.
+	public function test_agent_policy_applies_to_system_context(): void {
+		$tools_filter = function ( $tools ) {
+			foreach ( array( 'test_system_tool_a', 'test_system_tool_b' ) as $tool_name ) {
+				$tools[ $tool_name ] = array(
+					'label'       => 'Test System Tool',
+					'description' => 'Only available to system tasks.',
+					'class'       => 'NonExistentClass',
+					'method'      => 'handle_tool_call',
+					'parameters'  => array(),
+					'modes'       => array( 'system' ),
+				);
+			}
+			return $tools;
+		};
+		add_filter( 'datamachine_tools', $tools_filter );
+		ToolManager::clearCache();
+
 		$agent_id = $this->createAgentWithPolicy(
 			array(
 				'mode'  => 'deny',
-				'tools' => array( 'send_ping' ),
+				'tools' => array( 'test_system_tool_a' ),
 			)
 		);
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_SYSTEM,
 				'agent_id' => $agent_id,
 			)
 		);
 
-		$this->assertArrayNotHasKey( 'send_ping', $tools );
-		// Other chat tools should still be present.
-		$this->assertArrayHasKey( 'web_fetch', $tools );
+		$this->assertArrayNotHasKey( 'test_system_tool_a', $tools );
+		// Other system tools should still be present.
+		$this->assertArrayHasKey( 'test_system_tool_b', $tools );
+
+		remove_filter( 'datamachine_tools', $tools_filter );
+		ToolManager::clearCache();
 	}
 
 	public function test_agent_policy_applies_to_pipeline_context(): void {
@@ -791,13 +802,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools_no_agent = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_with_agent = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);
@@ -815,13 +826,13 @@ class ToolPolicyResolverTest extends WP_UnitTestCase {
 
 		$tools_no_agent = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_PIPELINE,
 			)
 		);
 
 		$tools_with_agent = $this->resolver->resolve(
 			array(
-				'mode'     => ToolPolicyResolver::MODE_CHAT,
+				'mode'     => ToolPolicyResolver::MODE_PIPELINE,
 				'agent_id' => $agent_id,
 			)
 		);

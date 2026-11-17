@@ -203,7 +203,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array(),
 			$available_tools,
 			array(),
-			'chat',
+			'system',
 			0,
 			array( 'search_query' => 'from client context' )
 		);
@@ -232,7 +232,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array(),
 			$available_tools,
 			array( 'job_id' => 42 ),
-			'chat',
+			'system',
 			0,
 			array( 'job_id' => 7 )
 		);
@@ -478,7 +478,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array( 'trusted_user_id' => 777 ),
 			$tools,
 			array( 'client_context' => $client_context ),
-			'chat',
+			'system',
 			0,
 			$client_context
 		);
@@ -519,7 +519,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array(),
 			$available_tools,
 			array(),
-			'chat',
+			'system',
 			0,
 			array( 'query' => 'ambient context value' )
 		);
@@ -645,7 +645,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 				'job_id'          => 21,
 				'flow_step_id'    => 34,
 			),
-			'chat',
+			'system',
 			11,
 			array( 'bridge_app' => 'unit-test' )
 		);
@@ -778,7 +778,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array( 'operation' => 'read' ),
 			$tools,
 			array(),
-			'chat',
+			'system',
 			0,
 			array( 'bound_query' => 'record-1' )
 		);
@@ -787,7 +787,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array( 'operation' => 'write' ),
 			$tools,
 			array(),
-			'chat',
+			'system',
 			0,
 			array( 'bound_query' => 'record-2' )
 		);
@@ -796,7 +796,7 @@ class ToolExecutorValidationTest extends WP_UnitTestCase {
 			array( 'operation' => 'delete' ),
 			$tools,
 			array(),
-			'chat',
+			'system',
 			0,
 			array( 'bound_query' => 'record-3' )
 		);

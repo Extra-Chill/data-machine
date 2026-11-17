@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Modes | chat, pipeline |
+| Modes | pipeline |
 | Mutation risk | Low mutation |
 | Registered in | `ToolServiceProvider.php` via `InternalLinkAudit` |
 | Backing abilities | `datamachine/audit-internal-links`, `datamachine/get-orphaned-posts`, `datamachine/get-backlinks`, `datamachine/check-broken-links` |

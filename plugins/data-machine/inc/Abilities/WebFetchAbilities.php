@@ -3,8 +3,8 @@
  * Web Fetch Abilities
  *
  * Read-only retrieval of a public web page as readable text. Exposed as the
- * datamachine/web-fetch ability (REST/MCP) and shared by the web_fetch chat
- * and pipeline tool, so both paths use one implementation and one set of
+ * datamachine/web-fetch ability (REST/MCP) and shared by the web_fetch
+ * pipeline and system tool, so both paths use one implementation and one set of
  * safety rules:
  *
  * - http(s) on the default ports only, no embedded credentials.

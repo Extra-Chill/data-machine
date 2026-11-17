@@ -99,7 +99,7 @@ When exceeded, the loop returns with the response flag `max_conversation_turns_r
 
 ### chain_depth
 
-Bounds how many cross-site agent hops a single A2A chain can contain before being refused. Prevents runaway recursion when agents on different sites can call each other's `/chat` endpoints.
+Bounds how many cross-site agent hops a single A2A chain can contain before being refused. Prevents runaway recursion when agents on different sites can call each other's REST endpoints.
 
 - **Default**: `3`
 - **Site-setting key**: `max_chain_depth`

@@ -116,7 +116,7 @@ class AdminFamiliesAbilityRestTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'deleted', $cleared );
 	}
 
-	public function test_rest_visible_settings_read_update_and_ping_secret(): void {
+	public function test_rest_visible_settings_read_and_update(): void {
 		$this->act_as_admin();
 
 		$settings = $this->run_ability( 'get-settings' );
@@ -131,11 +131,6 @@ class AdminFamiliesAbilityRestTest extends WP_UnitTestCase {
 		);
 		$this->assertTrue( $updated['success'] );
 		$this->assertSame( 25, (int) $this->run_ability( 'get-settings' )['settings']['jobs_per_page'] );
-
-		$secret = $this->run_ability( 'generate-ping-secret' );
-		$this->assertTrue( $secret['success'] );
-		$this->assertNotEmpty( $secret['secret'] );
-		$this->assertSame( 32, strlen( (string) $secret['secret'] ) );
 	}
 
 	public function test_rest_visible_scheduling_intervals_tool_config_and_handler_defaults(): void {

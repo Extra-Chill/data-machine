@@ -355,9 +355,6 @@ wp datamachine system health --types=php,wp,plugin
 wp datamachine system run alt_text_generation
 wp datamachine system run daily_memory_generation
 
-# Generate a chat session title
-wp datamachine system title abc-123 --force
-
 # Inspect the current site's Action Scheduler claim index (dry-run by default)
 wp datamachine system action-scheduler-claim-index
 
@@ -551,31 +548,6 @@ wp datamachine auth revoke google --target-user=42 --yes
 # View or save API config
 wp datamachine auth config google --show-secrets
 wp datamachine auth config reddit --client_id=xxx --client_secret=xxx
-```
-
-### datamachine chat
-
-Manage chat sessions. **Since**: 0.40.0
-
-WP-CLI's global `--user=<id>` selects the bootstrap user. Chat's
-`--owner-user=<id>` selects a session owner, and `--session-context=<type>`
-selects a chat-session mode; neither changes WordPress bootstrap context.
-
-```bash
-# List chat sessions
-wp datamachine chat list --owner-user=1 --limit=20
-
-# Get a session with conversation
-wp datamachine chat get abc-123
-
-# Create a session
-wp datamachine chat create --owner-user=1 --session-context=sidebar
-
-# Delete a session
-wp datamachine chat delete abc-123 --yes
-
-# Generate a session title
-wp datamachine chat title abc-123 --force
 ```
 
 ### datamachine posts
@@ -815,7 +787,7 @@ wp datamachine meta-description generate --post_type=post --limit=50 --force
 
 ### datamachine retention
 
-Inspect and schedule retention cleanup for jobs, logs, processed items, Action Scheduler rows, stale claims, files, and chat sessions.
+Inspect and schedule retention cleanup for jobs, logs, processed items, Action Scheduler rows, stale claims, and files.
 
 ```bash
 # Show policies and storage metrics
@@ -875,7 +847,7 @@ wp datamachine external show chubes.net/chubes-bot
 # Test or call the remote site with the stored token
 wp datamachine external test chubes.net/chubes-bot
 wp datamachine external call chubes.net/chubes-bot GET /wp-json/wp/v2/users/me
-wp datamachine external call chubes.net/chubes-bot POST /wp-json/datamachine/v1/chat --body='{"message":"hello"}'
+wp datamachine external call chubes.net/chubes-bot POST /wp-json/wp-abilities/v1/abilities/agents/chat/run --body='{"input":{"message":"hello"}}'
 
 # Remove a connection
 wp datamachine external remove chubes.net/chubes-bot --yes

@@ -3,7 +3,7 @@
  * Venue Abilities
  *
  * Provides abilities for venue management: health checks, updates, retrieval,
- * and duplicate detection. Chat tools and REST controllers delegate to these
+ * and duplicate detection. CLI commands and REST controllers delegate to these
  * abilities for business logic.
  *
  * @package DataMachineEvents\Abilities

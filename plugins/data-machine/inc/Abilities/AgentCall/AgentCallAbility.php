@@ -275,7 +275,7 @@ class AgentCallAbility {
 	 * Core always builds the canonical {task, messages, context, timestamp}
 	 * envelope. Vendor-specific payload shaping does not live in core: the
 	 * `datamachine_agent_call_payload` filter lets an extension reshape the
-	 * envelope for a given target URL (e.g. a chat-platform webhook). The
+	 * envelope for a given target URL (e.g. a messaging-platform webhook). The
 	 * filter receives the canonical payload plus the target URL and the raw
 	 * task/context, and must return an array to send as the JSON body.
 	 *

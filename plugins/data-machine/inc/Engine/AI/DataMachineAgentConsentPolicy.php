@@ -54,12 +54,6 @@ class DataMachineAgentConsentPolicy implements \WP_Agent_Consent_Policy {
 	 * @inheritDoc
 	 */
 	public function can_store_transcript( array $context = array() ): WP_Agent_Consent_Decision {
-		$mode = strtolower( (string) ( $context['mode'] ?? '' ) );
-
-		if ( 'chat' === $mode && true === $this->is_interactive( $context ) ) {
-			return $this->allowed( WP_Agent_Consent_Operation::STORE_TRANSCRIPT, 'datamachine_chat_session', $context );
-		}
-
 		if ( true === ( $context['persist_transcript'] ?? null ) || true === ( $context[ WP_Agent_Consent_Operation::STORE_TRANSCRIPT ] ?? null ) ) {
 			return $this->allowed( WP_Agent_Consent_Operation::STORE_TRANSCRIPT, 'datamachine_transcript_opt_in', $context );
 		}
@@ -126,7 +120,7 @@ class DataMachineAgentConsentPolicy implements \WP_Agent_Consent_Policy {
 
 		$mode = strtolower( (string) ( $context['mode'] ?? '' ) );
 
-		return in_array( $mode, array( 'chat', 'rest', 'interactive' ), true );
+		return in_array( $mode, array( 'rest', 'interactive' ), true );
 	}
 
 	/**

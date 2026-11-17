@@ -32,4 +32,3 @@ The ability runner returns the ability's output directly. Errors return standard
 | `datamachine/save-tool-config` | Save one tool's `config_data`. |
 | `datamachine/get-handler-defaults` | Handler defaults grouped by step type, with config field schemas. |
 | `datamachine/update-handler-defaults` | Replace defaults for one handler (`handler_slug`, `defaults`). |
-| `datamachine/generate-ping-secret` | Generate and store a new agent ping secret; the secret is returned once. |

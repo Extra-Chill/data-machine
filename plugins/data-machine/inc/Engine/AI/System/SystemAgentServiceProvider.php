@@ -31,7 +31,6 @@ use DataMachine\Engine\AI\System\Tasks\InternalLinkingTask;
 use DataMachine\Engine\AI\System\Tasks\JobReaperTask;
 use DataMachine\Engine\AI\System\Tasks\MetaDescriptionTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionActionSchedulerTask;
-use DataMachine\Engine\AI\System\Tasks\Retention\RetentionChatSessionsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCompletedJobsTask;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionEngineDataTask;
@@ -115,7 +114,6 @@ class SystemAgentServiceProvider {
 		$tasks[ RetentionCleanup::TASK_AS_ACTIONS ]      = RetentionActionSchedulerTask::class;
 		$tasks[ RetentionCleanup::TASK_STALE_CLAIMS ]    = RetentionStaleClaimsTask::class;
 		$tasks[ RetentionCleanup::TASK_FILES ]           = RetentionFilesTask::class;
-		$tasks[ RetentionCleanup::TASK_CHAT_SESSIONS ]   = RetentionChatSessionsTask::class;
 		$tasks[ RetentionCleanup::TASK_JOB_ARTIFACTS ]   = RetentionJobArtifactsTask::class;
 		$tasks[ RetentionCleanup::TASK_BATCH_WORKLISTS ] = RetentionBatchWorklistsTask::class;
 		$tasks[ RetentionCleanup::TASK_RECLAIM_SPACE ]   = RetentionReclaimSpaceTask::class;
@@ -277,17 +275,6 @@ class SystemAgentServiceProvider {
 				'label'              => 'Weekly repository-file cleanup',
 				'first_run_callback' => 'strtotime',
 				'first_run_arg'      => '+1 week',
-			),
-			RetentionCleanup::TASK_CHAT_SESSIONS   => array_merge(
-				$daily_first_run,
-				array(
-					'task_type'       => RetentionCleanup::TASK_CHAT_SESSIONS,
-					'interval'        => 'daily',
-					'enabled_setting' => 'retention_chat_sessions_enabled',
-					'default_enabled' => true,
-					'label'           => 'Daily chat-session cleanup',
-					'network_only'    => true,
-				)
 			),
 			RetentionCleanup::TASK_JOB_ARTIFACTS   => array_merge(
 				$daily_first_run,

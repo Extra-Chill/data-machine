@@ -295,7 +295,7 @@ Defines the admin UI fields. The task dropdown is populated from `TaskRegistry::
 **Source:** `inc/Engine/AI/System/Tasks/DailyMemoryTask.php`
 **Undo:** No
 
-Automated `MEMORY.md` maintenance. The task gathers same-day job/chat context into `activity_section`, performs deterministic overflow archiving for very large files, and otherwise uses the single `daily_memory` prompt to split persistent knowledge from session-specific content. Safety and conservation checks prevent lossy rewrites.
+Automated `MEMORY.md` maintenance. The task gathers same-day job context into `activity_section`, performs deterministic overflow archiving for very large files, and otherwise uses the single `daily_memory` prompt to split persistent knowledge from session-specific content. Safety and conservation checks prevent lossy rewrites.
 
 See [Daily Memory System](daily-memory-system.md) for complete documentation.
 

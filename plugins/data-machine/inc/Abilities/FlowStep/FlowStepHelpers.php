@@ -134,7 +134,7 @@ trait FlowStepHelpers {
 	 *
 	 * Delegates to the handler's SettingsClass::sanitize() method, which performs
 	 * type coercion, term ID resolution, and value validation. This ensures all
-	 * write paths (REST, CLI, chat tools, abilities API) produce consistent data.
+	 * write paths (REST, CLI, abilities API) produce consistent data.
 	 *
 	 * A sanitizer that synthesizes keys the caller did not pass (e.g. resolving
 	 * a venue name into a venue term ID) must declare those keys via
@@ -673,7 +673,7 @@ trait FlowStepHelpers {
 	 *
 	 * Post-#1291 the dedicated `user_message` slot is gone. This helper
 	 * is the public-facing shim that lets existing callers (CLI's
-	 * `--set-user-message`, ConfigureFlowSteps, CreateFlow chat tools,
+	 * `--set-user-message`, ConfigureFlowSteps, the CreateFlow ability,
 	 * the React UI's save path) keep their input contract while we
 	 * route the write through the unified `prompt_queue` storage:
 	 *

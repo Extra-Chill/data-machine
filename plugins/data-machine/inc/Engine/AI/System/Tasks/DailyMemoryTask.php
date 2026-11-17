@@ -25,7 +25,6 @@ use AgentsAPI\AI\WP_Agent_Run_Outcome;
 
 defined( 'ABSPATH' ) || exit;
 
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\PluginSettings;
 use DataMachine\Core\FilesRepository\AgentMemory;
@@ -1073,7 +1072,7 @@ class DailyMemoryTask extends SystemTask {
 					'memory_content'   => 'Current full content of MEMORY.md',
 					'date'             => 'Target date for archival context (YYYY-MM-DD)',
 					'max_size'         => 'Recommended maximum file size (human-readable, e.g. "8 KB")',
-					'activity_section' => 'Activity context section (jobs and chat sessions from the day, if any)',
+					'activity_section' => 'Activity context section (jobs from the day, if any)',
 				),
 			),
 		);
@@ -1119,7 +1118,7 @@ class DailyMemoryTask extends SystemTask {
 	 * per-agent schedule fan-out or the system-task agent envelope. Only
 	 * records visible to that agent/user pair reach the model, so one
 	 * agent's compaction can never summarize another agent's or another
-	 * user's jobs and chat sessions into the wrong MEMORY.md.
+	 * user's jobs into the wrong MEMORY.md.
 	 *
 	 * Two deliberate breadth choices exist:
 	 * - No principal bound at all (both IDs absent/0) collects NO context.
@@ -1148,11 +1147,6 @@ class DailyMemoryTask extends SystemTask {
 		$jobs_context = $this->getJobsContext( $date, $scope );
 		if ( ! empty( $jobs_context ) ) {
 			$parts[] = "## Jobs completed on {$date}\n\n{$jobs_context}";
-		}
-
-		$chat_context = $this->getChatContext( $date, $scope );
-		if ( ! empty( $chat_context ) ) {
-			$parts[] = "## Chat sessions on {$date}\n\n{$chat_context}";
 		}
 
 		return implode( "\n\n", $parts );
@@ -1206,28 +1200,6 @@ class DailyMemoryTask extends SystemTask {
 			$status  = $job['status'];
 			$source  = $job['source'];
 			$lines[] = "- [{$source}] {$label}: {$status}";
-		}
-
-		return implode( "\n", $lines );
-	}
-
-	/**
-	 * @param string $date  Date string (Y-m-d).
-	 * @param array  $scope Authorization scope (`user_id`, `agent_id`).
-	 * @return string
-	 */
-	private function getChatContext( string $date, array $scope ): string {
-		$sessions = ConversationStoreFactory::get()->list_sessions_for_day_scoped( $date, $scope );
-
-		if ( empty( $sessions ) ) {
-			return '';
-		}
-
-		$lines = array();
-		foreach ( $sessions as $session ) {
-			$title   = ! empty( $session['title'] ) ? $session['title'] : 'Untitled session';
-			$mode    = $session['mode'] ?? 'chat';
-			$lines[] = "- [{$mode}] {$title}";
 		}
 
 		return implode( "\n", $lines );

@@ -533,7 +533,7 @@ class HandlerToolResolutionTest extends WP_UnitTestCase {
 			function ( array $tools ): array {
 				$tools['static_global']          = array(
 					'description' => 'A static tool',
-					'modes'       => array( 'chat' ),
+					'modes'       => array( 'system' ),
 				);
 				$tools['__handler_tools_widget'] = array(
 					'_handler_callable' => static fn() => array( 'widget' => array() ),

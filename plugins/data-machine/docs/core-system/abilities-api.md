@@ -1,10 +1,10 @@
 # Abilities API
 
-WordPress 6.9 Abilities API provides standardized capability discovery and execution for Data Machine operations. All REST API, CLI, and Chat tool operations delegate to registered abilities.
+WordPress 6.9 Abilities API provides standardized capability discovery and execution for Data Machine operations. All REST API, CLI, and AI tool operations delegate to registered abilities.
 
 ## Overview
 
-The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
+The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and AI tools.
 
 **Total registered abilities**: 205
 
@@ -18,7 +18,7 @@ Data Machine follows a WordPress-shaped identifier model: `agent_id` is the stab
 
 ## Registered Ability Domains
 
-The current core registry has 201 `datamachine/*` abilities across these domains:
+The current core registry has 194 `datamachine/*` abilities across these domains:
 
 | Domain | Count | Source anchor | Examples |
 |--------|-------|---------------|----------|
@@ -28,7 +28,6 @@ The current core registry has 201 `datamachine/*` abilities across these domains
 | Agent memory | 5 | `inc/Abilities/AgentMemoryAbilities.php` | read/update/search sections, self-memory writes |
 | Agent tokens | 3 | `inc/Abilities/AgentTokenAbilities.php` | create/list/revoke agent bearer tokens |
 | Auth | 7 | `inc/Abilities/AuthAbilities.php` | provider listing, status, connect/disconnect, token set/refresh/revoke |
-| Chat | 6 | `inc/Abilities/Chat/` | sessions, read state, message sending |
 | Content/block editing | 5 | `inc/Abilities/Content/` | upsert posts, get/edit/replace blocks, insert content |
 | Daily memory | 5 | `inc/Abilities/DailyMemoryAbilities.php` | read/write/list/search/delete daily memory artifacts |
 | Duplicate checks | 2 | `inc/Abilities/DuplicateCheck/` | duplicate detection, title matching |
@@ -53,7 +52,7 @@ The current core registry has 201 `datamachine/*` abilities across these domains
 | Settings | 7 | `inc/Abilities/SettingsAbilities.php` | settings, intervals, tool config, handler defaults |
 | Source inventory | 2 | `inc/Abilities/SourceInventoryAbility.php`, `inc/Abilities/SourceAggregateAbility.php` | source inventory and aggregate reporting |
 | Step types | 2 | `inc/Abilities/StepTypeAbilities.php` | list/validate step types |
-| System | 3 | `inc/Abilities/SystemAbilities.php` | session titles, health checks, system task runs |
+| System | 2 | `inc/Abilities/SystemAbilities.php` | health checks, system task runs |
 | Taxonomy | 6 | `inc/Abilities/Taxonomy/` | get/create/update/delete/resolve terms, merge term meta |
 | Tracked items | 4 | `inc/Abilities/TrackedItemsAbilities.php` | upsert/get/list/summarize durable source coverage state |
 | Update handlers | 1 | `inc/Abilities/Update/` | WordPress update handler |
@@ -98,19 +97,18 @@ PermissionHelper::resolve_scoped_user_id($params);
 
 ### Delegation Pattern
 
-REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; implementation classes below an ability are internal details.
+REST API endpoints, CLI commands, and AI tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; implementation classes below an ability are internal details.
 
 ```
 REST API Endpoint → Ability → Database / WordPress API
 CLI Command → Ability → Database / WordPress API
-Chat Tool → Ability → Database / WordPress API
+AI Tool → Ability → Database / WordPress API
 ```
 
 ### Facade Pattern
 
 Several top-level ability classes serve as facades that instantiate sub-ability classes from subdirectories; other domains are registered directly from their subdirectory classes:
 
-- `inc/Abilities/ChatAbilities.php` → `inc/Abilities/Chat/CreateChatSessionAbility.php`, etc.
 - `inc/Abilities/EngineAbilities.php` → `inc/Abilities/Engine/RunFlowAbility.php`, etc.
 - Flow abilities are registered from `inc/Abilities/Flow/CreateFlowAbility.php`, `inc/Abilities/Flow/QueueAbility.php`, `inc/Abilities/Flow/WebhookTriggerAbility.php`, etc.
 
@@ -126,7 +124,7 @@ public function register(): void {
 
 ## Testing
 
-Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, chat/tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through the repository's configured test command or directly through the PHP smoke harness:
+Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through the repository's configured test command or directly through the PHP smoke harness:
 
 ```bash
 php tests/lightweight-ability-manifest-smoke.php

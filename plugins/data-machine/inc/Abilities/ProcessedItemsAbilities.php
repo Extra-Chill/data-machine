@@ -3,7 +3,7 @@
  * Processed Items Abilities
  *
  * Abilities API primitives for processed items (deduplication tracking) operations.
- * Centralizes clearing, checking, and history queries for REST API, CLI, and Chat tools.
+ * Centralizes clearing, checking, and history queries for REST API, CLI, and AI tools.
  *
  * Self-contained ability class - business logic inlined from ProcessedItemsManager (deleted).
  *

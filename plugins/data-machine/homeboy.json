@@ -4,7 +4,7 @@
     "lint:115f25907f28371418122a6879a5e3b487458182b6a658ba4e6fcf7f4c741bf5": {
       "context_id": "data-machine",
       "created_at": "2026-09-29T17:30:42Z",
-      "item_count": 1211,
+      "item_count": 1212,
       "known_fingerprints": [
         "0045979f87213bf57df24592665d84d3b640fa3d",
         "01700233e37002898203e13ab91699511ce02ee5",
@@ -127,6 +127,7 @@
         "1b20aec33189d8a793cb18863c75893a57883084",
         "1b5579fdb804299f73c6d8550e73ce70545be475",
         "1b6e9ea0700590d086c86b158f32d76e03db905d",
+        "1b87d69427b497eb765131661432712f7c9d54f5",
         "1bbe10122524ddf0178b6662bba85d5e38f1b74d",
         "1bdc4e01760fe92ceb522c8ead051da0bc9dba7d",
         "1c1029a3898818fd1801b701472f692fe1620281",
@@ -1219,7 +1220,7 @@
         "fffc72fdb3ea268a020e98a6fae6a9cfb477fbb4"
       ],
       "metadata": {
-        "findings_count": 1211
+        "findings_count": 1212
       }
     }
   },

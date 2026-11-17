@@ -469,8 +469,7 @@ class AIStep extends Step {
 			//
 			// When the job is owned by an agent, we resolve that agent's owner user
 			// and run the loop as that user, mirroring how AgentAuthMiddleware does
-			// this for REST bearer-token requests and ChatOrchestrator does it for
-			// in-browser chat. Tools fired inside the loop then execute with the
+			// this for REST bearer-token requests. Tools fired inside the loop then execute with the
 			// correct identity, post_author resolves to the agent owner, and
 			// per-agent capability ceilings are enforced in pipelines the same way
 			// they are in REST.

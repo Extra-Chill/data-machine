@@ -3,7 +3,7 @@
  * Pipeline Transcript Policy
  *
  * Resolves whether the AI conversation `$messages` array should be persisted
- * to a chat session for a given pipeline AI step invocation.
+ * to a transcript session for a given pipeline AI step invocation.
  *
  * Resolution order (first non-null wins):
  *   flow.flow_config['persist_transcripts']

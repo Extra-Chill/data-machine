@@ -87,13 +87,13 @@ namespace {
 	$resolver = new ConversationCompactionPolicyResolver();
 
 	// 1. No agent / no opt-in => disabled no-op.
-	$policy = $resolver->resolve( array( 'agent_id' => 0, 'modes' => array( 'chat' ) ) );
+	$policy = $resolver->resolve( array( 'agent_id' => 0, 'modes' => array( 'system' ) ) );
 	compaction_assert_same( false, $policy['enabled'], 'no agent resolves to disabled compaction' );
 	compaction_assert_same( true, $policy['preserve_tool_boundaries'], 'disabled default still carries safe substrate defaults' );
 
 	// 2. Agent exists but has no compaction config => disabled no-op.
 	$GLOBALS['__compaction_agents'][1] = array( 'agent_config' => array() );
-	$policy = $resolver->resolve( array( 'agent_id' => 1, 'modes' => array( 'chat' ) ) );
+	$policy = $resolver->resolve( array( 'agent_id' => 1, 'modes' => array( 'system' ) ) );
 	compaction_assert_same( false, $policy['enabled'], 'agent without compaction config resolves to disabled' );
 
 	// 3. Explicit policy with enabled=true opts in.
@@ -106,7 +106,7 @@ namespace {
 			),
 		),
 	);
-	$policy = $resolver->resolve( array( 'agent_id' => 2, 'modes' => array( 'chat' ) ) );
+	$policy = $resolver->resolve( array( 'agent_id' => 2, 'modes' => array( 'system' ) ) );
 	compaction_assert_same( true, $policy['enabled'], 'explicit enabled policy opts in' );
 	compaction_assert_same( 30, $policy['max_messages'], 'explicit policy max_messages is honored' );
 	compaction_assert_same( 8, $policy['recent_messages'], 'explicit policy recent_messages is honored' );
@@ -117,7 +117,7 @@ namespace {
 			'supports_conversation_compaction' => true,
 		),
 	);
-	$policy = $resolver->resolve( array( 'agent_id' => 3, 'modes' => array( 'chat' ) ) );
+	$policy = $resolver->resolve( array( 'agent_id' => 3, 'modes' => array( 'system' ) ) );
 	compaction_assert_same( true, $policy['enabled'], 'capability flag alone opts in' );
 	compaction_assert_same( 40, $policy['max_messages'], 'capability-flag opt-in uses default max_messages' );
 
@@ -128,7 +128,7 @@ namespace {
 			'conversation_compaction_policy'   => array( 'enabled' => false ),
 		),
 	);
-	$policy = $resolver->resolve( array( 'agent_id' => 4, 'modes' => array( 'chat' ) ) );
+	$policy = $resolver->resolve( array( 'agent_id' => 4, 'modes' => array( 'system' ) ) );
 	compaction_assert_same( false, $policy['enabled'], 'explicit enabled=false overrides capability flag' );
 
 	// 6. Summarizer honors an explicit provider/model pin in the policy.

@@ -39,7 +39,6 @@ class PermissionHelper {
 		'upload_media'     => 'upload_files',
 		'search_content'   => 'read',
 		'daily_memory'     => 'datamachine_daily_memory',
-		'chat'             => 'datamachine_chat',
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
 		'create_own_agent' => 'datamachine_create_own_agent',
@@ -88,7 +87,7 @@ class PermissionHelper {
 	 * Acting token ID when authenticated via agent bearer token.
 	 *
 	 * Distinguishes multiple external logins/clients authenticated to the same
-	 * agent. This is optional runtime context for integrations like chat bridges
+	 * agent. This is optional runtime context for integrations like messaging bridges
 	 * that need login-level routing on top of agent-level authorization.
 	 *
 	 * @since 0.47.1
@@ -137,7 +136,7 @@ class PermissionHelper {
 	 * after bearer-token resolution.
 	 * Describes who is calling and where this request sits in an
 	 * agent-to-agent chain. Null means no A2A caller context is set —
-	 * typically a top-of-chain request (admin UI, CLI, direct /chat call).
+	 * typically a top-of-chain request (admin UI, CLI, direct REST call).
 	 *
 	 * @since 0.71.0
 	 * @var \WP_Agent_Caller_Context|null
@@ -181,7 +180,7 @@ class PermissionHelper {
 	 *   Scope comes from the execution principal; overwrite and delete stay
 	 *   behind can_manage() inside DailyMemoryAbilities.
 	 * - web_fetch: reading a public web page as text maps to publish_posts,
-	 *   the same author level the web_fetch chat tool already requires.
+	 *   the same author level the web_fetch tool already requires.
 	 *
 	 * @since 0.37.0
 	 * @var string[]
@@ -193,7 +192,7 @@ class PermissionHelper {
 	 *
 	 * @since 0.37.0
 	 *
-	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, search_content, daily_memory, chat, use_tools, view_logs).
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, search_content, daily_memory, use_tools, view_logs, create_own_agent, web_fetch).
 	 * @return bool
 	 */
 	public static function can( string $action ): bool {

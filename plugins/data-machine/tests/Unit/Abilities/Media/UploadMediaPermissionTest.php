@@ -104,7 +104,7 @@ class UploadMediaPermissionTest extends WP_UnitTestCase {
 		$this->assertTrue( PermissionHelper::can( 'upload_media' ) );
 
 		PermissionHelper::clear_agent_context();
-		PermissionHelper::set_agent_context( 123, $owner_id, array( 'datamachine_chat' ), 456 );
+		PermissionHelper::set_agent_context( 123, $owner_id, array( 'datamachine_use_tools' ), 456 );
 		$this->assertFalse( PermissionHelper::can( 'upload_media' ) );
 	}
 

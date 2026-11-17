@@ -3,7 +3,7 @@
  * Image Generation Abilities
  *
  * Primitive ability for AI image generation via wp-ai-client.
- * All image generation — tools, CLI, REST, chat — flows through this ability.
+ * All image generation — tools, CLI, REST — flows through this ability.
  *
  * Includes optional prompt refinement: uses Data Machine's configured AI provider
  * to craft detailed image generation prompts from simple inputs. Inspired by the
@@ -301,7 +301,7 @@ class ImageGenerationAbilities {
 	/**
 	 * Refine a raw prompt using Data Machine's configured AI provider.
 	 *
-	 * Uses the same AI infrastructure as pipeline and chat agents — no external
+	 * Uses the same AI infrastructure as pipeline and system agents — no external
 	 * API keys needed beyond what's already configured in DM settings. The style
 	 * guide is user-configurable in the image generation tool settings.
 	 *

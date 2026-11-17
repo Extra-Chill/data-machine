@@ -16,7 +16,7 @@
  *
  * Extended for Extra-Chill/data-machine #3555: an explicit `system_agent_slug`
  * setting can pin system-task attribution to a fixed agent identity instead of
- * depending on the install default owner's active-agent chat preference. That
+ * depending on the install default owner's active-agent preference. That
  * setting is checked first; an unset or invalid (nonexistent agent) value falls
  * back to the existing owner/active-agent/single-agent chain unchanged.
  *
@@ -204,13 +204,6 @@ foreach ( $sources as $name => $path ) {
 		str_contains( $src, "'triggering_user_id' => \$triggering_user_id" )
 	);
 }
-
-echo "\n[11] Chat path is untouched — it still auto-provisions via resolve_or_create_agent_id\n";
-$chat_src = (string) file_get_contents( $root . '/inc/Api/Chat/ChatOrchestrator.php' );
-$assert(
-	'ChatOrchestrator calls datamachine_resolve_or_create_agent_id()',
-	str_contains( $chat_src, 'datamachine_resolve_or_create_agent_id' )
-);
 
 echo "\n[12] The resolver documents the attribution-vs-identity distinction\n";
 $plugin_src = (string) file_get_contents( $root . '/data-machine.php' );

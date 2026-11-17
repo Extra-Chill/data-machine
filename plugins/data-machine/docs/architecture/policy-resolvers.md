@@ -18,7 +18,7 @@ The shared convention is policy normalization plus explicit precedence. The clas
 
 ```php
 $tools = ( new ToolPolicyResolver() )->resolve( array(
-    'mode'       => ToolPolicyResolver::MODE_CHAT,
+    'mode'       => ToolPolicyResolver::MODE_SYSTEM,
     'agent_id'   => $agent_id,
     'deny'       => array( 'dangerous_tool' ),
     'allow_only' => array( 'safe_tool' ),
@@ -31,8 +31,6 @@ Current implementation shape:
 ```text
 ToolPolicyResolver::resolve()
     |
-    +--> chat gate via DataMachineToolAccessPolicy::passesChatGate()
-    |
     +--> ToolSourceRegistry::gather()
     |       - adjacent_handlers in pipeline mode
     |       - static_registry in every mode
@@ -40,7 +38,8 @@ ToolPolicyResolver::resolve()
     +--> WP_Agent_Tool_Policy::resolve()
     |       - mandatory Data Machine tools are preserved
     |       - generic allow/deny/category/mode filtering
-    |       - chat ability/access checks when applicable
+    |       - access-level and linked-ability permission checks
+    |         via DataMachineToolAccessPolicy
     |
     +--> apply_filters( 'datamachine_resolved_tools', ... )
 ```
@@ -64,7 +63,7 @@ Adjacent handler tools are different from optional/static tools. They come from 
 Some tools are too powerful for default exposure but are still valid in their real modes. They declare those real modes plus `requires_opt_in`.
 
 ```php
-'modes' => array( 'chat', ToolPolicyResolver::MODE_PIPELINE ),
+'modes' => array( ToolPolicyResolver::MODE_SYSTEM, ToolPolicyResolver::MODE_PIPELINE ),
 'requires_opt_in' => true,
 ```
 
@@ -91,7 +90,6 @@ Default source order:
 | Mode | Sources |
 |---|---|
 | `pipeline` | `adjacent_handlers`, then `static_registry` |
-| `chat` | `static_registry` |
 | `system` | `static_registry` |
 | custom mode | `static_registry` unless `agents_api_tool_sources_for_mode` changes it |
 
@@ -149,7 +147,7 @@ Resolution order:
 1. Explicit `deny` context list.
 2. Per-agent `agent_config.action_policy.tools[tool_name]`.
 3. Per-agent `agent_config.action_policy.categories[category]`.
-4. Tool-declared default, including per-mode keys such as `action_policy_chat`.
+4. Tool-declared default, including per-mode keys such as `action_policy_system`.
 5. Mode provider default from `DataMachineModeActionPolicyProvider`.
 6. Agents API global default.
 7. `datamachine_tool_action_policy` filter.

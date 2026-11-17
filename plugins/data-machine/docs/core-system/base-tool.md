@@ -2,18 +2,18 @@
 
 **Location**: `/inc/Engine/AI/Tools/BaseTool.php`
 **Since**: v0.14.10
-**Purpose**: Unified abstract base class for all AI tools (global and chat). Provides standardized error handling and tool registration through inheritance.
+**Purpose**: Unified abstract base class for all Data Machine AI tools. Provides standardized error handling and tool registration through inheritance.
 
 ## Overview
 
-The BaseTool class provides one registration path for tools in the unified `datamachine_tools` registry. Each tool declares the agent modes where it is visible, such as `chat` or `pipeline`.
+The BaseTool class provides one registration path for tools in the unified `datamachine_tools` registry. Each tool declares the agent modes where it is visible, such as `pipeline` or `system`.
 
 ## Key Features
 
-- **Unified Inheritance**: Single base class for all tools (global and chat)
+- **Unified Inheritance**: Single base class for all tools
 - **Mode-Aware Registration**: `registerTool()` declares where each tool is visible
 - **Unified Registry**: Registers tools through the single `datamachine_tools` filter
-- **Extensible Architecture**: Supports current and future agent modes (chat, pipeline, system, etc.)
+- **Extensible Architecture**: Supports current and future agent modes (pipeline, system, extension modes)
 - **Configuration Management**: Built-in support for tool configuration handlers
 - **Error Handling**: Standardized error response building with classification
 
@@ -28,12 +28,12 @@ Core registration method that adds a tool to the unified registry with explicit 
 **Parameters:**
 - `$toolName`: Tool identifier
 - `$toolDefinition`: Tool definition array OR callable that returns it
-- `$modes`: Agent modes where this tool is visible, such as `['chat']` or `['chat', 'pipeline']`
+- `$modes`: Agent modes where this tool is visible, such as `['system']` or `['system', 'pipeline']`. A tool with no modes never resolves.
 - `$meta`: Permission metadata, such as `ability`, `abilities`, or `access_level`
 
 **Example:**
 ```php
-$this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['chat']);
+$this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['system']);
 ```
 
 #### `registerConfigurationHandlers(string $tool_id)`
@@ -75,7 +75,7 @@ use DataMachine\Engine\AI\Tools\BaseTool;
 class ExternalLookup extends BaseTool {
 
     public function __construct() {
-        $this->registerTool('external_lookup', [$this, 'getToolDefinition'], ['chat', 'pipeline'], ['access_level' => 'admin']);
+        $this->registerTool('external_lookup', [$this, 'getToolDefinition'], ['system', 'pipeline'], ['access_level' => 'admin']);
         $this->registerConfigurationHandlers('external_lookup');
     }
 
@@ -96,18 +96,18 @@ class ExternalLookup extends BaseTool {
 }
 ```
 
-### Chat Tool
+### System Tool
 
 ```php
 <?php
-namespace DataMachine\Api\Chat\Tools;
+namespace MyPlugin\Tools;
 
 use DataMachine\Engine\AI\Tools\BaseTool;
 
 class CreatePipeline extends BaseTool {
 
     public function __construct() {
-        $this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['chat'], ['access_level' => 'admin']);
+        $this->registerTool('create_pipeline', [$this, 'getToolDefinition'], ['system'], ['access_level' => 'admin']);
     }
 
     public function getToolDefinition(): array {
@@ -159,6 +159,6 @@ The BaseTool class integrates seamlessly with the ToolManager system:
 
 ## Mode Support
 
-The class supports any mode string declared in the tool's `modes` array. Built-in modes are `chat`, `pipeline`, and `system`; third-party callers may resolve custom modes through `ToolPolicyResolver`.
+The class supports any mode string declared in the tool's `modes` array. Built-in modes are `pipeline` and `system`; third-party callers may resolve custom modes through `ToolPolicyResolver`.
 
-Only declare `pipeline` when the tool is useful inside automated pipeline AI steps. Chat affordances and tools that duplicate engine-level pipeline behavior should stay `chat`-only.
+Only declare `pipeline` when the tool is useful inside automated pipeline AI steps. Interactive affordances and tools that duplicate engine-level pipeline behavior should not declare `pipeline`.

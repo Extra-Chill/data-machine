@@ -14,7 +14,7 @@
  *
 	 * Identity model: one post = one (layer, workspace, user_id, agent_id, filename) tuple.
  * Filename is the relative path within the layer (`MEMORY.md`,
- * `daily/2026/04/17.md`, `contexts/chat.md`).
+ * `daily/2026/04/17.md`, `contexts/pipeline.md`).
  *
  * @package DataMachine\Core\FilesRepository
  * @since   next

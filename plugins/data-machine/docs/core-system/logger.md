@@ -6,14 +6,14 @@
 
 ## Overview
 
-Data Machine uses a centralized file-based logging system managed by Monolog for consistent, performant logging across all agents (Pipeline, Chat, System, CLI). Individual log files are maintained per agent type in the uploads directory.
+Data Machine uses a centralized file-based logging system managed by Monolog for consistent, performant logging across all agents (Pipeline, System, CLI). Individual log files are maintained per agent type in the uploads directory.
 
 ## Architecture
 
 **Design Pattern**: Abilities-based logging with Monolog file persistence.
 **Integration**: Custom WordPress action `datamachine_log` for decoupled logging from any component.
 **Log Storage**: Per-agent log files in uploads directory with Monolog StreamHandler.
-**Agent Context**: Automatically captures the executing agent type (Pipeline, Chat, System, CLI) and associated job/session context.
+**Agent Context**: Automatically captures the executing agent type (Pipeline, System, CLI) and associated job/session context.
 
 ## LogAbilities
 
@@ -48,10 +48,10 @@ Deletes log entries. If `$days` is provided, deletes logs older than that many d
 Components should ideally use the `datamachine_log` action to ensure loose coupling.
 
 ```php
-// Record info during a chat session
-do_action('datamachine_log', 'info', 'Chat session started', [
-    'session_id' => $session_id,
-    'agent_type' => 'chat'
+// Record info during a pipeline run
+do_action('datamachine_log', 'info', 'Pipeline step started', [
+    'job_id'     => $job_id,
+    'agent_type' => 'pipeline'
 ]);
 
 // Record system-level operation

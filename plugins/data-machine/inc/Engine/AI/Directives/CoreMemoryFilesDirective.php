@@ -55,7 +55,7 @@ class CoreMemoryFilesDirective implements DirectiveInterface {
 		$user_id           = $directory_manager->get_effective_user_id( (int) ( $payload['user_id'] ?? 0 ) );
 		$agent_id          = (int) ( $payload['agent_id'] ?? 0 );
 
-		// Auto-scaffold missing user-layer files (e.g. USER.md) on first chat.
+		// Auto-scaffold missing user-layer files (e.g. USER.md) on first use.
 		$scaffold_ability = \DataMachine\Abilities\File\ScaffoldAbilities::get_ability();
 		if ( $user_id > 0 && $scaffold_ability ) {
 			$scaffold_ability->execute(

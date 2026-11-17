@@ -336,7 +336,7 @@ $natural_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(),
 	5
 );
@@ -367,7 +367,7 @@ $satisfied_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(
 		'completion_assertions' => array(
 			'required_engine_data_keys' => array( 'final_url' ),
@@ -445,7 +445,7 @@ $nudge_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(
 		'event_sink'            => $nudge_event_sink,
 		'transcript_persister'  => $nudge_transcript,
@@ -551,7 +551,7 @@ $minimum_count_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(
 		'completion_assertions' => array(
 			'minimum_successful_tool_counts' => array( 'runtime_policy_tool' => 2 ),
@@ -1697,7 +1697,7 @@ $result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(
 		'completion_policy'    => $completion_policy,
 		'transcript_persister' => $transcript_policy,

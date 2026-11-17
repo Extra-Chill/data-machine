@@ -70,7 +70,7 @@ namespace {
 	$GLOBALS['datamachine_mode_model_options']      = array(
 		'datamachine_settings' => array(
 			'mode_models' => array(
-				'chat'     => array(
+				'agent'    => array(
 					'provider' => 'openai',
 					'model'    => 'gpt-5.5',
 				),
@@ -106,14 +106,14 @@ namespace {
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.5' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis', 'chat' ), 'chat' ),
-		'incomplete behavior mode falls through to chat model'
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis', 'agent' ), 'agent' ),
+		'incomplete behavior mode falls through to agent model'
 	);
 
 	$assert_same(
 		array( 'provider' => 'openai', 'model' => 'gpt-5.5' ),
-		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis' ), 'chat' ),
-		'chat execution surface fallback applies when behavior mode is alone'
+		PluginSettings::resolveModelForAgentModes( 7, array( 'analysis' ), 'agent' ),
+		'agent model fallback applies when behavior mode is alone'
 	);
 
 	$assert_same(

@@ -56,12 +56,6 @@ function datamachine_register_pipelines_admin_page_filters() {
 							'deps'  => array(),
 							'media' => 'all',
 						),
-
-						'datamachine-chat-sidebar'      => array(
-							'file'  => 'inc/Core/Admin/Pages/Pipelines/assets/css/chat-sidebar.css',
-							'deps'  => array(),
-							'media' => 'all',
-						),
 					),
 					'js'  => array(
 						// React bundle (only script needed)

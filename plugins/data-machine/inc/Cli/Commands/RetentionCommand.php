@@ -13,7 +13,6 @@ namespace DataMachine\Cli\Commands;
 
 use WP_CLI;
 use DataMachine\Cli\BaseCommand;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Engine\AI\System\Tasks\Retention\RetentionCleanup;
 use DataMachine\Engine\Tasks\TaskScheduler;
 
@@ -204,7 +203,6 @@ class RetentionCommand extends BaseCommand {
 
 		$this->report_action_scheduler_detail( $assoc_args );
 		$this->report_engine_data_detail();
-		$this->report_chat_session_detail( $assoc_args );
 
 		if ( ! $dry_run ) {
 			$total = array_sum( array_column( $results, 'eligible' ) );
@@ -341,32 +339,6 @@ class RetentionCommand extends BaseCommand {
 	}
 
 	/**
-	 * Report independent eligibility for the shared chat table's two policies.
-	 *
-	 * @param array $assoc_args Associative arguments (for --format).
-	 */
-	private function report_chat_session_detail( array $assoc_args ): void {
-		$breakdown = RetentionCleanup::countChatSessionBreakdown();
-		$rows      = array(
-			array(
-				'type'      => 'Human chat sessions',
-				'threshold' => $breakdown['session_retention_days'] . ' days',
-				'eligible'  => $breakdown['sessions'],
-			),
-			array(
-				'type'      => 'Pipeline transcripts',
-				'threshold' => $breakdown['transcript_retention_days'] > 0 ? $breakdown['transcript_retention_days'] . ' days' : 'disabled',
-				'eligible'  => $breakdown['transcripts'],
-			),
-		);
-
-		WP_CLI::log( '' );
-		WP_CLI::log( WP_CLI::colorize( '%BChat retention - independent eligibility%n' ) );
-		WP_CLI::log( '' );
-		$this->format_items( $rows, array( 'type', 'threshold', 'eligible' ), $assoc_args );
-	}
-
-	/**
 	 * Format a fractional-day window for human-readable CLI output.
 	 *
 	 * @param float $days Window in days (may be fractional, e.g. 0.25).
@@ -436,12 +408,6 @@ class RetentionCommand extends BaseCommand {
 				'count'     => array( RetentionCleanup::class, 'countOldFiles' ),
 			),
 			array(
-				'label'     => 'Chat sessions',
-				'task_type' => RetentionCleanup::TASK_CHAT_SESSIONS,
-				'threshold' => RetentionCleanup::chatRetentionDays() . ' days',
-				'count'     => array( RetentionCleanup::class, 'countChatSessions' ),
-			),
-			array(
 				'label'     => 'Job artifacts',
 				'task_type' => RetentionCleanup::TASK_JOB_ARTIFACTS,
 				'threshold' => RetentionCleanup::jobArtifactsMaxAgeDays() . ' days',
@@ -508,14 +474,6 @@ class RetentionCommand extends BaseCommand {
 				'retention' => round( apply_filters( 'datamachine_stale_claim_max_age', DAY_IN_SECONDS ) / 3600 ) . ' hours',
 				'filter'    => 'datamachine_stale_claim_max_age',
 			),
-			'Chat sessions'        => array(
-				'retention' => \DataMachine\Core\PluginSettings::get( 'chat_retention_days', 90 ) . ' days',
-				'filter'    => 'setting: chat_retention_days',
-			),
-			'Pipeline transcripts' => array(
-				'retention' => RetentionCleanup::transcriptRetentionDays() > 0 ? RetentionCleanup::transcriptRetentionDays() . ' days' : 'disabled',
-				'filter'    => 'option: datamachine_pipeline_transcript_retention_days',
-			),
 			'File cleanup'         => array(
 				'retention' => \DataMachine\Core\PluginSettings::get( 'file_retention_days', 7 ) . ' days',
 				'filter'    => 'setting: file_retention_days',
@@ -568,15 +526,6 @@ class RetentionCommand extends BaseCommand {
 			);
 		}
 		$sizes['_unique'] = $table_data;
-
-		// Chat sessions routes through the conversation store so swapped
-		// backends (e.g. AI Framework adapters) can opt into the metrics
-		// table or bow out by returning null.
-		$chat_metrics = ConversationStoreFactory::get()->get_storage_metrics();
-		if ( null !== $chat_metrics ) {
-			$sizes['Chat sessions']            = $chat_metrics;
-			$sizes['_unique']['Chat sessions'] = $chat_metrics;
-		}
 
 		// The packet store is files, not a table. Walking ~1M files on every
 		// `show` is too slow, so report totals recorded by the last complete

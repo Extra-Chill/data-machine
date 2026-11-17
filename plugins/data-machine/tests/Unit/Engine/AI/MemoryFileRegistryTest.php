@@ -143,9 +143,9 @@ class MemoryFileRegistryTest extends TestCase {
 	 * AND whose retrieval_policy is `always`.
 	 */
 	public function test_get_for_modes_filters_by_mode_and_policy(): void {
-		MemoryFileRegistry::register( 'CHAT_ONLY.md', 10, array(
+		MemoryFileRegistry::register( 'EDITOR_ONLY.md', 10, array(
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
-			'modes' => array( 'chat' ),
+			'modes' => array( 'editor' ),
 		) );
 		MemoryFileRegistry::register( 'PIPELINE_ONLY.md', 20, array(
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
@@ -159,13 +159,13 @@ class MemoryFileRegistryTest extends TestCase {
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
 		) );
 
-		$chat_files = MemoryFileRegistry::get_for_modes( array( 'chat' ) );
-		$this->assertArrayHasKey( 'CHAT_ONLY.md', $chat_files );
-		$this->assertArrayHasKey( 'ALL_MODES.md', $chat_files );
-		$this->assertArrayNotHasKey( 'PIPELINE_ONLY.md', $chat_files );
+		$editor_files = MemoryFileRegistry::get_for_modes( array( 'editor' ) );
+		$this->assertArrayHasKey( 'EDITOR_ONLY.md', $editor_files );
+		$this->assertArrayHasKey( 'ALL_MODES.md', $editor_files );
+		$this->assertArrayNotHasKey( 'PIPELINE_ONLY.md', $editor_files );
 		// NO_MODES.md is registered with retrieval_policy=never, so it must
 		// never appear in mode-filtered injection lists.
-		$this->assertArrayNotHasKey( 'NO_MODES.md', $chat_files );
+		$this->assertArrayNotHasKey( 'NO_MODES.md', $editor_files );
 	}
 
 	/**
@@ -176,15 +176,15 @@ class MemoryFileRegistryTest extends TestCase {
 			'layer'              => MemoryFileRegistry::LAYER_AGENT,
 			'injection_contexts' => array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ),
 		) );
-		MemoryFileRegistry::register( 'CHAT_ONLY.md', 20, array(
+		MemoryFileRegistry::register( 'EDITOR_ONLY.md', 20, array(
 			'layer' => MemoryFileRegistry::LAYER_AGENT,
-			'modes' => array( 'chat' ),
+			'modes' => array( 'editor' ),
 		) );
 
 		$files = MemoryFileRegistry::get_for_modes( array( 'analysis' ), array( MemoryFileRegistry::INJECTION_AGENT_IDENTITY ) );
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
-		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayNotHasKey( 'EDITOR_ONLY.md', $files );
 	}
 
 	/**

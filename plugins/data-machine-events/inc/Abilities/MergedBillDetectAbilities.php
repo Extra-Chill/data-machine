@@ -469,7 +469,7 @@ class MergedBillDetectAbilities {
 	/**
 	 * Load the per-post detail needed for scoring (body, performer, price).
 	 *
-	 * Kept package-private (public for the chat tool to reuse) so the
+	 * Public so the decide ability can reuse it: the
 	 * decide step can use the same extraction logic without duplicating it.
 	 *
 	 * @return array{body_text: string, performer: string, price: string, ticket_url: string}

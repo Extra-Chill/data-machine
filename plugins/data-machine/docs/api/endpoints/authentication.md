@@ -85,7 +85,6 @@ Endpoints check Data Machine permissions through `PermissionHelper`, not a singl
 | `manage_agents` | `datamachine_manage_agents` | Agent CRUD, access grants, tokens, cross-user agent files. |
 | `manage_flows` | `datamachine_manage_flows` | Flow, pipeline, jobs, analytics, internal link tools, and workflow operations. |
 | `manage_settings` | `datamachine_manage_settings` | Settings and system operations. |
-| `chat` | `datamachine_chat` | Chat access where enforced by the chat layer. |
 | `use_tools` | `datamachine_use_tools` | Tool execution where enforced by the tool layer. |
 | `view_logs` | `datamachine_view_logs` | Log access where enforced by the logs layer. |
 | `create_own_agent` | `datamachine_create_own_agent` | Self-service agent creation. |

@@ -5,10 +5,10 @@
  * declares it via allow_only / an allow-mode tool policy.
  *
  * Data Machine has no sandbox-specific knowledge: 'sandbox' is just an unknown
- * mode string that normalizes away, and the paired 'chat' mode carries tools.
+ * mode string that normalizes away, and the paired 'system' mode carries tools.
  * This test projects a real, registered ability under an opt-in tool name
  * (mirroring datamachine-code/workspace-write) and asserts the resolver
- * surfaces it for ['sandbox','chat'] + allow_only.
+ * surfaces it for ['sandbox','system'] + allow_only.
  *
  * @package DataMachine\Tests\Unit\AI\Tools
  */
@@ -36,7 +36,7 @@ class SandboxOptInToolResolutionTest extends WP_UnitTestCase {
 			'probe_optin_tool',
 			array(
 				'ability'         => 'datamachine/get-wordpress-post',
-				'modes'           => array( 'chat', 'pipeline' ),
+				'modes'           => array( 'system', 'pipeline' ),
 				'requires_opt_in' => true,
 			)
 		);
@@ -45,11 +45,11 @@ class SandboxOptInToolResolutionTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * The argument shape a sandbox run passes through ChatOrchestrator.
+	 * The argument shape a sandbox run passes to tool resolution.
 	 */
 	private function sandboxArgs(): array {
 		return array(
-			'modes'       => array( 'sandbox', 'chat' ),
+			'modes'       => array( 'sandbox', 'system' ),
 			'interactive' => true,
 			'allow_only'  => array( 'probe_optin_tool' ),
 			'tool_policy' => array(
@@ -66,7 +66,7 @@ class SandboxOptInToolResolutionTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey(
 			'probe_optin_tool',
 			$tools,
-			'Opt-in ability-projected tool must resolve for a sandbox+chat run when named via allow_only and an allow-mode tool policy.'
+			'Opt-in ability-projected tool must resolve for a sandbox+system run when named via allow_only and an allow-mode tool policy.'
 		);
 	}
 

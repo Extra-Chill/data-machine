@@ -6,7 +6,6 @@
  * Uses DateTimeParser for flexible datetime input handling.
  *
  * Provides abilities for CLI/REST/MCP consumption.
- * Chat tool wrapper lives in inc/Api/Chat/Tools/UpdateEvent.php.
  *
  * @package DataMachineEvents\Abilities
  */

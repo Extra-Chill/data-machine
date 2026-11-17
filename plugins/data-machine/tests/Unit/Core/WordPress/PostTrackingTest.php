@@ -146,13 +146,19 @@ class PostTrackingTest extends WP_UnitTestCase {
 	}
 
 	public function test_get_flow_ids_for_agent_returns_flow_ids(): void {
-		$a = $this->create_flow( 100, 'Agent 7 Flow A', 7 );
-		$b = $this->create_flow( 200, 'Agent 7 Flow B', 7 );
+		// Agent IDs far outside the auto-increment range, so flows that other
+		// MySQL test classes commit past the per-test transaction (DDL inside a
+		// test implicitly commits) can never belong to the agent under test.
+		$agent_id       = 7000007;
+		$other_agent_id = 8000008;
+
+		$a = $this->create_flow( 100, 'Agent Flow A', $agent_id );
+		$b = $this->create_flow( 200, 'Agent Flow B', $agent_id );
 		// Flows belonging to a different agent, or no agent, must not appear.
-		$this->create_flow( 100, 'Agent 8 Flow', 8 );
+		$this->create_flow( 100, 'Other Agent Flow', $other_agent_id );
 		$this->create_flow( 100, 'Unassigned Flow' );
 
-		$result = PostTracking::getFlowIdsForAgent( 7 );
+		$result = PostTracking::getFlowIdsForAgent( $agent_id );
 
 		$this->assertContains( $a, $result );
 		$this->assertContains( $b, $result );

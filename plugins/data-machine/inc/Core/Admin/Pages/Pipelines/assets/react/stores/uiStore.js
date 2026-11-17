@@ -1,8 +1,8 @@
 /**
  * UI State Store
  *
- * Zustand store for managing UI state (selected pipeline, modals, chat sidebar).
- * Persists selectedPipelineId, isChatOpen, and chatSessionId to localStorage.
+ * Zustand store for managing UI state (selected pipeline, modals).
+ * Persists selectedPipelineId to localStorage.
  */
 
 /**
@@ -37,15 +37,6 @@ export const useUIStore = create(
 			closeModal: () => {
 				set( { activeModal: null, modalData: null } );
 			},
-
-			// Chat sidebar state
-			isChatOpen: false,
-			chatSessionId: null,
-			toggleChat: () =>
-				set( ( state ) => ( { isChatOpen: ! state.isChatOpen } ) ),
-			setChatOpen: ( open ) => set( { isChatOpen: open } ),
-			setChatSessionId: ( id ) => set( { chatSessionId: id } ),
-			clearChatSession: () => set( { chatSessionId: null } ),
 
 			// Utility functions
 			getSelectedPipelineId: () => get().selectedPipelineId,
@@ -83,13 +74,15 @@ export const useUIStore = create(
 			name: 'datamachine-ui-store',
 			partialize: ( state ) => ( {
 				selectedPipelineId: state.selectedPipelineId,
-				isChatOpen: state.isChatOpen,
-				chatSessionId: state.chatSessionId,
 			} ),
 			version: 2,
+			// Only selectedPipelineId is persisted; retired chat sidebar keys
+			// from earlier versions are ignored.
 			merge: ( persistedState, currentState ) => ( {
 				...currentState,
-				...persistedState,
+				selectedPipelineId:
+					persistedState?.selectedPipelineId ??
+					currentState.selectedPipelineId,
 			} ),
 		}
 	)

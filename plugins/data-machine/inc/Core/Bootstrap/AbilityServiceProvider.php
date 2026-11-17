@@ -131,7 +131,6 @@ final class AbilityServiceProvider {
 		new \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility();
 		new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility();
 		new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility();
-		new \DataMachine\Engine\AI\Actions\ResolvePendingAction();
 
 		new \DataMachine\Abilities\Fetch\FetchFilesAbility();
 		new \DataMachine\Abilities\Email\EmailAbilities();

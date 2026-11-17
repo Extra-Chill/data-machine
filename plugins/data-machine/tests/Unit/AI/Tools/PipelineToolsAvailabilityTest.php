@@ -67,9 +67,9 @@ class PipelineToolsAvailabilityTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'web_fetch', $tools_with_disabled );
 	}
 
-	public function test_pipeline_step_tools_do_not_include_chat_tools(): void {
+	public function test_pipeline_step_disabled_tools_stay_denied(): void {
 		$pipeline_id = $this->pipelines->create_pipeline( [
-			'pipeline_name' => 'No Chat Tools Pipeline',
+			'pipeline_name' => 'Disabled Tools Pipeline',
 			'pipeline_config' => [],
 		] );
 

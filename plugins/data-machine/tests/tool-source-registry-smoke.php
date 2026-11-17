@@ -152,12 +152,12 @@ class SourcePolicyToolManager extends ToolManager {
 		return array(
 			'collision_tool'       => array( 'modes' => array( 'pipeline' ), 'origin' => 'static' ),
 			'static_pipeline_tool' => array( 'modes' => array( 'pipeline' ), 'origin' => 'static' ),
-			'chat_static_tool'     => array( 'modes' => array( 'chat' ), 'origin' => 'static', 'access_level' => 'public' ),
+			'editor_static_tool'     => array( 'modes' => array( 'editor' ), 'origin' => 'static', 'access_level' => 'public' ),
 			'system_static_tool'   => array( 'modes' => array( 'system' ), 'origin' => 'static' ),
 			'custom_static_tool'   => array( 'modes' => array( 'custom_mode' ), 'origin' => 'static' ),
 			'handler_wrapper'      => array( 'modes' => array( 'pipeline' ), '_handler_callable' => 'noop' ),
-			'disabled_static_tool' => array( 'modes' => array( 'chat' ), 'origin' => 'static', 'access_level' => 'public' ),
-			'durable_memory_tool'  => array( 'modes' => array( 'chat', 'pipeline' ), 'origin' => 'static', 'access_level' => 'public', 'requires_opt_in' => true ),
+			'disabled_static_tool' => array( 'modes' => array( 'editor' ), 'origin' => 'static', 'access_level' => 'public' ),
+			'durable_memory_tool'  => array( 'modes' => array( 'editor', 'pipeline' ), 'origin' => 'static', 'access_level' => 'public', 'requires_opt_in' => true ),
 		);
 	}
 
@@ -274,8 +274,8 @@ assert_source_equals( array( 'source_api_fetch:previous:fetch_step', 'publish_to
 
 echo "\n[2] non-pipeline modes use static registry only:\n";
 $manager = new SourcePolicyToolManager();
-assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, $manager ) ), 'chat mode gets static chat tools only', $failures, $passes );
-assert_source_equals( array(), $manager->handler_calls, 'chat mode does not query adjacent handlers', $failures, $passes );
+assert_source_equals( array( 'editor_static_tool' ), array_keys( resolve_source_tools( 'editor', $manager ) ), 'editor mode gets static editor tools only', $failures, $passes );
+assert_source_equals( array(), $manager->handler_calls, 'editor mode does not query adjacent handlers', $failures, $passes );
 assert_source_equals( array( 'system_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_SYSTEM, new SourcePolicyToolManager() ) ), 'system mode gets static system tools only', $failures, $passes );
 assert_source_equals( array( 'custom_static_tool' ), array_keys( resolve_source_tools( 'custom_mode', new SourcePolicyToolManager() ) ), 'custom mode gets static custom-mode tools only', $failures, $passes );
 
@@ -334,7 +334,7 @@ add_filter(
 	'agents_api_tool_source_order',
 	static function ( array $sources, array $context ): array {
 		$modes = is_array( $context['modes'] ?? null ) ? $context['modes'] : array();
-		if ( in_array( ToolPolicyResolver::MODE_CHAT, $modes, true ) ) {
+		if ( in_array( 'editor', $modes, true ) ) {
 			$sources[] = 'extra_source';
 		}
 		return $sources;
@@ -342,8 +342,8 @@ add_filter(
 	10,
 	2
 );
-$tools = resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() );
-assert_source_equals( array( 'chat_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
+$tools = resolve_source_tools( 'editor', new SourcePolicyToolManager() );
+assert_source_equals( array( 'editor_static_tool', 'extra_tool' ), array_keys( $tools ), 'filter appends extra source after static source', $failures, $passes );
 remove_all_filters_for_source_smoke();
 add_filter(
 	'datamachine_tool_sources',
@@ -367,7 +367,7 @@ add_filter(
 	10,
 	1
 );
-assert_source_equals( array( 'chat_static_tool' ), array_keys( resolve_source_tools( ToolPolicyResolver::MODE_CHAT, new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
+assert_source_equals( array( 'editor_static_tool' ), array_keys( resolve_source_tools( 'editor', new SourcePolicyToolManager() ) ), 'legacy Data Machine tool-source filters are no longer mirrored', $failures, $passes );
 
 echo "\n[4] multi-mode runs expose every active mode surface:\n";
 remove_all_filters_for_source_smoke();
@@ -382,7 +382,7 @@ $multimode = resolve_source_tools( array( 'pipeline', 'custom_mode' ), new Sourc
 assert_source_equals( true, isset( $multimode['custom_static_tool'] ), 'multi-mode run keeps custom mode tools', $failures, $passes );
 assert_source_equals( true, isset( $multimode['static_pipeline_tool'] ), 'multi-mode run exposes pipeline tools', $failures, $passes );
 assert_source_equals( true, isset( $multimode['collision_tool'] ), 'multi-mode run exposes static pipeline tools', $failures, $passes );
-assert_source_equals( false, isset( $multimode['chat_static_tool'] ), 'multi-mode run does not leak unrelated mode tools', $failures, $passes );
+assert_source_equals( false, isset( $multimode['editor_static_tool'] ), 'multi-mode run does not leak unrelated mode tools', $failures, $passes );
 assert_source_equals( false, isset( $multimode['handler_wrapper'] ), 'multi-mode run still skips handler wrappers in static source', $failures, $passes );
 
 echo "\n[5] requires_opt_in tools require allow_only:\n";
@@ -418,16 +418,16 @@ $multi_opt_in_no_allowlist = resolve_source_tools(
 	new SourcePolicyToolManager()
 );
 assert_source_equals( false, isset( $multi_opt_in_no_allowlist['durable_memory_tool'] ), 'multi-mode run skips opt-in pipeline tool without allowlist', $failures, $passes );
-$chat_no_inheritance = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+$editor_no_inheritance = resolve_source_tools(
+	'editor',
 	new SourcePolicyToolManager()
 );
-assert_source_equals( false, isset( $chat_no_inheritance['durable_memory_tool'] ), 'chat mode also respects requires_opt_in', $failures, $passes );
+assert_source_equals( false, isset( $editor_no_inheritance['durable_memory_tool'] ), 'editor mode also respects requires_opt_in', $failures, $passes );
 
 echo "\n[6] runtime tools are normalized and opt-in:\n";
 $GLOBALS['__datamachine_log_entries'] = array();
 $runtime_tools = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	new SourcePolicyToolManager(),
 	array(
 		'client_context' => array(
@@ -450,7 +450,7 @@ $runtime_tools = resolve_source_tools(
 assert_source_equals( false, isset( $runtime_tools['client/select_block'] ), 'runtime tool is denied by default because it requires allow_only opt-in', $failures, $passes );
 
 $ambient_context_tools = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	new SourcePolicyToolManager(),
 	array(
 		'allow_only'     => array( 'client/ambient_tool' ),
@@ -480,7 +480,7 @@ add_filter(
 	3
 );
 $adapter_context_tools = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	new SourcePolicyToolManager(),
 	array(
 		'allow_only'     => array( 'client/ambient_tool' ),
@@ -501,7 +501,7 @@ remove_all_filters_for_source_smoke();
 $GLOBALS['__datamachine_log_entries'] = array();
 
 $runtime_policy_tools = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	new SourcePolicyToolManager(),
 	array(
 		'tool_policy'    => array(
@@ -528,7 +528,7 @@ $runtime_policy_tools = resolve_source_tools(
 assert_source_equals( true, isset( $runtime_policy_tools['client/select_block'] ), 'allow-mode tool policy opts in a client runtime tool', $failures, $passes );
 
 $runtime_tools = resolve_source_tools(
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	new SourcePolicyToolManager(),
 	array(
 		'allow_only'      => array( 'client/select_block' ),
@@ -620,7 +620,7 @@ $bound_server_execution = ToolExecutor::executeTool(
 	array(),
 	$bound_server_tools,
 	array(),
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	0,
 	array( 'search_query' => 'from client context' )
 );
@@ -637,7 +637,7 @@ $payload_host_execution = ToolExecutor::executeTool(
 		),
 	),
 	array( 'job_id' => 42 ),
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	0,
 	array( 'job_id' => 7 )
 );
@@ -649,7 +649,7 @@ $unbound_server_execution = ToolExecutor::executeTool(
 	array(),
 	$bound_server_tools,
 	array(),
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	0,
 	array( 'query' => 'ambient context value' )
 );
@@ -661,7 +661,7 @@ $client_execution = ToolExecutor::executeTool(
 	array( 'client_id' => 'block-1' ),
 	$runtime_tools,
 	array(),
-	ToolPolicyResolver::MODE_CHAT,
+	'editor',
 	0,
 	array()
 );
@@ -689,7 +689,7 @@ resolve_source_tools( ToolPolicyResolver::MODE_PIPELINE, new SourcePolicyToolMan
 assert_source_equals( 0, count_source_smoke_callbacks( 'agents_api_tool_source_order' ), 'gather removes its instance-scoped source-order callback', $failures, $passes );
 assert_source_equals(
 	array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ),
-	$instance_registry->orderSourcesForContext( array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ), array( 'modes' => array( ToolPolicyResolver::MODE_CHAT ) ), new AgentsAPI\AI\Tools\WP_Agent_Tool_Source_Registry() ),
+	$instance_registry->orderSourcesForContext( array( 'static_registry', 'adjacent_handlers', 'runtime_tools' ), array( 'modes' => array( 'editor' ) ), new AgentsAPI\AI\Tools\WP_Agent_Tool_Source_Registry() ),
 	'ordering callback leaves non-Data Machine registries unchanged',
 	$failures,
 	$passes

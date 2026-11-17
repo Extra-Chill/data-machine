@@ -261,7 +261,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'listAgents' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -293,7 +293,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getActiveAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -329,7 +329,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'setActiveAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -2945,7 +2945,7 @@ class AgentAbilities {
 	/**
 	 * Find agent rows with no external references.
 	 *
-	 * Candidates are agents that own nothing: no chat sessions, no jobs, no
+	 * Candidates are agents that own nothing: no jobs, no
 	 * access grants, no on-disk agent directory, no bundle install metadata, and
 	 * they are not the install's default agent. The default agent and any agent
 	 * with files, grants, sessions, jobs, or bundle config is always spared.
@@ -3067,7 +3067,7 @@ class AgentAbilities {
 	/**
 	 * Collect agent IDs that have any reference preventing prune.
 	 *
-	 * References checked: chat sessions, jobs, access grants, on-disk directory,
+	 * References checked: jobs, access grants, on-disk directory,
 	 * bundle install config, and the install default agent.
 	 *
 	 * @param array $agents          List of agent rows.
@@ -3104,46 +3104,6 @@ class AgentAbilities {
 		}
 
 		global $wpdb;
-
-		// Chat sessions: network-wide table (current) plus legacy per-site tables.
-		if ( class_exists( \DataMachine\Core\Database\Chat\Chat::class ) ) {
-			$chat_table = $wpdb->base_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME;
-			// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			$chat_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i WHERE agent_id IS NOT NULL AND agent_id > 0', $chat_table ) );
-			// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-			foreach ( $chat_agent_ids as $id ) {
-				$referenced[ (int) $id ] = true;
-			}
-
-			// Legacy per-site tables (pre-network migration).
-			if ( function_exists( 'is_multisite' ) && is_multisite() && function_exists( 'get_sites' ) ) {
-				$blog_ids = get_sites(
-					array(
-						'fields' => 'ids',
-						'number' => 0,
-					)
-				);
-				foreach ( $blog_ids as $blog_id ) {
-					$site_prefix = $wpdb->get_blog_prefix( (int) $blog_id );
-					$site_table  = $site_prefix . \DataMachine\Core\Database\Chat\Chat::TABLE_NAME;
-					if ( $site_table === $chat_table ) {
-						continue;
-					}
-					// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-					$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $site_table ) );
-					// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-					if ( $exists !== $site_table ) {
-						continue;
-					}
-					// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-					$site_agent_ids = $wpdb->get_col( $wpdb->prepare( 'SELECT DISTINCT agent_id FROM %i WHERE agent_id IS NOT NULL AND agent_id > 0', $site_table ) );
-					// phpcs:enable WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
-					foreach ( $site_agent_ids as $id ) {
-						$referenced[ (int) $id ] = true;
-					}
-				}
-			}
-		}
 
 		// Jobs (agent_id column).
 		$jobs_repo  = new \DataMachine\Core\Database\Jobs\Jobs();

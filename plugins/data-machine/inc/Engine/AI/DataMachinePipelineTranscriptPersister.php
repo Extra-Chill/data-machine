@@ -9,13 +9,12 @@ namespace DataMachine\Engine\AI;
 
 use AgentsAPI\AI\WP_Agent_Conversation_Request;
 use AgentsAPI\AI\WP_Agent_Transcript_Persister;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Workspace\WordPressWorkspaceScope;
 
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Persists opted-in pipeline transcripts through Data Machine's transcript store.
+ * Persists opted-in pipeline transcripts through the Agents API conversation store.
  */
 class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Persister {
 
@@ -43,14 +42,27 @@ class DataMachinePipelineTranscriptPersister implements WP_Agent_Transcript_Pers
 			return '';
 		}
 
-		$store     = ConversationStoreFactory::get_transcript_store();
+		$store = TranscriptStore::get();
+		if ( null === $store ) {
+			do_action(
+				'datamachine_log',
+				'debug',
+				'AIConversationLoop: Transcript persistence skipped; no Agents API conversation store is registered',
+				array(
+					'job_id'       => $runtime_context['job_id'] ?? null,
+					'flow_step_id' => $runtime_context['flow_step_id'] ?? null,
+				)
+			);
+			return '';
+		}
+
 		$workspace = $request->workspace() ?? WordPressWorkspaceScope::current();
 
 		$user_id    = (int) ( $runtime_context['user_id'] ?? 0 );
 		$agent_id   = (int) ( $runtime_context['agent_id'] ?? 0 );
 		$agent_slug = ! empty( $runtime_context['agent_slug'] )
 			? (string) $runtime_context['agent_slug']
-			: ConversationStoreFactory::resolve_agent_slug_for_transcript( $agent_id );
+			: TranscriptStore::resolve_agent_slug( $agent_id );
 
 		$store_metadata = array(
 			'source'       => 'pipeline_transcript',

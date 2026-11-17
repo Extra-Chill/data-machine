@@ -7,7 +7,6 @@
  * missing description, or missing meta sync (block has data but post meta failed).
  *
  * Provides abilities for CLI/REST/MCP consumption.
- * Chat tool wrapper lives in inc/Api/Chat/Tools/EventHealthCheck.php.
  *
  * @package DataMachineEvents\Abilities
  */

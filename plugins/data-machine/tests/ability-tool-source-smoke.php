@@ -304,14 +304,14 @@ $helper_registered = datamachine_register_ability_tool(
 	'helper_demo',
 	array(
 		'ability' => 'demo/summarize',
-		'modes'   => array( 'chat' ),
+		'modes'   => array( 'system' ),
 	)
 );
 $helper_map_registered = datamachine_register_ability_tool(
 	'helper_map_demo',
 	array(
 		'ability_map'            => array( 'summarize' => 'demo/summarize' ),
-		'modes'                  => array( 'chat' ),
+		'modes'                  => array( 'system' ),
 		'strip_action_parameter' => true,
 		'parameters'             => array(
 			'type'       => 'object',
@@ -330,7 +330,7 @@ add_filter(
 	static function ( array $tools ): array {
 		$tools['summarize_demo'] = array(
 			'ability'              => 'demo/summarize',
-			'modes'                => array( 'chat', 'pipeline' ),
+			'modes'                => array( 'system', 'pipeline' ),
 			'action_policy'        => 'direct',
 			'requires_opt_in'      => true,
 			'client_context_bindings' => array( 'job_id' ),
@@ -382,11 +382,11 @@ add_filter(
 
 echo "\n[1] ability metadata becomes a model-facing tool declaration:\n";
 $source = new AbilityToolSource( new AbilityToolSourceSmokeManager() );
-$tools  = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
+$tools  = $source( array( 'system' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
 assert_ability_tool_source_equals( true, $helper_registered, 'helper registers a valid ability tool projection', $failures, $passes );
 assert_ability_tool_source_equals( true, $helper_map_registered, 'helper registers a non-empty ability map projection', $failures, $passes );
 assert_ability_tool_source_equals( false, $empty_map_registered, 'helper rejects an empty ability map projection', $failures, $passes );
-assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'chat mode exposes selected ability tool when opted in', $failures, $passes );
+assert_ability_tool_source_equals( true, isset( $tools['summarize_demo'] ), 'system mode exposes selected ability tool when opted in', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['helper_demo'] ), 'helper projection feeds ability tool source', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $tools['helper_map_demo'] ), 'map-only helper projection feeds ability tool source', $failures, $passes );
 assert_ability_tool_source_equals( false, isset( $tools['helper_map_demo']['execution_ability'] ), 'map-only projection omits the scalar execution marker', $failures, $passes );
@@ -408,8 +408,8 @@ assert_ability_tool_source_equals( true, isset( $with_opt_in['summarize_demo'] )
 assert_ability_tool_source_equals( false, isset( $with_opt_in['missing_ability_tool'] ), 'missing ability declaration is skipped', $failures, $passes );
 assert_ability_tool_source_equals( false, isset( $with_opt_in['disabled_ability_tool'] ), 'requires_config ability tool respects tool availability', $failures, $passes );
 assert_ability_tool_source_equals( true, isset( $with_opt_in['configured_ability_tool'] ), 'requires_config ability projection can be available without static registry entry', $failures, $passes );
-$chat_only = $source( array( 'chat' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
-assert_ability_tool_source_equals( false, isset( $chat_only['collision_tool'] ), 'mode filtering hides unrelated ability tools', $failures, $passes );
+$system_only = $source( array( 'system' ), array( 'allow_only' => array( 'summarize_demo' ) ) );
+assert_ability_tool_source_equals( false, isset( $system_only['collision_tool'] ), 'mode filtering hides unrelated ability tools', $failures, $passes );
 
 $manager_tools = ( new ToolManager() )->get_tools_for_settings_page();
 assert_ability_tool_source_equals( true, isset( $manager_tools['configured_ability_tool'] ), 'ToolManager settings data includes ability projection without static registry entry', $failures, $passes );

@@ -445,7 +445,7 @@ trait FlowHelpers {
 				}
 				// Override user_message arrives as a workflow-spec input
 				// (matches the public contract used by `flow copy` and
-				// chat tools). Convert it to a 1-entry static
+				// the create-flow ability). Convert it to a 1-entry static
 				// prompt_queue so AIStep sees it post-#1291.
 				if ( ! empty( $override['user_message'] ) ) {
 					$new_step_config = FlowStepConfigFactory::withUserMessage( $new_step_config, $override['user_message'] );

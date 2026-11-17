@@ -74,7 +74,7 @@ add_action( 'datamachine_agent_modes', function ( $modes ) {
 
 Filters the guidance text injected for a specific execution mode. Fired by `AgentModeDirective` at priority 22 in the directive chain.
 
-Built-in modes with defaults: `chat`, `pipeline`, `system`. Unknown modes receive an empty string as the default — extension filters are the sole content source for custom modes.
+Built-in modes with defaults: `pipeline`, `system`. Unknown modes receive an empty string as the default — extension filters are the sole content source for custom modes.
 
 **Since:** 0.68.0
 
@@ -182,4 +182,4 @@ Central registry for execution modes. Extensions register modes; the settings UI
 
 Injects execution-mode guidance as a runtime directive. Reads `$payload['agent_modes']` and emits one `system_text` output with composed content for every active mode.
 
-Built-in defaults for `chat`, `pipeline`, and `system` are shipped as class constants. Custom modes (e.g. `editor`, `bridge`) provide their content via the `datamachine_agent_mode_{slug}` filter and can be additive with other active modes.
+Built-in defaults for `pipeline` and `system` are shipped as class constants. Custom modes (e.g. `editor`, `bridge`) provide their content via the `datamachine_agent_mode_{slug}` filter and can be additive with other active modes.

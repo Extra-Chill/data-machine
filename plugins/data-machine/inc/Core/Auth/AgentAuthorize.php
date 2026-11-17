@@ -571,7 +571,7 @@ class AgentAuthorize {
 				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory' ),
 				'ability_allow'      => array(),
 				'ability_deny'       => array(),
-				'capabilities'       => array( 'read', 'datamachine_chat', 'datamachine_use_tools' ),
+				'capabilities'       => array( 'read', 'datamachine_use_tools' ),
 			),
 			'content_collaborator' => array(
 				'label'              => __( 'Content collaborator', 'data-machine' ),
@@ -579,7 +579,7 @@ class AgentAuthorize {
 				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory', 'datamachine-publishing', 'datamachine-media', 'datamachine-seo' ),
 				'ability_allow'      => array(),
 				'ability_deny'       => array( 'datamachine/delete-flow', 'datamachine/delete-pipeline' ),
-				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'upload_files', 'datamachine_chat', 'datamachine_use_tools' ),
+				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'upload_files', 'datamachine_use_tools' ),
 			),
 			'publisher'            => array(
 				'label'              => __( 'Publisher', 'data-machine' ),
@@ -587,7 +587,7 @@ class AgentAuthorize {
 				'ability_categories' => array( 'datamachine-agent', 'datamachine-content', 'datamachine-memory', 'datamachine-publishing', 'datamachine-media', 'datamachine-seo', 'datamachine-taxonomy' ),
 				'ability_allow'      => array(),
 				'ability_deny'       => array( 'datamachine/delete-flow', 'datamachine/delete-pipeline' ),
-				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'edit_others_posts', 'edit_published_posts', 'upload_files', 'datamachine_chat', 'datamachine_use_tools' ),
+				'capabilities'       => array( 'read', 'edit_posts', 'publish_posts', 'edit_others_posts', 'edit_published_posts', 'upload_files', 'datamachine_use_tools' ),
 			),
 			'full_owner_ceiling'   => array(
 				'label'              => __( 'Full owner ceiling', 'data-machine' ),

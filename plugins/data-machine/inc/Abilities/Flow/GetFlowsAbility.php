@@ -17,7 +17,7 @@ class GetFlowsAbility {
 	use FlowHelpers;
 
 	/**
-	 * Default per_page for REST/chat callers. CLI defaults to 0 (all).
+	 * Default per_page for REST callers. CLI defaults to 0 (all).
 	 */
 	private const DEFAULT_PER_PAGE = 20;
 

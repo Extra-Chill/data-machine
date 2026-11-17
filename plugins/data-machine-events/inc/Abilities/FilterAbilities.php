@@ -9,7 +9,7 @@
  * cross-filtering, and archive context support.
  *
  * Consumers: Filters REST controller, render.php (filter-bar visibility),
- * CLI, Chat, MCP — anything that needs to know "what filter options exist?"
+ * CLI, REST, MCP — anything that needs to know "what filter options exist?"
  *
  * @package DataMachineEvents\Abilities
  */

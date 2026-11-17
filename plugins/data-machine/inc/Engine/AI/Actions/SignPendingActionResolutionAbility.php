@@ -53,7 +53,7 @@ final class SignPendingActionResolutionAbility {
 					'input_schema'        => self::input_schema(),
 					'output_schema'       => self::output_schema(),
 					'execute_callback'    => array( self::class, 'execute' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

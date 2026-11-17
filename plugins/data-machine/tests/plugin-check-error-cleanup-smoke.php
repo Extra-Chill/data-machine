@@ -65,7 +65,7 @@ if ( '' !== $package_zip ) {
 	agents_api_smoke_assert_equals( array(), $forbidden_paths, 'candidate ZIP contains no forbidden test, stub, development-config, or nested-archive paths', $failures, $passes );
 }
 
-foreach ( array( 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/Directives/ClientContextDirective.php' ) as $guarded_file ) {
+foreach ( array( 'inc/Core/Admin/AdminRootFilters.php', 'inc/Engine/AI/TranscriptStore.php' ) as $guarded_file ) {
 	agents_api_smoke_assert_equals( true, str_contains( datamachine_plugin_check_source( $guarded_file ), "defined( 'ABSPATH' ) || exit;" ), "{$guarded_file} has a direct access guard", $failures, $passes );
 }
 

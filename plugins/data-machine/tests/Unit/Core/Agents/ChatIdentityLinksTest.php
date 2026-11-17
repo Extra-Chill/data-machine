@@ -22,6 +22,27 @@ class ChatIdentityLinksTest extends WP_UnitTestCase {
 
 		$this->user_id  = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->other_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+
+		// WP_User_Query salts its cache with the users `last_changed` value,
+		// which comes from microtime(). Some test runtimes return the
+		// same value for back-to-back calls, so a lookup cached just before
+		// a meta write can survive it. Drop cached user queries on every
+		// user-meta write so lookups always see the current links.
+		foreach ( array( 'added_user_meta', 'updated_user_meta', 'deleted_user_meta' ) as $hook ) {
+			add_action( $hook, array( $this, 'flush_user_query_cache' ) );
+		}
+	}
+
+	public function tear_down(): void {
+		foreach ( array( 'added_user_meta', 'updated_user_meta', 'deleted_user_meta' ) as $hook ) {
+			remove_action( $hook, array( $this, 'flush_user_query_cache' ) );
+		}
+
+		parent::tear_down();
+	}
+
+	public function flush_user_query_cache(): void {
+		wp_cache_flush_group( 'user-queries' );
 	}
 
 	private function stored_actors( int $user_id, string $platform = self::PLATFORM ): array {

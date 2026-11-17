@@ -73,7 +73,6 @@ class PostQueryAbilities {
 		}
 
 		$this->registerAbility();
-		$this->registerChatTool();
 		self::$registered = true;
 	}
 
@@ -204,56 +203,6 @@ class PostQueryAbilities {
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	private function registerChatTool(): void {
-		add_filter(
-			'datamachine_tools',
-			function ( $tools ) {
-				$tools['query_posts'] = array(
-					'_callable' => array( $this, 'getQueryPostsTool' ),
-					'modes'     => array( 'chat' ),
-					'ability'   => 'datamachine/query-posts',
-				);
-				return $tools;
-			}
-		);
-	}
-
-	public function getQueryPostsTool(): array {
-		return array(
-			'class'       => self::class,
-			'method'      => 'handleQueryPosts',
-			'description' => 'Find posts created by Data Machine. Filter by handler slug, flow ID, or pipeline ID. Returns post ID, title, handler, flow ID, pipeline ID, and post date.',
-			'parameters'  => array(
-				'filter_by'    => array(
-					'type'        => 'string',
-					'required'    => true,
-					'enum'        => array( 'handler', 'flow', 'pipeline' ),
-					'description' => 'What to filter by: "handler" (slug), "flow" (ID), or "pipeline" (ID)',
-				),
-				'filter_value' => array(
-					'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'integer' ) ),
-					'required'    => true,
-					'description' => 'Handler slug (e.g., "universal_web_scraper"), flow ID, or pipeline ID',
-				),
-				'post_type'    => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Post type to query (default: "any")',
-				),
-				'post_status'  => array(
-					'type'        => 'string',
-					'required'    => false,
-					'description' => 'Post status (default: "publish")',
-				),
-				'per_page'     => array(
-					'type'        => 'integer',
-					'required'    => false,
-					'description' => 'Number of posts to return (default: 20)',
-				),
-			),
-		);
 	}
 
 	/**
@@ -495,25 +444,6 @@ class PostQueryAbilities {
 			'total'    => $query->found_posts,
 			'per_page' => $per_page,
 			'offset'   => $offset,
-		);
-	}
-
-	public function handleQueryPosts( array $parameters, array $tool_def = array() ): array {
-		$tool_def;
-		$result = $this->executeQueryPosts(
-			array(
-				'filter_by'    => $parameters['filter_by'] ?? '',
-				'filter_value' => $parameters['filter_value'] ?? '',
-				'post_type'    => $parameters['post_type'] ?? 'any',
-				'post_status'  => $parameters['post_status'] ?? 'publish',
-				'per_page'     => $parameters['per_page'] ?? self::DEFAULT_PER_PAGE,
-			)
-		);
-
-		return array(
-			'success'   => true,
-			'data'      => $result,
-			'tool_name' => 'query_posts',
 		);
 	}
 

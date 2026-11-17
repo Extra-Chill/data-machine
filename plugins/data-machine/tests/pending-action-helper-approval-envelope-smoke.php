@@ -175,7 +175,7 @@ datamachine_pending_action_helper_assert( ! array_key_exists( 'grants', $payload
 
 datamachine_pending_action_helper_assert( 'data-machine' === $result['metadata']['adapter'], 'Data Machine is identified as adapter metadata.' );
 datamachine_pending_action_helper_assert( 'wiki_upsert' === $result['metadata']['datamachine']['kind'], 'Data Machine handler kind lives in adapter metadata.' );
-datamachine_pending_action_helper_assert( 'resolve_pending_action' === $result['metadata']['datamachine']['resolve_with'], 'Data Machine resolver name lives in adapter metadata.' );
+datamachine_pending_action_helper_assert( 'agents/resolve-pending-action' === $result['metadata']['datamachine']['resolve_with'], 'Data Machine resolver name lives in adapter metadata.' );
 
 $stored = PendingActionStore::get( $result['action_id'] );
 datamachine_pending_action_helper_assert( is_array( $stored ), 'Pending action is still stored through the existing store.' );

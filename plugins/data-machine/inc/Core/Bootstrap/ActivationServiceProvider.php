@@ -114,7 +114,6 @@ final class ActivationServiceProvider {
 		as_unschedule_all_actions( 'datamachine_cleanup_processed_items', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_as_actions', array(), 'datamachine-maintenance' );
 		as_unschedule_all_actions( 'datamachine_cleanup_old_files', array(), 'datamachine-files' );
-		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions', array(), 'datamachine-chat' );
 	}
 
 	/**
@@ -263,7 +262,6 @@ final class ActivationServiceProvider {
 			\DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::create_table();
 			\DataMachine\Core\Database\RunMetadata\RunMetadata::create_table();
 
-			\DataMachine\Core\Database\Chat\Chat::create_table();
 			\DataMachine\Engine\AI\Actions\PendingActionStore::create_table();
 		} catch ( \Throwable $error ) {
 			do_action( 'datamachine_log', 'error', 'Data Machine schema convergence threw an exception', array( 'error' => $error->getMessage() ) );
@@ -370,10 +368,6 @@ final class ActivationServiceProvider {
 				'columns' => array( 'metadata_id', 'job_id', 'metadata_path', 'metadata_value', 'value_type', 'created_at', 'updated_at' ),
 				'indexes' => array( 'PRIMARY', 'job_path', 'path_value', 'job_id' ),
 			),
-			$network . 'datamachine_chat_sessions' => array(
-				'columns' => array( 'session_id', 'workspace_type', 'workspace_id', 'user_id', 'owner_type', 'owner_key_hash', 'owner_label', 'agent_id', 'title', 'messages', 'metadata', 'provider', 'model', 'provider_response_id', 'mode', 'created_at', 'updated_at', 'last_read_at', 'expires_at', 'transcript_lock_token', 'transcript_lock_expires_at' ),
-				'indexes' => array( 'PRIMARY', 'workspace', 'user_id', 'owner', 'agent_id', 'mode', 'user_mode', 'created_at', 'updated_at', 'expires_at', 'transcript_lock_expires_at' ),
-			),
 			$site . 'datamachine_pending_actions'  => array(
 				'columns' => array( 'action_id', 'kind', 'summary', 'preview_data', 'apply_input', 'agent_id', 'agent', 'workspace_type', 'workspace_id', 'created_by', 'creator', 'context', 'metadata', 'status', 'created_at', 'expires_at', 'resolved_at', 'resolved_by', 'resolver', 'resolution_result', 'resolution_error', 'resolution_metadata', 'receipt_nonce', 'receipt_consumed_at', 'receipt_operation', 'receipt_evidence' ),
 				'indexes' => array( 'PRIMARY', 'workspace', 'status', 'kind', 'agent_id', 'agent', 'created_by', 'creator', 'resolver', 'expires_at', 'created_at' ),
@@ -382,15 +376,21 @@ final class ActivationServiceProvider {
 	}
 
 	/**
+	 * Role capability granted by older releases for the removed chat mode.
+	 * Stripped from roles on upgrade and on uninstall.
+	 */
+	private const RETIRED_CHAT_CAPABILITY = 'datamachine_chat';
+
+	/**
 	 * Register Data Machine capabilities on roles.
 	 */
 	public static function register_capabilities(): void {
 		$role_capabilities = array(
-			'administrator' => array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
-			'editor'        => array( 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
-			'author'        => array( 'datamachine_chat', 'datamachine_use_tools', 'datamachine_create_own_agent' ),
-			'contributor'   => array( 'datamachine_chat', 'datamachine_create_own_agent' ),
-			'subscriber'    => array( 'datamachine_chat', 'datamachine_create_own_agent' ),
+			'administrator' => array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
+			'editor'        => array( 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' ),
+			'author'        => array( 'datamachine_use_tools', 'datamachine_create_own_agent' ),
+			'contributor'   => array( 'datamachine_create_own_agent' ),
+			'subscriber'    => array( 'datamachine_create_own_agent' ),
 		);
 
 		foreach ( $role_capabilities as $role_name => $capabilities ) {
@@ -402,6 +402,9 @@ final class ActivationServiceProvider {
 			foreach ( $capabilities as $capability ) {
 				$role->add_cap( $capability );
 			}
+
+			// Retired with the Data Machine chat mode (Extra-Chill/data-machine#3973).
+			$role->remove_cap( self::RETIRED_CHAT_CAPABILITY );
 		}
 	}
 
@@ -409,7 +412,7 @@ final class ActivationServiceProvider {
 	 * Remove Data Machine capabilities from roles.
 	 */
 	public static function remove_capabilities(): void {
-		$capabilities = array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_chat', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent' );
+		$capabilities = array( 'datamachine_manage_agents', 'datamachine_manage_flows', 'datamachine_manage_settings', 'datamachine_view_analytics', 'datamachine_render_images', 'datamachine_daily_memory', 'datamachine_use_tools', 'datamachine_view_logs', 'datamachine_create_own_agent', self::RETIRED_CHAT_CAPABILITY );
 
 		foreach ( array( 'administrator', 'editor', 'author', 'contributor', 'subscriber' ) as $role_name ) {
 			$role = get_role( $role_name );

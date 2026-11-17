@@ -171,7 +171,7 @@ class CallerContextTest extends WP_UnitTestCase {
 		add_filter( 'pre_http_request', $filter, 10, 3 );
 
 		try {
-			\DataMachine\Core\Auth\RemoteAgentClient::request( 'remote.example', 'sarai', 'POST', '/wp-json/datamachine/v1/chat' );
+			\DataMachine\Core\Auth\RemoteAgentClient::request( 'remote.example', 'sarai', 'POST', '/wp-json/datamachine/v1/trigger/42' );
 		} finally {
 			remove_filter( 'pre_http_request', $filter, 10 );
 			delete_option( \DataMachine\Core\Auth\AgentAuthCallback::OPTION_KEY );

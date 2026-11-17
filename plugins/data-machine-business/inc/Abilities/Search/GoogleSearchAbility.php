@@ -4,7 +4,7 @@
  *
  * Exposes Google Custom Search as datamachine/google-search so REST and MCP
  * agents can run read-only web searches with the site's configured key. The
- * google_search chat/pipeline tool delegates here, so both share one
+ * google_search pipeline tool delegates here, so both share one
  * implementation and one not-configured error.
  *
  * @package DataMachineBusiness\Abilities\Search

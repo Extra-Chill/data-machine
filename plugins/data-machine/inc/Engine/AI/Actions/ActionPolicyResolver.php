@@ -23,7 +23,7 @@
  * 2. Per-agent `action_policy.tools[<tool_name>]` override.
  * 3. Per-agent `action_policy.categories[<category>]` override.
  * 4. Tool-declared default (`tool_def['action_policy']`) when present.
- * 5. Mode preset (chat defaults publish-family to 'preview', pipeline
+ * 5. Mode preset (`action_policy_<mode>` on the tool declaration; pipeline
  *    and system default to 'direct' since there is no user to confirm).
  * 6. Global default: 'direct'.
  * 7. `datamachine_tool_action_policy` filter (always runs last).
@@ -45,7 +45,6 @@ class ActionPolicyResolver {
 	 * MemoryPolicyResolver for consistency.
 	 */
 	public const MODE_PIPELINE = 'pipeline';
-	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
 	private \WP_Agent_Action_Policy_Resolver $resolver;
@@ -66,7 +65,7 @@ class ActionPolicyResolver {
 	 *     Resolution context.
 	 *
 	 *     @type string     $tool_name      Required. The tool being invoked.
-	 *     @type string     $mode           Required. Agent mode (chat/pipeline/system).
+	 *     @type string     $mode           Required. Agent mode (pipeline/system).
 	 *     @type array      $tool_def       Optional. Tool definition (to read `action_policy` default).
 	 *     @type array      $input          Optional. Normalized invocation input.
 	 *     @type int|null   $agent_id       Optional. Acting agent ID for per-agent overrides.
@@ -80,7 +79,7 @@ class ActionPolicyResolver {
 		$context          = $this->withAgentConfig( $context );
 		$policy           = $this->resolver->resolve_for_tool( $context );
 
-		return $this->applyDataMachineFilter( $policy, (string) ( $context['tool_name'] ?? '' ), (string) ( $context['mode'] ?? self::MODE_CHAT ), $context );
+		return $this->applyDataMachineFilter( $policy, (string) ( $context['tool_name'] ?? '' ), (string) ( $context['mode'] ?? self::MODE_SYSTEM ), $context );
 	}
 
 	/**
@@ -173,7 +172,6 @@ class ActionPolicyResolver {
 	 */
 	public static function getModes(): array {
 		return array(
-			self::MODE_CHAT     => 'Admin chat session (users present, preview-friendly)',
 			self::MODE_PIPELINE => 'Pipeline step execution (no user, direct-only)',
 			self::MODE_SYSTEM   => 'System task execution (no user, direct-only)',
 		);

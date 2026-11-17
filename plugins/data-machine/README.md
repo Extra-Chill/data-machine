@@ -4,7 +4,7 @@ Agentic workflow automation for WordPress.
 
 [![Try Data Machine in WordPress Playground](https://img.shields.io/badge/Try_Data_Machine_in-WordPress_Playground-3858e9?style=for-the-badge&logo=wordpress&logoColor=white)](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/Extra-Chill/data-machine/main/plugins/data-machine/blueprints/playground.json)
 
-Click the badge to open a fresh Data Machine in a browser-only WordPress instance. The Playground boots WordPress, installs Data Machine plus its substrate (Agents API and the WordPress AI Provider for OpenAI), and drops you into the Data Machine admin. Add your own OpenAI key in Settings to start chatting with an agent or running a pipeline. Nothing persists once the tab closes.
+Click the badge to open a fresh Data Machine in a browser-only WordPress instance. The Playground boots WordPress, installs Data Machine plus its substrate (Agents API and the WordPress AI Provider for OpenAI), and drops you into the Data Machine admin. Add your own OpenAI key in Settings to start running a pipeline. Nothing persists once the tab closes.
 
 ## What It Does
 
@@ -57,7 +57,7 @@ Long-running automation uses small repeatable units instead of one unbounded req
 | **Cycle** | One bounded scheduler/engine pass. It claims due work, advances jobs, and exits. |
 | **Drain** | CLI/operator command that repeatedly runs due work until the queue is empty or a budget is reached. |
 | **Worker** | Runtime wrapper for ongoing background processing. It runs cycles under configured limits. |
-| **Retention** | Cleanup tasks for old logs, jobs, processed items, files, Action Scheduler rows, stale claims, and chat sessions. |
+| **Retention** | Cleanup tasks for old logs, jobs, processed items, files, Action Scheduler rows, and stale claims. |
 
 Useful entry points: `wp datamachine cycle`, `wp datamachine drain`, `wp datamachine worker`, `wp datamachine jobs summary`, and `wp datamachine retention`.
 
@@ -68,7 +68,6 @@ One agent, three operational modes — same identity and memory, different guida
 | Mode | Purpose | Tools |
 |---------|---------|-------|
 | **Pipeline** | Automated workflow execution | Handler-specific tools scoped to the current step |
-| **Chat** | Conversational interface in wp-admin | 30+ management tools (flows, pipelines, jobs, logs, memory, content) |
 | **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions, retention (GitHub issues in data-machine-code extension) |
 
 Built-in mode guidance is injected by `AgentModeDirective` at runtime and extensions can register more modes through `AgentModeRegistry`. Configure AI provider and model per mode in Settings. Each mode falls back to the global default if no override is set.
@@ -94,7 +93,7 @@ Daily memory files are append-only history and are also system-task artifacts: `
 
 Tool access is resolved at runtime by policy classes instead of hardcoded allow-lists. Data Machine combines tool sources, mode policy, handler adjacency, memory policy, and action policy to decide what an agent can see and what requires approval.
 
-When an operation needs human approval, it becomes a **pending action** backed by Agents API approval vocabulary and Data Machine storage/resolution adapters. Pending actions can be inspected and resolved through REST, abilities, chat tools, and CLI (`wp datamachine pending-actions`).
+When an operation needs human approval, it becomes a **pending action** backed by Agents API approval vocabulary and Data Machine storage/resolution adapters. Pending actions can be inspected and resolved through REST, abilities, tools, and CLI (`wp datamachine pending-actions`).
 
 ### Abilities API
 
@@ -151,7 +150,7 @@ Pipelines are built from **step types**. Some use pluggable **handlers** — int
 | **Webhook Gate** | Pause pipeline until an external webhook callback fires |
 | **System Task** | Background tasks (alt text, image generation, daily memory, etc.) |
 
-Agent Ping is outbound-only. It hands context to another agent or system and supports confirmation/callback REST routes; inbound starts use flow webhooks or chat/API surfaces.
+Agent Ping is outbound-only. It hands context to another agent or system and supports confirmation/callback REST routes; inbound starts use flow webhooks or API surfaces.
 
 ## Media Primitives
 
@@ -213,7 +212,6 @@ wp datamachine alt-text          # AI alt text generation
 wp datamachine auth              # OAuth/provider auth management
 wp datamachine batch             # Batch operations
 wp datamachine blocks            # Gutenberg block operations
-wp datamachine chat              # Chat agent interface
 wp datamachine cycle             # Run one bounded scheduler/engine cycle
 wp datamachine drain             # Drain due work until empty or budgeted
 wp datamachine email             # Site email read/send/reply operations
@@ -251,7 +249,6 @@ Full REST API under `datamachine/v1`:
 - `GET|POST /flows`, `GET|PATCH|DELETE /flows/{id}` — Flow CRUD, pause/resume, duplicate, queue, config, webhooks
 - `GET|POST|DELETE /jobs`, `GET /jobs/{id}` — Job management, cleanup, monitoring, undo-capable artifacts
 - `GET|POST|DELETE /logs` — Log search, metadata, and cleanup
-- `GET|POST /chat`, `POST /chat/continue`, `GET|DELETE /chat/{session_id}` — Chat and sessions
 - `GET|POST|DELETE /files`, `/files/agent`, `/files/agent/daily/...` — Flow files, memory files, daily memory artifacts
 - `GET|POST|PATCH|DELETE /agents...` — Agent CRUD, current agent, access, tokens
 - `POST /agent-ping/confirm`, `POST /agent-ping/callback/{callback_id}` — Agent Ping confirmation/callbacks
@@ -259,7 +256,7 @@ Full REST API under `datamachine/v1`:
 - `GET|POST /auth/*`, `/email/*`, `/users/*`, `/analytics/*`, `/links/*`; `DELETE /processed-items` — Supporting product surfaces
 - `GET /actions/pending`, `GET /actions/pending/{id}`, `POST /actions/resolve` — Approval-gated pending actions
 
-Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-json/datamachine/v1` are the Data Machine product API, not the generic Agents API substrate.
+Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-json/datamachine/v1` are the Data Machine product API, not the generic Agents API substrate. Chat sessions and the chat REST surface are owned by Agents API (`agents/chat`) and host chat runtimes, not Data Machine.
 
 ## Extensions
 
@@ -289,13 +286,13 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 
 ## AI Providers
 
-Configure any provider registered with `wp-ai-client`, then choose a global default per site with optional per-mode overrides for pipeline, chat, and system. Data Machine reads provider/model metadata from the wp-ai-client provider registry and Connectors-shaped settings via `WpAiClientProviderAdmin`; runtime dispatch goes through `RequestBuilder` and has no fallback to `chubes_ai_request` or `ai-http-client`.
+Configure any provider registered with `wp-ai-client`, then choose a global default per site with optional per-mode overrides for pipeline, system, and the default agent model (`agent`). Data Machine reads provider/model metadata from the wp-ai-client provider registry and Connectors-shaped settings via `WpAiClientProviderAdmin`; runtime dispatch goes through `RequestBuilder` and has no fallback to `chubes_ai_request` or `ai-http-client`.
 
 ## Runtime Architecture
 
 Data Machine's runtime seam uses Agents API vocabulary but keeps Data Machine product policy in Data Machine:
 
-- `datamachine_run_conversation()` is the Data Machine entry point for chat and pipeline AI turns.
+- `datamachine_run_conversation()` is the Data Machine entry point for pipeline and system AI turns.
 - `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic turn sequencing, budgets, transcript persistence, locks, event callbacks, and normalized result fields.
 - Data Machine's turn runner owns request assembly, wp-ai-client dispatch, Data Machine tool execution, duplicate-call protection, tool runtime rules, completion assertions, job artifacts, and product logging.
 - `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; the old `success/data/error` array shape is historical.

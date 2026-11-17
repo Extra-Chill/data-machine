@@ -285,11 +285,9 @@ agent is acting during *this specific* invocation:
 
 | Flow                     | `calling_user_id` value                        |
 |--------------------------|------------------------------------------------|
-| Chat session             | the chat caller's user ID                      |
+| Host chat runtime        | the chat caller's user ID                      |
 | Pipeline execution       | `0` (no human caller; scheduled work)          |
 | System task              | `0` (alt-text, meta, internal-linking, etc.)   |
-| REST chat with bearer    | the bearer-owner user ID                       |
-| processPing health check | `0` (admin user_id borrowed for storage only)  |
 
 Tools and directives read it with the consumer helper:
 

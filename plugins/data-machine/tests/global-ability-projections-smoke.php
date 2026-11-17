@@ -104,7 +104,7 @@ foreach ( $migrated as $tool_name => $ability_slug ) {
 
 	assert_global_projection( ! empty( $projection ), "{$tool_name} registers an ability projection", $failures, $passes );
 	assert_global_projection( $ability_slug === $linked, "{$tool_name} projection links {$ability_slug}", $failures, $passes );
-	assert_global_projection( array( 'chat', 'pipeline' ) === ( $projection['modes'] ?? array() ), "{$tool_name} preserves chat and pipeline modes", $failures, $passes );
+	assert_global_projection( array( 'pipeline' ) === ( $projection['modes'] ?? array() ), "{$tool_name} remains pipeline-only", $failures, $passes );
 	assert_global_projection( ! isset( $projection['class'] ), "{$tool_name} no longer declares a class handler", $failures, $passes );
 	assert_global_projection( ! isset( $projection['method'] ), "{$tool_name} no longer declares a method handler", $failures, $passes );
 	assert_global_projection( 'object' === ( $projection['parameters']['type'] ?? '' ), "{$tool_name} preserves its object parameter schema", $failures, $passes );
@@ -121,9 +121,9 @@ assert_global_projection( false !== strpos( $image_source, "registerConfiguratio
 $provider_source = read_global_tool_source( 'inc/Core/Bootstrap/RuntimeServiceProvider.php', $root );
 $image_position  = strpos( $provider_source, 'new \\DataMachine\\Engine\\AI\\Configuration\\ImageGenerationSettings();' );
 $register_position = strpos( $provider_source, '\\datamachine_register_global_ability_tools();' );
-$queue_position    = strpos( $provider_source, 'new \\DataMachine\\Engine\\AI\\Tools\\Global\\QueueValidator();' );
+$webfetch_position = strpos( $provider_source, 'new \\DataMachine\\Engine\\AI\\Tools\\Global\\WebFetch();' );
 assert_global_projection(
-	false !== $image_position && false !== $register_position && false !== $queue_position && $image_position < $register_position && $register_position < $queue_position,
+	false !== $image_position && false !== $register_position && false !== $webfetch_position && $image_position < $register_position && $register_position < $webfetch_position,
 	'full runtime invokes the registrar at the former projected-tool registration point',
 	$failures,
 	$passes
@@ -132,7 +132,6 @@ assert_global_projection(
 $exceptions = array(
 	'inc/Engine/AI/Tools/Global/AgentMemory.php'       => 'agent_memory',
 	'inc/Engine/AI/Tools/Global/AgentDailyMemory.php'  => 'agent_daily_memory',
-	'inc/Engine/AI/Tools/Global/QueueValidator.php'    => 'queue_validator',
 	'inc/Engine/AI/Tools/Global/WebFetch.php'          => 'web_fetch',
 );
 

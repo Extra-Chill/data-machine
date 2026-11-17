@@ -3,7 +3,7 @@
  * Event Scraper Test Ability
  *
  * Tests universal web scraper compatibility with a target URL.
- * Provides structured JSON output via WordPress Abilities API and Chat Tools.
+ * Provides structured JSON output via the WordPress Abilities API.
  *
  * Qualify-path divergence (issue #265, fixed in #266):
  * -----------------------------------------------------
@@ -687,7 +687,7 @@ class EventScraperTest {
 	 * Execute the scraper once through core's generic test-handler ability.
 	 *
 	 * The caller of test-event-scraper has already passed this ability's own
-	 * manage_options gate (or is trusted server code: CLI, chat tool, tests).
+	 * manage_options gate (or is trusted server code: CLI, tests).
 	 * The nested call runs through the Abilities API so test-handler input and
 	 * output validation still apply, inside PermissionHelper::run_as_system()
 	 * so its Data Machine permission check does not re-authorize a delegation

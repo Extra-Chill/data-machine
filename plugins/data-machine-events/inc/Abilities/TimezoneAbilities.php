@@ -3,7 +3,7 @@
  * Timezone Abilities
  *
  * Finds events with missing venue timezone and fixes them with geocoding support.
- * Provides abilities for CLI/REST/MCP and AI tools for chat.
+ * Provides abilities for CLI/REST/MCP.
  *
  * @package DataMachineEvents\Abilities
  */

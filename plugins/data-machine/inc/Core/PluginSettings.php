@@ -287,7 +287,7 @@ class PluginSettings {
 	 * 4. Network global default_provider / default_model
 	 * 5. Empty strings
 	 *
-	 * @param string $mode Execution mode: 'chat', 'pipeline', 'system'.
+	 * @param string $mode Execution mode: 'agent', 'pipeline', 'system'.
 	 * @return array{ provider: string, model: string }
 	 */
 	public static function getModelForMode( string $mode ): array {
@@ -384,7 +384,7 @@ class PluginSettings {
 	 * Resolve provider/model for the first complete mode in an ordered mode set.
 	 *
 	 * Behavioral modes can intentionally omit model configuration and compose with
-	 * an execution surface mode such as chat or pipeline. Treat provider/model as
+	 * an execution surface mode such as agent, pipeline, or system. Treat provider/model as
 	 * an atomic pair so a provider from one mode is never combined with a model
 	 * from another mode.
 	 *

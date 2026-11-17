@@ -12,8 +12,6 @@ defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Abilities\Engine\PipelineBatchScheduler;
 use DataMachine\Core\Database\BaseRepository;
-use DataMachine\Core\Database\Chat\Chat;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Logs\LogRepository;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
@@ -37,7 +35,6 @@ class RetentionCleanup {
 	public const TASK_AS_ACTIONS      = 'retention_as_actions';
 	public const TASK_STALE_CLAIMS    = 'retention_stale_claims';
 	public const TASK_FILES           = 'retention_files';
-	public const TASK_CHAT_SESSIONS   = 'retention_chat_sessions';
 	public const TASK_JOB_ARTIFACTS   = 'retention_job_artifacts';
 	public const TASK_BATCH_WORKLISTS = 'retention_batch_worklists';
 	public const TASK_RECLAIM_SPACE   = 'retention_reclaim_space';
@@ -794,14 +791,6 @@ class RetentionCleanup {
 
 	public static function fileRetentionDays(): int {
 		return self::positiveDays( PluginSettings::get( 'file_retention_days', 7 ), 7 );
-	}
-
-	public static function chatRetentionDays(): int {
-		return self::positiveDays( PluginSettings::get( 'chat_retention_days', 90 ), 90 );
-	}
-
-	public static function transcriptRetentionDays(): int {
-		return (int) get_option( 'datamachine_pipeline_transcript_retention_days', 30 );
 	}
 
 	public static function jobArtifactsMaxAgeDays(): int {
@@ -2476,83 +2465,6 @@ class RetentionCleanup {
 	public static function jobArtifactsCleanupMaxRuntimeSeconds(): int {
 		$seconds = (int) apply_filters( 'datamachine_job_artifacts_cleanup_max_runtime_seconds', 60 );
 		return $seconds > 0 ? $seconds : 60;
-	}
-
-	public static function countChatSessions(): int {
-		$breakdown = self::countChatSessionBreakdown();
-		return $breakdown['sessions'] + $breakdown['transcripts'];
-	}
-
-	/**
-	 * Count human sessions and pipeline transcripts against independent TTLs.
-	 *
-	 * @return array{sessions:int,transcripts:int,session_retention_days:int,transcript_retention_days:int}
-	 */
-	public static function countChatSessionBreakdown(): array {
-		$chat_db = ConversationStoreFactory::get();
-
-		$retention_days            = self::chatRetentionDays();
-		$transcript_retention_days = self::transcriptRetentionDays();
-
-		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
-			return array(
-				'sessions'                  => 0,
-				'transcripts'               => 0,
-				'session_retention_days'    => $retention_days,
-				'transcript_retention_days' => $transcript_retention_days,
-			);
-		}
-
-		$transcript_count = $chat_db->count_old_pipeline_transcripts( $transcript_retention_days );
-
-		return array(
-			'sessions'                  => $chat_db->count_old_sessions( $retention_days, true ),
-			'transcripts'               => $transcript_count,
-			'session_retention_days'    => $retention_days,
-			'transcript_retention_days' => $transcript_retention_days,
-		);
-	}
-
-	public static function cleanupChatSessions(): array {
-		$chat_db = ConversationStoreFactory::get();
-
-		if ( $chat_db instanceof Chat && ! Chat::table_exists() ) {
-			return array(
-				'deleted'             => 0,
-				'sessions_deleted'    => 0,
-				'transcripts_deleted' => 0,
-			);
-		}
-
-		$retention_days            = self::chatRetentionDays();
-		$transcript_retention_days = self::transcriptRetentionDays();
-		$transcripts_deleted       = 0;
-
-		if ( $transcript_retention_days > 0 ) {
-			$transcripts_deleted = $chat_db->cleanup_pipeline_transcripts( $transcript_retention_days );
-		}
-
-		$sessions_deleted = $chat_db->cleanup_old_sessions( $retention_days );
-
-		do_action(
-			'datamachine_log',
-			'debug',
-			'Chat sessions cleanup completed',
-			array(
-				'sessions_deleted'          => $sessions_deleted,
-				'retention_days'            => $retention_days,
-				'transcripts_deleted'       => $transcripts_deleted,
-				'transcript_retention_days' => $transcript_retention_days,
-			)
-		);
-
-		return array(
-			'deleted'                   => (int) $sessions_deleted + (int) $transcripts_deleted,
-			'sessions_deleted'          => (int) $sessions_deleted,
-			'transcripts_deleted'       => (int) $transcripts_deleted,
-			'retention_days'            => $retention_days,
-			'transcript_retention_days' => $transcript_retention_days,
-		);
 	}
 
 	private static function positiveDays( mixed $value, int $fallback ): int {

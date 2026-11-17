@@ -45,57 +45,9 @@ class SettingsAbilities {
 			$this->registerSaveToolConfig();
 			$this->registerGetHandlerDefaults();
 			$this->registerUpdateHandlerDefaults();
-			$this->registerGeneratePingSecret();
 		};
 
 		\DataMachine\Abilities\AbilityRegistration::on_abilities_api_init( $register_callback );
-	}
-
-	private function registerGeneratePingSecret(): void {
-		wp_register_ability(
-			'datamachine/generate-ping-secret',
-			array(
-				'label'               => __( 'Generate Ping Secret', 'data-machine' ),
-				'description'         => __( 'Generate and store a new agent ping secret, returning it once.', 'data-machine' ),
-				'category'            => 'datamachine-settings',
-				'input_schema'        => array(
-					'type'       => 'object',
-					'properties' => array(),
-				),
-				'output_schema'       => array(
-					'type'       => 'object',
-					'properties' => array(
-						'success' => array( 'type' => 'boolean' ),
-						'secret'  => array( 'type' => 'string' ),
-					),
-				),
-				'execute_callback'    => array( $this, 'executeGeneratePingSecret' ),
-				'permission_callback' => array( $this, 'checkPermission' ),
-				'meta'                => array( 'show_in_rest' => true ),
-			)
-		);
-	}
-
-	/**
-	 * Execute generate-ping-secret ability.
-	 *
-	 * Owns the behavior formerly exposed by the datamachine/v1
-	 * /settings/generate-ping-secret wrapper route (see #3456).
-	 *
-	 * @param array $input Input parameters (unused).
-	 * @return array Result with the new secret.
-	 */
-	public function executeGeneratePingSecret( array $input ): array {
-		unset( $input );
-
-		$secret = wp_generate_password( 32, false );
-
-		PluginSettings::update( array( 'chat_ping_secret' => $secret ) );
-
-		return array(
-			'success' => true,
-			'secret'  => $secret,
-		);
 	}
 
 	private function registerGetSettings(): void {
@@ -139,8 +91,6 @@ class SettingsAbilities {
 					'properties' => array(
 						'cleanup_job_data_on_failure'    => array( 'type' => 'boolean' ),
 						'file_retention_days'            => array( 'type' => 'integer' ),
-						'chat_retention_days'            => array( 'type' => 'integer' ),
-						'chat_ai_titles_enabled'         => array( 'type' => 'boolean' ),
 						'alt_text_auto_generate_enabled' => array( 'type' => 'boolean' ),
 						'problem_flow_threshold'         => array( 'type' => 'integer' ),
 						'flows_per_page'                 => array( 'type' => 'integer' ),
@@ -421,8 +371,6 @@ class SettingsAbilities {
 			'settings'         => array(
 				'cleanup_job_data_on_failure'             => $settings['cleanup_job_data_on_failure'] ?? true,
 				'file_retention_days'                     => $settings['file_retention_days'] ?? 7,
-				'chat_retention_days'                     => $settings['chat_retention_days'] ?? 90,
-				'chat_ai_titles_enabled'                  => $settings['chat_ai_titles_enabled'] ?? true,
 				'alt_text_auto_generate_enabled'          => $settings['alt_text_auto_generate_enabled'] ?? true,
 				'problem_flow_threshold'                  => $settings['problem_flow_threshold'] ?? 3,
 				'flows_per_page'                          => $settings['flows_per_page'] ?? 20,
@@ -469,17 +417,6 @@ class SettingsAbilities {
 			$days                                = absint( $input['file_retention_days'] );
 			$all_settings['file_retention_days'] = max( 1, min( 90, $days ) );
 			$handled_keys[]                      = 'file_retention_days';
-		}
-
-		if ( isset( $input['chat_retention_days'] ) ) {
-			$days                                = absint( $input['chat_retention_days'] );
-			$all_settings['chat_retention_days'] = max( 1, min( 365, $days ) );
-			$handled_keys[]                      = 'chat_retention_days';
-		}
-
-		if ( isset( $input['chat_ai_titles_enabled'] ) ) {
-			$all_settings['chat_ai_titles_enabled'] = (bool) $input['chat_ai_titles_enabled'];
-			$handled_keys[]                         = 'chat_ai_titles_enabled';
 		}
 
 		if ( isset( $input['alt_text_auto_generate_enabled'] ) ) {

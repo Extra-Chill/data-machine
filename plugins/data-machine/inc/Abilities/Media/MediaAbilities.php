@@ -58,7 +58,7 @@ class MediaAbilities {
 			'datamachine/upload-media',
 			array(
 				'label'               => 'Upload Media',
-				'description'         => 'Upload or fetch a media file (image or video), store it in the repository, and return a reference (path, URL, or media ID). Automatically detects media type from MIME. To import an image from a link (e.g. a chat attachment) into the Media Library, pass url with to_media_library true; that mode only needs the upload_files capability and returns media_id for use elsewhere (e.g. an image-template image block attachment_id). file_path and repository storage are operator-only.',
+				'description'         => 'Upload or fetch a media file (image or video), store it in the repository, and return a reference (path, URL, or media ID). Automatically detects media type from MIME. To import an image from a link (e.g. a message attachment) into the Media Library, pass url with to_media_library true; that mode only needs the upload_files capability and returns media_id for use elsewhere (e.g. an image-template image block attachment_id). file_path and repository storage are operator-only.',
 				'category'            => 'datamachine-media',
 				'input_schema'        => array(
 					'type'       => 'object',

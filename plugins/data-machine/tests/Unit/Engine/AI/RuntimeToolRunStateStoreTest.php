@@ -33,7 +33,7 @@ class RuntimeToolRunStateStoreTest extends TestCase {
 		$this->assertSame( RuntimeToolRunStateStore::STATUS_PENDING, $state['status'] );
 		$this->assertSame( 120, $state['timeout_seconds'] );
 		$this->assertSame( '2026-06-18T00:02:00+00:00', $state['deadline_at'] );
-		$this->assertNull( $state['resume_payload'] );
+		$this->assertArrayNotHasKey( 'resume_payload', $state );
 		$this->assertNull( $state['finalize_payload'] );
 		$this->assertArrayHasKey( 'runtime_tool_run_state', $jobs->data[42] );
 	}
@@ -56,26 +56,6 @@ class RuntimeToolRunStateStoreTest extends TestCase {
 		$this->assertSame( $first, $second );
 		$this->assertSame( 'first', $second['finalize_payload']['result']['value'] );
 		$this->assertSame( RuntimeToolRunStateStore::STATUS_FINALIZED, $second['status'] );
-	}
-
-	public function test_resume_returns_state_only_to_first_winner(): void {
-		$jobs  = new RuntimeToolRunStateJobsDouble();
-		$store = new RuntimeToolRunStateStore( $jobs );
-
-		$store->create(
-			42,
-			array(
-				'runtime_tool_request_id' => 'runtime_tool_42',
-				'tool_name'               => 'client.inspect',
-			)
-		);
-
-		$first  = $store->resume( 42, array( 'session_id' => 'session-a' ) );
-		$second = $store->resume( 42, array( 'session_id' => 'session-b' ) );
-
-		$this->assertSame( 'session-a', $first['resume_payload']['session_id'] );
-		$this->assertSame( RuntimeToolRunStateStore::STATUS_RESUMED, $first['status'] );
-		$this->assertNull( $second );
 	}
 
 	public function test_finalize_retries_conflicting_engine_data_write(): void {

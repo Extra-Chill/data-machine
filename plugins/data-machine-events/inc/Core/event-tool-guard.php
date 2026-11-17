@@ -66,8 +66,8 @@ function register_event_tool_guard(): void {
  * something an events pipeline ever needs: the only legitimate publish path is
  * the adjacent `upsert_event` handler tool, which is preserved.
  *
- * - `upsert_post`      — UpsertPostAbility (modes: chat/pipeline/system).
- * - `insert_content`   — InsertContentAbility (modes: chat/pipeline/system/editor).
+ * - `upsert_post`      — UpsertPostAbility (modes: pipeline/system).
+ * - `insert_content`   — InsertContentAbility (modes: pipeline/system/editor).
  * - `wordpress_publish`— generic publish-step handler tool (only present when a
  *                        publish step is adjacent; stripped defensively).
  *
@@ -86,7 +86,7 @@ function event_ai_blocked_tools(): array {
 	 * Site operators can tighten or loosen the strip list without a code change.
 	 * Tools listed here are removed from the resolved set ONLY when the AI step
 	 * is adjacent to an `upsert_event` upsert; they are untouched for every
-	 * other pipeline and for chat/system mode.
+	 * other pipeline and for system mode.
 	 *
 	 * @param string[] $tools Lowercase tool names to strip.
 	 */

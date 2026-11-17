@@ -20,7 +20,7 @@ class GoogleSearchConsole extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'google_search_console' );
-		$this->registerTool( 'google_search_console', array( $this, 'getToolDefinition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/google-search-console' ) );
+		$this->registerTool( 'google_search_console', array( $this, 'getToolDefinition' ), array( 'pipeline' ), array( 'ability' => 'datamachine/google-search-console' ) );
 	}
 
 	/**

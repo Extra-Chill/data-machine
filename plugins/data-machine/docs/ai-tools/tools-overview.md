@@ -2,7 +2,7 @@
 
 AI tools should be exposed as WordPress Ability projections whenever a single registered ability already owns the execution contract. `inc/Engine/AI/Tools/ToolServiceProvider.php` still instantiates tool classes so they can register configuration handlers and ability projections, but the model-facing declaration should use `datamachine_register_ability_tool()` instead of a class/method handler when possible.
 
-The `datamachine_tools` class/method registry serves composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
+The `datamachine_tools` class/method registry serves composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`pipeline`, `system`, or pipeline-policy mode). Tools without an explicit mode list are not available in any mode and the ability or access level required to execute them.
 
 ## Registered Tool Inventory
 
@@ -14,85 +14,32 @@ Mutation risk means what the tool can change when called successfully:
 - **Content mutation**: creates, updates, assigns, merges, or deletes WordPress content/taxonomy/files.
 - **Destructive**: deletes durable workflow objects, files, logs, jobs, or terms.
 
-### Chat And Pipeline Tools
+### Pipeline Tools
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `image_generation` | chat, pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
-| `internal_link_audit` | chat, pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
-| `local_search` | chat, pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
-| `web_fetch` | chat, pipeline | Read-only | Fetch readable content from a URL. | [Web Fetch](web-fetch.md) |
-| `wordpress_post_reader` | chat, pipeline | Read-only | Read a WordPress post by permalink URL. | [WordPress Post Reader](wordpress-post-reader.md) |
+| `image_generation` | pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
+| `internal_link_audit` | pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
+| `local_search` | pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
+| `web_fetch` | pipeline | Read-only | Fetch readable content from a URL. | [Web Fetch](web-fetch.md) |
+| `wordpress_post_reader` | pipeline | Read-only | Read a WordPress post by permalink URL. | [WordPress Post Reader](wordpress-post-reader.md) |
 
-### Chat And Pipeline-Policy Tools
+### Pipeline-Policy Tools
 
 Pipeline-policy tools are available while resolving pipeline tool policy, not as regular adjacent handler tools.
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `agent_daily_memory` | chat, pipeline policy | Low mutation | Read, write, list, and search daily memory journal files. | [Agent Daily Memory](agent-daily-memory.md) |
-| `agent_memory` | chat, pipeline policy | Low mutation | Read and update agent markdown files by section. | [Agent Memory](agent-memory.md) |
+| `agent_daily_memory` | pipeline policy (opt-in) | Low mutation | Read, write, list, and search daily memory journal files. | [Agent Daily Memory](agent-daily-memory.md) |
+| `agent_memory` | pipeline policy (opt-in) | Low mutation | Read and update agent markdown files by section. | [Agent Memory](agent-memory.md) |
 
-### Chat-Only Read And Diagnostics Tools
+### System Tools
 
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `api_query` | Read-only | Query documented Data Machine REST endpoints with mutation operations restricted. | [API Query](api-query.md) |
-| `get_handler_defaults` | Read-only | Read site-wide handler defaults for one handler or all handlers. | [Get Handler Defaults](get-handler-defaults.md) |
-| `list_flows` | Read-only | List flows with pipeline, handler, and pagination filters. | [List Flows](list-flows.md) |
-| `read_logs` | Read-only | Read Data Machine logs with agent/job/pipeline/flow filters. | [Read Logs](read-logs.md) |
-| `search_taxonomy_terms` | Read-only | Search taxonomy terms before create/update/assign operations. | [Search Taxonomy Terms](search-taxonomy-terms.md) |
-| `system_health_check` | Read-only | Run unified Data Machine and extension diagnostics. | [System Health Check](system-health-check.md) |
+| Tool | Modes | Mutation risk | Purpose | Docs |
+| --- | --- | --- | --- | --- |
+| `consult_agent` | system (opt-in) | Read-only | Ask another registered agent a question through the Agents API `agents/chat` ability and return its answer. Implemented in `inc/Engine/AI/Tools/Global/ConsultAgent.php`; must be enabled explicitly through the task's `enabled_tools`. | — |
 
-### Chat-Only Workflow Configuration Tools
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `add_pipeline_step` | Config mutation | Add a step to a pipeline and sync flows. | [Add Pipeline Step](add-pipeline-step.md) |
-| `authenticate_handler` | Config mutation | Manage handler credentials and OAuth status. | [Authenticate Handler](authenticate-handler.md) |
-| `configure_flow_steps` | Config mutation | Configure handler settings and AI user messages for one or many flow steps. | [Configure Flow Steps](configure-flow-steps.md) |
-| `configure_pipeline_step` | Config mutation | Configure pipeline-level AI system prompt and tool policy. | [Configure Pipeline Step](configure-pipeline-step.md) |
-| `copy_flow` | Config mutation | Duplicate a flow within or across compatible pipelines. | [Copy Flow](copy-flow.md) |
-| `create_flow` | Config mutation | Create one or more flows with optional schedules and step configs. | [Create Flow](create-flow.md) |
-| `create_pipeline` | Config mutation | Create one or more pipelines and their initial flow. | [Create Pipeline](create-pipeline.md) |
-| `manage_queue` | Config mutation | Add/list/clear/remove/update/move prompt queue items and set queue mode. | [Manage Queue](manage-queue.md) |
-| `reorder_pipeline_steps` | Config mutation | Reorder pipeline steps. | [Reorder Pipeline Steps](reorder-pipeline-steps.md) |
-| `run_flow` | Low mutation | Run a flow now or schedule a future run. | [Run Flow](run-flow.md) |
-| `set_handler_defaults` | Config mutation | Update site-wide defaults for handler configs. | [Set Handler Defaults](set-handler-defaults.md) |
-| `update_flow` | Config mutation | Update flow title and/or schedule. | [Update Flow](update-flow.md) |
-
-### Chat-Only Content And File Mutation Tools
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `assign_taxonomy_term` | Content mutation | Assign a term to one or more posts. | [Assign Taxonomy Term](assign-taxonomy-term.md) |
-| `create_taxonomy_term` | Content mutation | Create a taxonomy term if it does not exist. | [Create Taxonomy Term](create-taxonomy-term.md) |
-| `delete_file` | Destructive | Delete an uploaded file scoped to a flow step. | [Delete File](delete-file.md) |
-| `merge_taxonomy_terms` | Destructive | Reassign posts from a source term to a target term and delete the source term. | [Merge Taxonomy Terms](merge-taxonomy-terms.md) |
-| `update_taxonomy_term` | Content mutation | Update taxonomy term fields and meta. | [Update Taxonomy Term](update-taxonomy-term.md) |
-
-### Chat-Only Destructive Workflow Tools
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `delete_flow` | Destructive | Delete a flow. | [Delete Flow](delete-flow.md) |
-| `delete_pipeline` | Destructive | Delete a pipeline and its associated flows. | [Delete Pipeline](delete-pipeline.md) |
-| `delete_pipeline_step` | Destructive | Remove a pipeline step and cascade to flows. | [Delete Pipeline Step](delete-pipeline-step.md) |
-| `manage_jobs` | Destructive | List/summarize jobs and delete, fail, retry, or recover jobs. | [Manage Jobs](manage-jobs.md) |
-| `manage_logs` | Destructive | Clear logs or read log metadata. | [Manage Logs](manage-logs.md) |
-
-### Chat-Only External Execution Tools
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `execute_workflow` | Content mutation | Execute an ephemeral workflow through the Execute API. | [Execute Workflow](execute-workflow.md) |
-| `send_ping` | Low mutation | POST a prompt/context payload to one or more webhook URLs. | [Send Ping](send-ping.md) |
-
-### Chat-Only Duplicate Prevention Tool
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `queue_validator` | Read-only | Check if a topic exists in published content or a flow queue. | [Queue Validator](queue-validator.md) |
+Topic duplicate checks are no longer a model tool. Use the `datamachine/check-duplicate` ability or `wp datamachine flows queue validate` (backed by `DataMachine\Core\Similarity\QueueTopicValidator`).
 
 ## Handler-Specific Tools
 
@@ -115,9 +62,9 @@ Common extension tools include:
 - `list_github_pulls`, `list_github_repos`
 - `workspace_path`, `workspace_list`, `workspace_show`, `workspace_ls`, `workspace_read`
 
-## Unregistered Core Class
+## Removed Interactive Tools
 
-`inc/Api/Chat/Tools/GetProblemFlows.php` defines `get_problem_flows`, but `ToolServiceProvider.php` does not instantiate it. It is not part of the registered core inventory until the provider registers it or another bootstrap path instantiates the class.
+Data Machine no longer has an interactive agent mode. The admin/workflow tools that used to live under `inc/Api/Chat/Tools/` and the `queue_validator` tool were removed. Interactive agent runtimes (for example the Agents API `agents/chat` ability) can project the underlying `datamachine/*` abilities as tools directly.
 
 ## Tool Architecture
 
@@ -131,9 +78,7 @@ Class/method tool declarations are still explicit exceptions:
 
 - `agent_memory` and `agent_daily_memory` compose several file/memory abilities behind one action router and resolve agent/user scope before dispatch.
 - `internal_link_audit` composes several internal-link abilities behind one action router and strips internal response keys.
-- `queue_validator` contains duplicate-prevention orchestration across published posts and queue state that is reused by queue-add behavior.
 - `web_fetch` has no registered WordPress ability yet; it remains a class/method tool until a first-class fetch ability exists.
-- Chat-only workflow/admin tools in `inc/Api/Chat/Tools/` remain Data Machine product tools until each one has a public ability contract worth projecting.
 - Adjacent handler tools remain runtime-generated class/method declarations because their schemas depend on neighboring pipeline handler configuration.
 
 Legacy tool classes extend `BaseTool` and register themselves with `registerTool()`. Registration declares:
@@ -153,7 +98,6 @@ For normal prose, AI tools should write markdown and omit `content_format` unles
 
 | Directory | Contents |
 | --- | --- |
-| `inc/Engine/AI/Tools/Global/` | Chat/pipeline global tools such as search, analytics, memory, image generation, and audits. |
-| `inc/Api/Chat/Tools/` | Chat-only admin/workflow/content tools. |
+| `inc/Engine/AI/Tools/Global/` | Global tools such as memory, web fetch, queue validation, and `consult_agent`. |
 | `inc/Engine/AI/Tools/` | Tool registration, policy resolution, execution, and shared base classes. |
 | `inc/Abilities/Analytics/` | Analytics ability implementations used by analytics tools. |

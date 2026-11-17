@@ -23,7 +23,7 @@ ToolSourceRegistry
 ToolPolicyResolver::resolve()
 ```
 
-Use `ToolManager` when code needs to read Data Machine's registered tool definitions or resolve handler-owned tools. Use `ToolPolicyResolver::resolve()` when code needs the tool set an agent may actually see for a chat, pipeline, or system request.
+Use `ToolManager` when code needs to read Data Machine's registered tool definitions or resolve handler-owned tools. Use `ToolPolicyResolver::resolve()` when code needs the tool set an agent may actually see for a pipeline, system, or extension-mode request.
 
 ## Registry Contract
 
@@ -33,7 +33,7 @@ All product and extension tools register through `datamachine_tools`.
 add_filter( 'datamachine_tools', function ( array $tools ): array {
     $tools['my_plugin/search'] = array(
         '_callable'     => array( MyToolDefinitions::class, 'search' ),
-        'modes'         => array( 'chat' ),
+        'modes'         => array( 'system' ),
         'ability'       => 'my-plugin/search',
         'access_level'  => 'admin',
     );
@@ -56,7 +56,7 @@ array(
     ),
     'class'           => MySearchTool::class,
     'method'          => 'handle_tool_call',
-    'modes'           => array( 'chat' ),
+    'modes'           => array( 'system' ),
     'requires_config' => false,
 )
 ```
@@ -68,7 +68,7 @@ array(
     'description' => 'Create a wiki note.',
     'parameters'  => array( /* JSON-schema-like parameter map */ ),
     'ability'     => 'example/create-report',
-    'modes'       => array( 'chat' ),
+    'modes'       => array( 'system' ),
 )
 ```
 
@@ -117,7 +117,7 @@ Resolved handler tools automatically receive `handler`, `handler_config`, inheri
 
 | Source | Class | Used by default in |
 |---|---|---|
-| `static_registry` | `DataMachineToolRegistrySource` | `chat`, `pipeline`, `system`, custom modes |
+| `static_registry` | `DataMachineToolRegistrySource` | `pipeline`, `system`, custom modes |
 | `adjacent_handlers` | `AdjacentHandlerToolSource` | `pipeline` |
 
 `DataMachineToolRegistrySource` reads `ToolManager::get_all_tools()`, filters by each tool's `modes`, applies global enablement/configuration checks, and adapts policy-gated pipeline tools.
@@ -133,8 +133,9 @@ Tool definitions declare the request modes that may see them:
 | Mode | Constant | Use |
 |---|---|---|
 | `pipeline` | `ToolPolicyResolver::MODE_PIPELINE` | Automated AI pipeline steps. Includes adjacent handler tools plus static registry tools explicitly marked for pipeline. |
-| `chat` | `ToolPolicyResolver::MODE_CHAT` | User-present chat sessions. Runs the chat access gate and ability permission checks. |
 | `system` | `ToolPolicyResolver::MODE_SYSTEM` | Background/system jobs with a small explicit tool set. |
+
+Tools must declare their modes; a tool with no `modes` never resolves. Extensions may resolve their own mode strings (for example `editor`). Access-level and linked-ability permission checks run through `DataMachineToolAccessPolicy` in every mode.
 
 Runtime requests may activate multiple modes at once, for example `['pipeline', 'world']`. A tool is eligible when its declared `modes` intersects with any active mode. Powerful tools can add `requires_opt_in => true`; those tools must also appear in `allow_only`, usually from `enabled_tools` in the flow-step snapshot.
 

@@ -369,19 +369,6 @@ class DATAMACHINE_Events {
 		// references AbilityPermissions::canWrite()/canRead().
 		require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/AbilityPermissions.php';
 
-		// Load chat tools - self-register via ToolRegistrationTrait
-		new \DataMachineEvents\Api\Chat\Tools\VenueHealthCheck();
-		new \DataMachineEvents\Api\Chat\Tools\UpdateVenue();
-		new \DataMachineEvents\Api\Chat\Tools\EventHealthCheck();
-		new \DataMachineEvents\Api\Chat\Tools\EventQualityAudit();
-		new \DataMachineEvents\Api\Chat\Tools\UpdateEvent();
-		new \DataMachineEvents\Api\Chat\Tools\MoveEvent();
-		new \DataMachineEvents\Api\Chat\Tools\DeleteEvent();
-		new \DataMachineEvents\Api\Chat\Tools\GetVenueEvents();
-		new \DataMachineEvents\Api\Chat\Tools\FindBrokenTimezoneEvents();
-		new \DataMachineEvents\Api\Chat\Tools\FixEventTimezone();
-		new \DataMachineEvents\Api\Chat\Tools\TestEventScraper();
-
 		// Load abilities - self-register ability + tool
 		if ( file_exists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php' ) ) {
 			require_once DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Abilities/EventScraperTest.php';
@@ -564,17 +551,9 @@ class DATAMACHINE_Events {
 			new \DataMachineEvents\Abilities\MergedBillDecideAbilities();
 		}
 
-		// Chat tools for the merged-bill agent decision step (issue #256).
-		if ( class_exists( 'DataMachineEvents\\Api\\Chat\\Tools\\MergedBillInspect' ) ) {
-			new \DataMachineEvents\Api\Chat\Tools\MergedBillInspect();
-		}
-		if ( class_exists( 'DataMachineEvents\\Api\\Chat\\Tools\\MergedBillDecide' ) ) {
-			new \DataMachineEvents\Api\Chat\Tools\MergedBillDecide();
-		}
-
-		// Recurring resolver hook — drains the merged-bill candidate queue
-		// by invoking the chat agent. Registered at init so the hook fires
-		// once Action Scheduler is ready.
+		// Recurring resolver hook — queues merged-bill candidates and announces
+		// them for an agent to resolve through the merged-bill abilities.
+		// Registered at init so the hook fires once Action Scheduler is ready.
 		if ( class_exists( 'DataMachineEvents\\Steps\\MergedBills\\MergedBillResolverFlow' ) ) {
 			\DataMachineEvents\Steps\MergedBills\MergedBillResolverFlow::register();
 		}

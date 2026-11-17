@@ -29,7 +29,7 @@ class InsertContentAbility {
 		}
 
 		$this->register_ability();
-		$this->register_chat_tool();
+		$this->register_tool();
 		self::$registered = true;
 	}
 
@@ -80,7 +80,7 @@ class InsertContentAbility {
 						),
 					),
 					'execute_callback'    => array( self::class, 'execute' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => false ),
 				)
 			);
@@ -90,19 +90,19 @@ class InsertContentAbility {
 	}
 
 	/**
-	 * Register as a chat tool.
+	 * Register as a model tool.
 	 */
-	private function register_chat_tool(): void {
+	private function register_tool(): void {
 		add_filter(
 			'datamachine_tools',
 			function ( $tools ) {
 				$tools['insert_content'] = array(
-					'_callable'                => array( self::class, 'getChatTool' ),
-					'modes'                    => array( 'chat', 'pipeline', 'system', 'editor' ),
+					'_callable'                => array( self::class, 'getToolDefinition' ),
+					'modes'                    => array( 'pipeline', 'system', 'editor' ),
 					'ability'                  => 'datamachine/insert-content',
 					// Generic content-writing tools are opt-in for pipeline AI
 					// steps so a model cannot improvise arbitrary publishes that
-					// bypass the flow's declared handler. Chat/system/editor
+					// bypass the flow's declared handler. System/editor
 					// unaffected. See data-machine#2852.
 					'requires_pipeline_opt_in' => true,
 				);
@@ -112,14 +112,14 @@ class InsertContentAbility {
 	}
 
 	/**
-	 * Chat tool definition.
+	 * Model tool definition.
 	 *
 	 * @return array
 	 */
-	public static function getChatTool(): array {
+	public static function getToolDefinition(): array {
 		return array(
 			'class'       => self::class,
-			'method'      => 'handleChatToolCall',
+			'method'      => 'handleToolCall',
 			'description' => 'Insert new content into a WordPress post at a specific position (beginning, end, or after a specific paragraph). Returns a canonical preview diff for user review.',
 			'parameters'  => array(
 				'post_id'               => array(
@@ -148,13 +148,13 @@ class InsertContentAbility {
 	}
 
 	/**
-	 * Handle chat tool call.
+	 * Handle a model tool call.
 	 *
 	 * @param array $params   Tool parameters.
 	 * @param array $tool_def Tool definition.
 	 * @return array Result.
 	 */
-	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
+	public static function handleToolCall( array $params, array $tool_def = array() ): array {
 		unset( $tool_def );
 
 		$result = self::execute( $params );

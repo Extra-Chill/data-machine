@@ -1,52 +1,49 @@
 <?php
 /**
- * Tests for QueueValidator global tool.
+ * Tests for the queue topic validator.
  *
- * @package DataMachine\Tests\Unit\Engine\AI\Tools\Global
+ * @package DataMachine\Tests\Unit\Core\Similarity
  */
 
-namespace DataMachine\Tests\Unit\Engine\AI\Tools\Global;
+namespace DataMachine\Tests\Unit\Core\Similarity;
 
+use DataMachine\Core\Similarity\QueueTopicValidator;
 use DataMachine\Core\Similarity\SimilarityEngine;
-use DataMachine\Engine\AI\Tools\Global\QueueValidator;
 use WP_UnitTestCase;
 
-class QueueValidatorTest extends WP_UnitTestCase {
+class QueueTopicValidatorTest extends WP_UnitTestCase {
 
-	private QueueValidator $validator;
+	private QueueTopicValidator $validator;
 
 	public function setUp(): void {
 		parent::setUp();
-		$this->validator = new QueueValidator();
+		$this->validator = new QueueTopicValidator();
 	}
 
 	/**
-	 * Test handle_tool_call returns error when topic is missing.
+	 * Test validate returns error when topic is missing.
 	 */
-	public function test_handle_tool_call_requires_topic(): void {
-		$result = $this->validator->handle_tool_call( array() );
+	public function test_validate_requires_topic(): void {
+		$result = $this->validator->validate( array() );
 
-		$this->assertFalse( $result['success'] );
-		$this->assertStringContainsString( 'topic', $result['error'] );
-		$this->assertSame( 'queue_validator', $result['tool_name'] );
+		$this->assertSame( 'error', $result['verdict'] );
+		$this->assertStringContainsString( 'topic', $result['reason'] );
 	}
 
 	/**
-	 * Test handle_tool_call returns clear for unique topic.
+	 * Test validate returns clear for unique topic.
 	 */
-	public function test_handle_tool_call_returns_clear_for_unique_topic(): void {
-		$result = $this->validator->handle_tool_call( array( 'topic' => 'Completely Unique Topic That Definitely Does Not Exist Anywhere' ) );
+	public function test_validate_returns_clear_for_unique_topic(): void {
+		$result = $this->validator->validate( array( 'topic' => 'Completely Unique Topic That Definitely Does Not Exist Anywhere' ) );
 
-		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'clear', $result['verdict'] );
-		$this->assertSame( 'queue_validator', $result['tool_name'] );
 		$this->assertArrayHasKey( 'reason', $result );
 	}
 
 	/**
-	 * Test handle_tool_call detects duplicate published post.
+	 * Test validate detects duplicate published post.
 	 */
-	public function test_handle_tool_call_detects_duplicate_post(): void {
+	public function test_validate_detects_duplicate_post(): void {
 		$post_id = $this->factory->post->create(
 			array(
 				'post_title'  => 'The Spiritual Meaning of Blue Jays',
@@ -55,9 +52,8 @@ class QueueValidatorTest extends WP_UnitTestCase {
 			)
 		);
 
-		$result = $this->validator->handle_tool_call( array( 'topic' => 'Spiritual Meaning of Blue Jays' ) );
+		$result = $this->validator->validate( array( 'topic' => 'Spiritual Meaning of Blue Jays' ) );
 
-		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'duplicate', $result['verdict'] );
 		$this->assertSame( 'published_post', $result['source'] );
 		$this->assertSame( $post_id, $result['match']['post_id'] );
@@ -67,9 +63,9 @@ class QueueValidatorTest extends WP_UnitTestCase {
 	}
 
 	/**
-	 * Test handle_tool_call ignores draft posts.
+	 * Test validate ignores draft posts.
 	 */
-	public function test_handle_tool_call_ignores_draft_posts(): void {
+	public function test_validate_ignores_draft_posts(): void {
 		$this->factory->post->create(
 			array(
 				'post_title'  => 'Draft About Mysterious Platypus Facts',
@@ -78,16 +74,15 @@ class QueueValidatorTest extends WP_UnitTestCase {
 			)
 		);
 
-		$result = $this->validator->handle_tool_call( array( 'topic' => 'Mysterious Platypus Facts' ) );
+		$result = $this->validator->validate( array( 'topic' => 'Mysterious Platypus Facts' ) );
 
-		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'clear', $result['verdict'] );
 	}
 
 	/**
 	 * Test custom threshold overrides default.
 	 */
-	public function test_handle_tool_call_respects_custom_threshold(): void {
+	public function test_validate_respects_custom_threshold(): void {
 		$this->factory->post->create(
 			array(
 				'post_title'  => 'Why Do Crows Caw at Night',
@@ -97,14 +92,13 @@ class QueueValidatorTest extends WP_UnitTestCase {
 		);
 
 		// Very high threshold — should clear even with partial match.
-		$result = $this->validator->handle_tool_call(
+		$result = $this->validator->validate(
 			array(
 				'topic'                => 'Crows Cawing',
 				'similarity_threshold' => '0.99',
 			)
 		);
 
-		$this->assertTrue( $result['success'] );
 		$this->assertSame( 'clear', $result['verdict'] );
 	}
 
@@ -165,21 +159,5 @@ class QueueValidatorTest extends WP_UnitTestCase {
 		$this->assertSame( 0.0, SimilarityEngine::jaccard( array(), array( 'word' ) ) );
 		$this->assertSame( 0.0, SimilarityEngine::jaccard( array( 'word' ), array() ) );
 		$this->assertSame( 0.0, SimilarityEngine::jaccard( array(), array() ) );
-	}
-
-	/**
-	 * Test tool definition has required fields.
-	 */
-	public function test_get_tool_definition(): void {
-		$def = $this->validator->getToolDefinition();
-
-		$this->assertSame( QueueValidator::class, $def['class'] );
-		$this->assertSame( 'handle_tool_call', $def['method'] );
-		$this->assertArrayHasKey( 'description', $def );
-		$this->assertArrayHasKey( 'parameters', $def );
-		$this->assertSame( 'object', $def['parameters']['type'] );
-		$this->assertSame( array( 'topic' ), $def['parameters']['required'] );
-		$this->assertArrayHasKey( 'topic', $def['parameters']['properties'] );
-		$this->assertArrayNotHasKey( 'requires_config', $def );
 	}
 }

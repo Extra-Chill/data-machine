@@ -2,7 +2,7 @@
 /**
  * Data Machine tool access policy.
  *
- * Adapts Data Machine permission helpers and chat gating into the
+ * Adapts Data Machine permission helpers into the
  * generic tool policy filter's access-level callback shape.
  *
  * @package DataMachine\Engine\AI\Tools\Policy
@@ -17,19 +17,6 @@ defined( 'ABSPATH' ) || exit;
 final class DataMachineToolAccessPolicy {
 
 	/**
-	 * Return whether chat tools pass the coarse permission gate.
-	 *
-	 * @param array $args Resolution arguments.
-	 * @return bool Whether the caller can proceed past the chat gate.
-	 */
-	public function passesChatGate( array $args ): bool {
-		// @phpstan-ignore-next-line WordPress apply_filters accepts additional hook arguments.
-		$require_use_tools_for_chat = apply_filters( 'datamachine_require_use_tools_for_chat_tools', false, $args );
-
-		return ! $require_use_tools_for_chat || PermissionHelper::can( 'use_tools' );
-	}
-
-	/**
 	 * Check if the current user meets an access level requirement.
 	 *
 	 * @param string $access_level One of: public, authenticated, author, editor, admin.
@@ -41,7 +28,7 @@ final class DataMachineToolAccessPolicy {
 		}
 
 		$action_map = array(
-			'authenticated' => 'chat',
+			'authenticated' => 'search_content',
 			'author'        => 'use_tools',
 			'editor'        => 'view_logs',
 			'admin'         => 'manage_settings',

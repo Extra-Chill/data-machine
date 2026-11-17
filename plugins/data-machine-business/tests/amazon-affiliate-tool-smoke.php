@@ -166,7 +166,6 @@ namespace {
 
 	$tools = apply_filters( 'datamachine_tools', array() );
 	assert_true_for_amazon_tool( isset( $tools['amazon_affiliate_link'] ), 'tool registers with Data Machine registry', $failures, $passes );
-	assert_true_for_amazon_tool( in_array( 'chat', $tools['amazon_affiliate_link']['modes'] ?? array(), true ), 'tool is chat-visible', $failures, $passes );
 	assert_true_for_amazon_tool( in_array( 'pipeline', $tools['amazon_affiliate_link']['modes'] ?? array(), true ), 'tool is pipeline-visible', $failures, $passes );
 	assert_true_for_amazon_tool( 'admin' === ( $tools['amazon_affiliate_link']['access_level'] ?? '' ), 'tool remains admin-only', $failures, $passes );
 

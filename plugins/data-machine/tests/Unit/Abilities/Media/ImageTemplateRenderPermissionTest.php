@@ -42,16 +42,16 @@ class ImageTemplateRenderPermissionTest extends WP_UnitTestCase {
 
 	public function test_render_images_denied_without_the_cap(): void {
 		// Mirrors the concrete case in #3635: contributor with only
-		// datamachine_chat must not be able to render — but also must not
+		// datamachine_use_tools must not be able to render — but also must not
 		// need flow/agent/settings admin to get there.
 		$user_id = self::factory()->user->create( array( 'role' => 'contributor' ) );
 		$user    = get_user_by( 'id', $user_id );
-		$user->add_cap( 'datamachine_chat' );
+		$user->add_cap( 'datamachine_use_tools' );
 		wp_set_current_user( $user_id );
 
 		$this->assertFalse( PermissionHelper::can( 'render_images' ) );
 
-		$user->remove_cap( 'datamachine_chat' );
+		$user->remove_cap( 'datamachine_use_tools' );
 	}
 
 	public function test_render_images_implied_by_management_capability(): void {
@@ -108,7 +108,7 @@ class ImageTemplateRenderPermissionTest extends WP_UnitTestCase {
 		PermissionHelper::set_agent_context(
 			123,
 			$owner_id,
-			array( 'datamachine_chat' ),
+			array( 'datamachine_use_tools' ),
 			456
 		);
 

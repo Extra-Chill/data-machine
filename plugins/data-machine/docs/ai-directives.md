@@ -4,9 +4,9 @@ Data Machine assembles AI request context through directive classes registered o
 
 Key current facts:
 
-- `AgentModeDirective` injects built-in mode guidance for `chat`, `pipeline`, and `system` at priority 22.
+- `AgentModeDirective` injects built-in mode guidance for `pipeline` and `system` at priority 22.
 - `CoreMemoryFilesDirective` injects registered memory files from the shared, agent, and user layers.
-- Pipeline, flow, daily-memory, and chat-inventory directives add request-specific context after the core mode and memory layers.
+- Pipeline, flow, and daily-memory directives add request-specific context after the core mode and memory layers.
 - Tools are injected by `RequestBuilder` through `PromptBuilder::setTools()`, not by a directive class.
 
 Use [core-system/ai-directives.md](core-system/ai-directives.md) as the authoritative reference for priorities, mode assignments, filters, and examples.

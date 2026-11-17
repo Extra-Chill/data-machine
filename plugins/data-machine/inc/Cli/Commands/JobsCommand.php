@@ -32,8 +32,7 @@ use DataMachine\Core\RunMetrics;
 use DataMachine\Core\Jobs\JobLiveness;
 use DataMachine\Core\Jobs\JobReaper;
 use DataMachine\Core\Jobs\SchedulerEvidence;
-use DataMachine\Core\Database\Chat\Chat;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
+use DataMachine\Engine\AI\TranscriptStore;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Core\Database\Jobs\LegacyAIConcurrencyReconciler;
 use DataMachine\Core\Database\Jobs\JobStatusMigration;
@@ -1859,10 +1858,6 @@ class JobsCommand extends BaseCommand {
 		$engine_data           = $job['engine_data'] ?? array();
 		$transcript_session_id = $engine_data['transcript_session_id'] ?? '';
 		if ( empty( $transcript_session_id ) ) {
-			$transcript_session_id = $this->findTranscriptSessionIdForJob( $job_id );
-		}
-
-		if ( empty( $transcript_session_id ) ) {
 			WP_CLI::error(
 				sprintf(
 					'No transcript persisted for job %d. Enable datamachine_persist_pipeline_transcripts (or set persist_transcripts on the pipeline/flow) and re-run the job.',
@@ -1872,7 +1867,12 @@ class JobsCommand extends BaseCommand {
 			return;
 		}
 
-		$store   = ConversationStoreFactory::get();
+		$store = TranscriptStore::get();
+		if ( null === $store ) {
+			WP_CLI::error( 'No Agents API conversation store is registered, so persisted transcripts cannot be read.' );
+			return;
+		}
+
 		$session = $store->get_session( (string) $transcript_session_id );
 
 		if ( ! $session ) {
@@ -2023,30 +2023,6 @@ class JobsCommand extends BaseCommand {
 		$result['encoding']       = 'base64';
 
 		WP_CLI::log( wp_json_encode( $result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
-	}
-
-	/**
-	 * Locate a pipeline transcript by metadata for jobs created before engine_data
-	 * stored transcript_session_id.
-	 *
-	 * @param int $job_id Job ID.
-	 * @return string Transcript session ID, or empty string when none exists.
-	 */
-	private function findTranscriptSessionIdForJob( int $job_id ): string {
-		global $wpdb;
-
-		$table = Chat::get_prefixed_table_name();
-		$like  = '%"job_id":' . $job_id . '%';
-		$row   = $wpdb->get_var(
-			$wpdb->prepare(
-				'SELECT session_id FROM %i WHERE mode = %s AND metadata LIKE %s ORDER BY created_at DESC LIMIT 1',
-				$table,
-				'pipeline',
-				$like
-			)
-		);
-
-		return is_string( $row ) ? $row : '';
 	}
 
 	/**

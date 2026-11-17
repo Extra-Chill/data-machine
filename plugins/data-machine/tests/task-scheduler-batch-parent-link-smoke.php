@@ -74,8 +74,8 @@ function build_execute_workflow_create_args( ?array $initial_data ): array {
 	$args = array(
 		'pipeline_id' => 'direct',
 		'flow_id'     => 'direct',
-		'source'      => 'chat',
-		'label'       => 'Chat Workflow',
+		'source'      => 'direct',
+		'label'       => 'Direct Workflow',
 	);
 	if ( is_array( $initial_data ) ) {
 		$initial_parent_job_id = (int) ( $initial_data['parent_job_id'] ?? 0 );

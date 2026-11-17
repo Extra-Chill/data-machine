@@ -4,7 +4,7 @@
  *
  * Single entry point for determining which tools are available for any
  * execution context. Composes tools from registered sources, filters by
- * context (pipeline/chat/system), then applies per-agent tool policies.
+ * context (pipeline/system), then applies per-agent tool policies.
  *
  * Resolution precedence (highest to lowest):
  * 1. Explicit deny list (always wins)
@@ -12,7 +12,7 @@
  * 3. Ability category filter (narrows tools by their linked ability's category)
  * 4. Context-level allow_only (narrows to explicit subset)
  * 5. Pipeline content-writing opt-in (generic write tools excluded by default)
- * 6. Context preset (pipeline/chat/system)
+ * 6. Context preset (pipeline/system)
  * 7. Global enablement settings
  * 8. Tool configuration requirements
  *
@@ -34,7 +34,6 @@ class ToolPolicyResolver {
 	 * Agent mode presets define which tool pools are available.
 	 */
 	public const MODE_PIPELINE = 'pipeline';
-	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
 	/**
@@ -116,11 +115,7 @@ class ToolPolicyResolver {
 		$modes    = self::normalizeModes( $args['modes'] ?? ( array_key_exists( 'mode', $args ) ? array( $args['mode'] ) : array( self::MODE_PIPELINE ) ) );
 		$agent_id = isset( $args['agent_id'] ) ? (int) $args['agent_id'] : 0;
 
-		$is_interactive = in_array( self::MODE_CHAT, $modes, true ) || ! empty( $args['interactive'] );
-
-		if ( $is_interactive && ! $this->tool_access_policy->passesChatGate( $args ) ) {
-			return array();
-		}
+		$is_interactive = ! empty( $args['interactive'] );
 
 		$agent_policy = $agent_id > 0 ? $this->getAgentToolPolicy( $agent_id ) : null;
 		$args         = $this->withAgentPolicyAllowOnly( $args, $agent_policy );
@@ -147,7 +142,7 @@ class ToolPolicyResolver {
 			unset( $policy_context['agent_id'], $policy_context['agent_slug'] );
 		}
 
-		// Interactive modes are request-user scoped. Pipeline/system run as product automation.
+		// Interactive callers are request-user scoped. Pipeline/system run as product automation.
 		if ( $is_interactive ) {
 			$policy_context['tool_access_checker'] = array( $this->tool_access_policy, 'canAccessTool' );
 		}
@@ -162,7 +157,7 @@ class ToolPolicyResolver {
 		// tools (publish-wordpress, upsert-post, insert-content, ...) leak
 		// otherwise: a model can improvise arbitrary publishes that bypass the
 		// flow's declared handler and its guards. Adjacent-handler plumbing is
-		// mandatory and therefore exempt. Chat/system modes are unaffected.
+		// mandatory and therefore exempt. System mode is unaffected.
 		// See https://github.com/Extra-Chill/data-machine/issues/2852.
 		if ( in_array( self::MODE_PIPELINE, $modes, true ) ) {
 			$tools = $this->filterPipelineWriteOptInTools( $tools, $args );
@@ -546,7 +541,6 @@ class ToolPolicyResolver {
 	public static function getModes(): array {
 		return array(
 			self::MODE_PIPELINE => 'Pipeline execution with handler tools from adjacent steps',
-			self::MODE_CHAT     => 'Chat interaction with full management tools',
 			self::MODE_SYSTEM   => 'System task execution with minimal toolset',
 		);
 	}
@@ -558,6 +552,21 @@ class ToolPolicyResolver {
 	 * @return array<int,string>
 	 */
 	public static function normalizeModes( mixed $modes ): array {
+		$normalized = self::normalizeDeclaredModes( $modes );
+		return ! empty( $normalized ) ? $normalized : array( self::MODE_PIPELINE );
+	}
+
+	/**
+	 * Normalize the modes a tool declaration names, without a default.
+	 *
+	 * Active run modes default to pipeline ({@see normalizeModes()}), but a
+	 * tool declaration that names no modes is available in no mode: it must
+	 * opt into pipeline and/or system explicitly.
+	 *
+	 * @param mixed $modes Raw declared mode input.
+	 * @return array<int,string>
+	 */
+	public static function normalizeDeclaredModes( mixed $modes ): array {
 		if ( is_string( $modes ) ) {
 			$modes = array( $modes );
 		}
@@ -576,8 +585,7 @@ class ToolPolicyResolver {
 			}
 		}
 
-		$normalized = array_values( array_unique( $normalized ) );
-		return ! empty( $normalized ) ? $normalized : array( self::MODE_PIPELINE );
+		return array_values( array_unique( $normalized ) );
 	}
 
 	/**

@@ -2,20 +2,18 @@
  * Runtime configuration component.
  *
  * Global AI runtime settings: provider/model, per-mode overrides, site
- * context, turns, and webhook access.
+ * context, and turns.
  */
 
 /**
  * WordPress dependencies
  */
-import { useState, useEffect, useCallback } from '@wordpress/element';
-import { Button, Notice } from '@wordpress/components';
+import { useEffect } from '@wordpress/element';
 
 /**
  * External dependencies
  */
 import { useSettings, useUpdateSettings } from '@shared/queries/settings';
-import { executeAbility } from '@shared/utils/api';
 import { useFormState } from '@shared/hooks/useFormState';
 import SettingsSaveBar, {
 	useSaveStatus,
@@ -36,12 +34,6 @@ const AgentSettings = () => {
 	const { data: providersData } = useProviders();
 	const updateMutation = useUpdateSettings();
 	const maxTurnsDefault = data?.defaults?.max_turns ?? 1;
-	const [ pingSecret, setPingSecret ] = useState( '' );
-	const [ pingSecretVisible, setPingSecretVisible ] = useState( false );
-	const [ pingCopied, setPingCopied ] = useState( false );
-	const [ pingGenerating, setPingGenerating ] = useState( false );
-	const [ pingError, setPingError ] = useState( '' );
-	const [ confirmRegenerateOpen, setConfirmRegenerateOpen ] = useState( false );
 
 	const form = useFormState( {
 		initialData: EMPTY_FORM,
@@ -53,47 +45,6 @@ const AgentSettings = () => {
 	} );
 	const { reset } = form;
 	const { setHasChanges } = save;
-
-	useEffect( () => {
-		if ( data?.settings?.chat_ping_secret ) {
-			setPingSecret( data.settings.chat_ping_secret );
-		}
-	}, [ data ] );
-
-	const generatePingSecret = useCallback( async () => {
-		setPingError( '' );
-		setPingGenerating( true );
-		try {
-			const response = await executeAbility(
-				'generate-ping-secret'
-			);
-			if ( response.success && response.secret ) {
-				setPingSecret( response.secret );
-				setPingSecretVisible( true );
-			}
-		} catch ( err ) {
-			setPingError( err.message || 'Failed to generate secret.' );
-		} finally {
-			setPingGenerating( false );
-			setConfirmRegenerateOpen( false );
-		}
-	}, [] );
-
-	const handleGeneratePingSecret = useCallback( () => {
-		if ( pingSecret ) {
-			setConfirmRegenerateOpen( true );
-			return;
-		}
-
-		generatePingSecret();
-	}, [ generatePingSecret, pingSecret ] );
-
-	const handleCopyPingSecret = useCallback( () => {
-		navigator.clipboard.writeText( pingSecret ).then( () => {
-			setPingCopied( true );
-			setTimeout( () => setPingCopied( false ), 2000 );
-		} );
-	}, [ pingSecret ] );
 
 	useEffect( () => {
 		if ( data?.settings ) {
@@ -142,15 +93,6 @@ const AgentSettings = () => {
 	return (
 		<div className="datamachine-agent-settings">
 			<h2 className="datamachine-agent-settings-title">Configuration</h2>
-			{ pingError && (
-				<Notice
-					status="error"
-					isDismissible
-					onRemove={ () => setPingError( '' ) }
-				>
-					{ pingError }
-				</Notice>
-			) }
 			<table className="form-table">
 				<tbody>
 					<tr>
@@ -343,105 +285,8 @@ const AgentSettings = () => {
 							/>
 							<p className="description">
 								Maximum number of conversation turns allowed for
-								AI runtime loops (1-50). Applies to both pipeline
-								and chat conversations.
+								AI runtime loops (1-50).
 							</p>
-						</td>
-					</tr>
-
-					<tr>
-						<th scope="row">Chat Webhook</th>
-						<td>
-							<div className="datamachine-ping-secret-section">
-								<p className="description" style={ { marginTop: 0 } }>
-									Allow external services to send messages to
-									the chat runtime via webhook. Use this
-									endpoint URL and secret token in Agent Ping
-									step configurations.
-								</p>
-
-								<div style={ { marginBottom: '12px' } }>
-									<strong>Endpoint URL:</strong>{ ' ' }
-									<code>
-										{ window.location.origin }
-										/wp-json/datamachine/v1/chat/ping
-									</code>
-								</div>
-
-								{ pingSecret ? (
-									<div
-										style={ {
-											display: 'flex',
-											alignItems: 'center',
-											gap: '8px',
-											marginBottom: '12px',
-										} }
-									>
-										<input
-											type={
-												pingSecretVisible
-													? 'text'
-													: 'password'
-											}
-											value={ pingSecret }
-											readOnly
-											className="regular-text"
-										/>
-										<Button
-											variant="secondary"
-											onClick={ () =>
-												setPingSecretVisible(
-													! pingSecretVisible
-												)
-											}
-										>
-											{ pingSecretVisible
-												? 'Hide'
-												: 'Show' }
-										</Button>
-										<Button
-											variant="secondary"
-											onClick={ handleCopyPingSecret }
-										>
-											{ pingCopied
-												? 'Copied!'
-												: 'Copy' }
-										</Button>
-									</div>
-								) : (
-									<p>
-										<em>
-											No secret configured. Generate one
-											to enable the webhook endpoint.
-										</em>
-									</p>
-								) }
-
-								<Button
-									variant={
-										pingSecret ? 'secondary' : 'primary'
-									}
-									onClick={ handleGeneratePingSecret }
-									isBusy={ pingGenerating }
-									disabled={ pingGenerating }
-								>
-									{ pingSecret
-										? 'Regenerate Secret'
-										: 'Generate Secret' }
-								</Button>
-
-								{ pingSecret && (
-									<p
-										className="description"
-										style={ { marginTop: '8px' } }
-									>
-										Send requests with header:{ ' ' }
-										<code>
-											Authorization: Bearer &lt;secret&gt;
-										</code>
-									</p>
-								) }
-							</div>
 						</td>
 					</tr>
 				</tbody>
@@ -452,30 +297,6 @@ const AgentSettings = () => {
 				saveStatus={ save.saveStatus }
 				onSave={ save.handleSave }
 			/>
-
-			{ confirmRegenerateOpen && (
-				<Notice status="warning" isDismissible={ false }>
-					<p>
-						Regenerating will invalidate the current token. Any services
-						using it will lose access. Continue?
-					</p>
-					<Button
-						variant="primary"
-						onClick={ generatePingSecret }
-						isBusy={ pingGenerating }
-						disabled={ pingGenerating }
-					>
-						Regenerate Secret
-					</Button>{ ' ' }
-					<Button
-						variant="secondary"
-						onClick={ () => setConfirmRegenerateOpen( false ) }
-						disabled={ pingGenerating }
-					>
-						Cancel
-					</Button>
-				</Notice>
-			) }
 		</div>
 	);
 };

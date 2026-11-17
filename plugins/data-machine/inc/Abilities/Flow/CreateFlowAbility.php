@@ -184,7 +184,7 @@ class CreateFlowAbility {
 		// from `agent export` / bundle round-trips. datamachine_resolve_agent_id()
 		// is the context-agnostic resolver shared by logging: explicit context →
 		// PermissionHelper active-agent context (set by AIStep / SystemTaskStep /
-		// RunFlowAbility / AgentAuthMiddleware for REST / MCP / chat / pipeline runs)
+		// RunFlowAbility / AgentAuthMiddleware for REST / MCP / pipeline runs)
 		// → acting-user → owned-agent fallback. NULL remains a legitimate "unowned /
 		// system" state when no agent context can be resolved. See #2481.
 		if ( ( null === $agent_id || $agent_id <= 0 ) && function_exists( 'datamachine_resolve_agent_id' ) ) {

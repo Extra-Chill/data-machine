@@ -16,7 +16,7 @@ class PageSpeedTool extends BaseTool {
 
 	public function __construct() {
 		$this->registerConfigurationHandlers( 'pagespeed' );
-		$this->registerTool( 'pagespeed', array( $this, 'get_tool_definition' ), array( 'chat', 'pipeline' ), array( 'ability' => 'datamachine/pagespeed' ) );
+		$this->registerTool( 'pagespeed', array( $this, 'get_tool_definition' ), array( 'pipeline' ), array( 'ability' => 'datamachine/pagespeed' ) );
 	}
 
 	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {

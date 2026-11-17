@@ -47,12 +47,10 @@ require_once __DIR__ . '/Core/Admin/Pages/Agent/AgentFilters.php';
 require_once __DIR__ . '/Core/Admin/Pages/Logs/LogsFilters.php';
 require_once __DIR__ . '/Core/Admin/Pages/Jobs/JobsFilters.php';
 require_once __DIR__ . '/Api/AgentBundles.php';
-require_once __DIR__ . '/Api/Chat/ChatFilters.php';
 require_once __DIR__ . '/Engine/Bundle/register-agent-package-artifacts.php';
 require_once __DIR__ . '/Engine/Bundle/AgentBundleUpgradeActionHandlers.php';
 require_once __DIR__ . '/Engine/AI/Directives/CoreMemoryFilesDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentModeDirective.php';
-require_once __DIR__ . '/Engine/AI/Directives/CallerContextDirective.php';
 require_once __DIR__ . '/Engine/Agents/datamachine-register-agents.php';
 
 /*
@@ -162,8 +160,6 @@ function datamachine_register_default_memory_files(): void {
 
 \DataMachine\Core\Bootstrap\HostIntegrationServiceProvider::register();
 
-require_once __DIR__ . '/Engine/AI/Directives/ClientContextDirective.php';
-require_once __DIR__ . '/Engine/AI/Directives/CrossSiteHandoffDirective.php';
 require_once __DIR__ . '/Engine/AI/Directives/AgentDailyMemoryDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';

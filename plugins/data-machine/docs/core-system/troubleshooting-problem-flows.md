@@ -17,9 +17,6 @@ The Jobs dashboard provides visual indicators for flows that are experiencing is
 You can retrieve a list of currently flagged flows through the `datamachine/get-problem-flows` ability run route:
 `POST /wp-json/wp-abilities/v1/abilities/datamachine/get-problem-flows/run` with body `{"input": {}}`
 
-### AI Chat Agent
-The chat agent can list problem flows via the `get_problem_flows` tool.
-
 ## Notes
 
 A problem flow is a signal based on consecutive job statuses; the underlying cause depends on the specific handler/provider configuration and the upstream source.

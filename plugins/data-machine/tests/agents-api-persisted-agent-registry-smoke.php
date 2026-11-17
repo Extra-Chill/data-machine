@@ -168,9 +168,9 @@ $legacy_config = AgentConfigFactory::normalize(
 		'provider'    => 'openai',
 		'model'       => 'gpt-5.5',
 		'mode_models' => array(
-			'chat' => array(
+			'agent' => array(
 				'provider' => 'openai',
-				'model'    => 'gpt-5.5-chat',
+				'model'    => 'gpt-5.5-agent',
 			),
 		),
 	)
@@ -179,7 +179,7 @@ agents_api_smoke_assert_equals( 'openai', $legacy_config['default_provider'] ?? 
 agents_api_smoke_assert_equals( 'gpt-5.5', $legacy_config['default_model'] ?? '', 'legacy model becomes default_model', $failures, $passes );
 agents_api_smoke_assert_equals( false, array_key_exists( 'provider', $legacy_config ), 'legacy provider alias is not persisted', $failures, $passes );
 agents_api_smoke_assert_equals( false, array_key_exists( 'model', $legacy_config ), 'legacy model alias is not persisted', $failures, $passes );
-agents_api_smoke_assert_equals( 'gpt-5.5-chat', $legacy_config['mode_models']['chat']['model'] ?? '', 'mode_models remain canonical mode overrides', $failures, $passes );
+agents_api_smoke_assert_equals( 'gpt-5.5-agent', $legacy_config['mode_models']['agent']['model'] ?? '', 'mode_models remain canonical mode overrides', $failures, $passes );
 
 echo "\n[2] persisted projection preserves earlier declarative registrations:\n";
 datamachine_persisted_agent_registry_reset();

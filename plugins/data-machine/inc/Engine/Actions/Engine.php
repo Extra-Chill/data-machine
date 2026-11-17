@@ -212,7 +212,7 @@ function datamachine_register_execution_engine() {
 	 * Routine wake observability: log every scheduled flow/system run.
 	 *
 	 * @param mixed $routine The waking routine value object.
-	 * @param mixed $result  Ability or chat output.
+	 * @param mixed $result  Ability or tool output.
 	 */
 	add_action(
 		'wp_agent_routine_run_completed',

@@ -2,7 +2,7 @@
 
 **File Location**: `inc/Engine/AI/Tools/Global/WordPressPostReader.php`
 
-**Registration**: `datamachine_global_tools` filter (available to all AI agents - pipeline + chat)
+**Registration**: `datamachine_global_tools` filter (pipeline mode)
 
 Enables AI models to retrieve complete WordPress post content by URL for detailed analysis and content processing. Perfect complement to Local Search for accessing full post content instead of excerpts.
 

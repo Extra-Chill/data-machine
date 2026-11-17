@@ -2,7 +2,7 @@
 /**
  * Centralized tool management for Data Machine AI system.
  *
- * Use-case agnostic tool management serving both Chat and Pipeline agents.
+ * Use-case agnostic tool management serving pipeline and system agents.
  * Handles tool discovery, configuration, enablement, and validation.
  *
  * Tool definitions support lazy loading via callables to prevent translation
@@ -662,7 +662,7 @@ class ToolManager {
 	 * Direct logic replacement for datamachine_tool_enabled filter.
 	 *
 	 * @param string      $tool_id Tool identifier
-	 * @param string|null $context_id Context ID (pipeline_step_id for pipeline, null for chat)
+	 * @param string|null $context_id Context ID (pipeline_step_id for pipeline, null outside a step)
 	 * @return bool True if tool is available
 	 */
 	public function is_tool_available( string $tool_id, ?string $context_id = null ): bool {
@@ -682,7 +682,7 @@ class ToolManager {
 			// Fall through to global checks
 		}
 
-		// Chat context (no context_id): check global enablement + configuration
+		// Global checks (all contexts): enablement + configuration
 		if ( ! $this->is_globally_enabled( $tool_id ) ) {
 			return false; // Globally disabled
 		}
@@ -800,7 +800,7 @@ class ToolManager {
 		$static_tools   = $this->get_all_tools();
 		$ability_source = new AbilityToolSource( $this );
 		$ability_tools  = $ability_source(
-			array( ToolPolicyResolver::MODE_CHAT, ToolPolicyResolver::MODE_PIPELINE, ToolPolicyResolver::MODE_SYSTEM ),
+			array( ToolPolicyResolver::MODE_PIPELINE, ToolPolicyResolver::MODE_SYSTEM ),
 			array( 'include_unavailable' => true )
 		);
 
@@ -810,7 +810,7 @@ class ToolManager {
 	/**
 	 * Get tools for REST API response.
 	 *
-	 * @param string|null $mode Optional agent mode to filter tools ('pipeline', 'chat', 'system').
+	 * @param string|null $mode Optional agent mode to filter tools ('pipeline', 'system').
 	 *                          When null, returns all tools.
 	 * @return array Tools formatted for API
 	 */

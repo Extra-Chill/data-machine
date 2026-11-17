@@ -2,7 +2,7 @@
 /**
  * Universal AI conversation message building utilities.
  *
- * Provides standardized message formatting for all AI agents (pipeline and chat).
+ * Provides standardized message formatting for all AI agents (pipeline and system).
  * All methods are static with no state management.
  *
  * @package DataMachine\Engine\AI
@@ -580,22 +580,21 @@ class ConversationManager {
 	/**
 	 * Generate a tool result message for duplicate tool call prevention.
 	 *
-	 * The correction message is mode-aware. Chat-mode conversations end after a
-	 * duplicate (the tool's result IS the answer to the user's question), but
-	 * pipeline-mode conversations still have downstream work — typically a
+	 * The correction message is mode-aware. System-mode (and unknown-mode)
+	 * conversations end after a duplicate (the tool's result IS the answer),
+	 * but pipeline-mode conversations still have downstream work — typically a
 	 * publish handler tool — so the AI must be told to keep going. Bridge mode
-	 * is treated like chat-with-continuation since the conversation is with a
-	 * remote user. Unknown modes fall back to chat semantics.
+	 * continues the response since the conversation is with a remote user.
 	 *
 	 * @param string $tool_name  Tool name that was duplicated
 	 * @param int    $turn_count Current conversation turn
-	 * @param string $mode       Execution mode ('chat', 'pipeline', 'bridge', ...). Defaults to 'chat'.
+	 * @param string $mode       Execution mode ('system', 'pipeline', 'bridge', ...). Defaults to 'system'.
 	 * @return array Formatted tool result message
 	 */
 	public static function generateDuplicateToolCallMessage(
 		string $tool_name,
 		int $turn_count = 0,
-		string $mode = 'chat'
+		string $mode = 'system'
 	): array {
 		$tool_result = array(
 			'success' => false,
@@ -612,7 +611,7 @@ class ConversationManager {
 	 * @param string $mode      Execution mode slug.
 	 * @return string Correction message routed to the AI.
 	 */
-	public static function duplicateToolCallError( string $tool_name, string $mode = 'chat' ): string {
+	public static function duplicateToolCallError( string $tool_name, string $mode = 'system' ): string {
 		return self::buildDuplicateToolCallError( $tool_name, $mode );
 	}
 
@@ -629,7 +628,7 @@ class ConversationManager {
 				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation. Do NOT call it again. Move on to the next required pipeline action using the result you already have.";
 			case 'bridge':
 				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters. Do NOT call it again. Continue your response to the user using the result you already have.";
-			case 'chat':
+			case 'system':
 			default:
 				return "DUPLICATE REJECTED: You already called {$tool_name} with these exact parameters earlier in this conversation and it succeeded. Do NOT call it again. Do NOT call skip_item about this. The task is done — end the conversation.";
 		}

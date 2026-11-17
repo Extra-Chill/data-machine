@@ -1,6 +1,6 @@
 # Data Machine Documentation
 
-Complete user and agent documentation for Data Machine, the WordPress automation product layer that combines pipelines, flows, jobs, chat agents, system tasks, policy-gated tools, REST/WP-CLI surfaces, and extension-owned handlers on top of the generic Agents API substrate.
+Complete user and agent documentation for Data Machine, the WordPress automation product layer that combines pipelines, flows, jobs, system tasks, policy-gated tools, REST/WP-CLI surfaces, and extension-owned handlers on top of the generic Agents API substrate.
 
 ## Agent Orientation
 
@@ -46,7 +46,7 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 - **Daily Memory System**: DailyMemoryTask lifecycle, deterministic overflow, opt-in daily injection, and daily memory artifacts ([core-system/daily-memory-system.md](core-system/daily-memory-system.md)).
 - **Memory Policy**: Per-agent memory injection policy and safe self-memory write gates ([core-system/memory-policy.md](core-system/memory-policy.md)).
 - **Agent Bundles**: Portable agent package schema, artifact tracking, extras, extension artifacts, run artifacts, and authenticated sources ([core-system/agent-bundles.md](core-system/agent-bundles.md)).
-- **Universal Engine**: Shared AI infrastructure for pipeline, chat, and system agents ([core-system/universal-engine.md](core-system/universal-engine.md)).
+- **Universal Engine**: Shared AI infrastructure for pipeline and system agents ([core-system/universal-engine.md](core-system/universal-engine.md)).
 - **AI Conversation Loop**: Data Machine turn runner over `AgentsAPI\AI\WP_Agent_Conversation_Loop` ([core-system/ai-conversation-loop.md](core-system/ai-conversation-loop.md)).
 - **AI Directives System**: Hierarchical directive injection for contextual AI behavior ([core-system/ai-directives.md](core-system/ai-directives.md)).
 - **Tool Execution**: Resolved tool dispatch, action policy, ability execution, and approval staging ([core-system/tool-execution.md](core-system/tool-execution.md)).
@@ -70,18 +70,17 @@ Core should expose behavior through abilities, hooks, REST, CLI, handlers, and b
 
 ### AI Tools
 - **Tools Overview**: Static, ability-backed, and adjacent handler tools available to AI agents.
-- **Execute Workflow**: Modular execution of multi-step workflows from the chat toolset.
 - **Static Registry Tools**: Research, memory, workflow-management, and site-operation tools registered through `datamachine_tools`.
 - **Pipeline Handler Tools**: Runtime tools generated from adjacent fetch, publish, and upsert handlers.
 - **Policy-Gated Tools**: Tools are composed from sources and filtered by mode, memory, action, and handler policies before exposure.
 - **Global Tools**: Local Search, Web Fetch, WordPress Post Reader, daily memory, image generation, search-console/analytics, and others used across agents.
-- **Chat Tools**: AddPipelineStep, ApiQuery, ConfigureFlowSteps, ConfigurePipelineStep, CreateFlow, CreatePipeline, RunFlow, UpdateFlow, and other workflow management tools.
+- **Chat**: Owned by Agents API (`agents/chat`) and host chat runtimes. Data Machine has no chat agent mode; it keeps chat identity linking and the opt-in, system-only `consult_agent` tool.
 
 ### API Reference
 - **API Overview**: Canonical REST route inventory sourced from `inc/Api` registrations ([api/index.md](api/index.md)).
-- **Endpoints**: Agents, Agent Ping, Analytics, Auth, Chat, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, Pipelines, Settings, System, and other REST resources.
+- **Endpoints**: Agents, Agent Ping, Analytics, Auth, Email, Execute, Files, Flows, Internal Links, Jobs, Logs, Pipelines, Settings, System, and other REST resources.
 - **Workflow Endpoints**: Execute, flows, queues, webhooks, jobs, logs, and processed items.
-- **Agent Endpoints**: Chat, chat sessions, agents, access, tokens, memory files, daily memory, Agent Ping callbacks, and pending-action resolution.
+- **Agent Endpoints**: Agents, access, tokens, memory files, daily memory, Agent Ping callbacks, and pending-action resolution.
 - **Discovery/Settings Endpoints**: Handlers, step types, providers, tools, settings, system tasks, auth, and users.
 
 ### Development

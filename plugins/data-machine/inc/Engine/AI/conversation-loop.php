@@ -7,7 +7,7 @@
  * persistence, and event emission wired as options.
  *
  * This file replaces the former 748-LOC AIConversationLoop class. Both
- * ChatOrchestrator and AIStep call datamachine_run_conversation() directly.
+ * AIStep and other runtimes call datamachine_run_conversation() directly.
  *
  * @package DataMachine\Engine\AI
  */
@@ -45,7 +45,7 @@ defined( 'ABSPATH' ) || exit;
  * @param array  $tools       Available tools keyed by tool name.
  * @param string $provider    AI provider identifier.
  * @param string $model       AI model identifier.
- * @param array  $modes       Execution modes ('pipeline', 'chat', ...).
+ * @param array  $modes       Execution modes ('pipeline', 'system', ...).
  * @param array  $payload     Step payload / loop context.
  * @param int    $max_turns   Maximum conversation turns.
  * @param bool   $single_turn Execute exactly one turn and return.
@@ -1826,19 +1826,19 @@ function datamachine_runtime_tool_request_store(): WP_Agent_Runtime_Tool_Request
 }
 
 /**
- * Store pending runtime tool request metadata on the owning chat session.
+ * Store pending runtime tool request metadata on the owning conversation session.
  *
  * @param array<string,mixed> $pending_request Pending request metadata.
  */
 function datamachine_store_runtime_tool_request_on_session( array $pending_request ): void {
 	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $pending_request );
 	$session_id           = (string) ( $datamachine_metadata['session_id'] ?? '' );
-	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
+	$transcript_store     = TranscriptStore::get();
+	if ( '' === $session_id || null === $transcript_store ) {
 		return;
 	}
 
-	$chat_db = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
-	$session = $chat_db->get_session( $session_id );
+	$session = $transcript_store->get_session( $session_id );
 	if ( ! is_array( $session ) ) {
 		return;
 	}
@@ -1852,7 +1852,7 @@ function datamachine_store_runtime_tool_request_on_session( array $pending_reque
 	$metadata['status']        = 'processing';
 	$metadata['last_activity'] = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
 
-	$chat_db->update_session(
+	$transcript_store->update_session(
 		$session_id,
 		is_array( $session['messages'] ?? null ) ? $session['messages'] : array(),
 		$metadata,
@@ -1911,17 +1911,22 @@ function datamachine_submit_runtime_tool_result( string $request_id, $result ): 
 		'success'    => true,
 		'request_id' => $request_id,
 		'job_id'     => datamachine_runtime_tool_job_id_from_request_id( $request_id ),
-		'scheduled'  => ! empty( $continuation_result['scheduled'] ),
+		'projected'  => ! empty( $continuation_result['projected'] ),
 	);
 }
 
 /**
- * Project a submitted runtime-tool result into Data Machine chat/session state and resume queue.
+ * Finalize a submitted runtime-tool result and project it into the owning session transcript.
+ *
+ * Finalizes any packet execution reservation, terminalizes the request job,
+ * and appends the tool result to the session transcript. Data Machine does not
+ * resume the paused conversation itself; the transport that owns the session
+ * observes `datamachine_runtime_tool_result_submitted`.
  *
  * @param array<string,mixed> $request          Canonical runtime-tool request.
  * @param array<string,mixed> $canonical_result Canonical runtime-tool result.
- * @param array<string,mixed> $context          Continuation context.
- * @return array<string,mixed> Resume scheduling result.
+ * @param array<string,mixed> $context          Completion context.
+ * @return array<string,mixed> Projection result.
  */
 function datamachine_continue_runtime_tool_request( array $request, array $canonical_result, array $context = array() ): array {
 	unset( $context );
@@ -1948,7 +1953,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 			do_action( 'datamachine_log', 'error', 'Runtime tool result could not finalize its packet execution reservation.', array( 'request_id' => $request_id ) );
 			datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 			return array(
-				'scheduled'             => false,
+				'projected'             => false,
 				'request_id'            => $request_id,
 				'reservation_finalized' => false,
 			);
@@ -1956,7 +1961,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		if ( ! datamachine_mark_runtime_tool_completion_phase( $job_id, $request_id, 'reservation_finalized_at' ) ) {
 			datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 			return array(
-				'scheduled'                   => false,
+				'projected'                   => false,
 				'request_id'                  => $request_id,
 				'reservation_phase_persisted' => false,
 			);
@@ -1975,7 +1980,7 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		if ( ! $completed || ! datamachine_mark_runtime_tool_completion_phase( $job_id, $request_id, 'job_terminalized_at' ) ) {
 			datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 			return array(
-				'scheduled'        => false,
+				'projected'        => false,
 				'request_id'       => $request_id,
 				'job_terminalized' => false,
 			);
@@ -1983,26 +1988,29 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 		$phases['job_terminalized_at'] = gmdate( 'c' );
 	}
 
-	$session_id = (string) ( $datamachine_metadata['session_id'] ?? '' );
-	if ( '' === $session_id || ! class_exists( \DataMachine\Core\Database\Chat\ConversationStoreFactory::class ) ) {
-		return array( 'scheduled' => false );
+	$session_id       = (string) ( $datamachine_metadata['session_id'] ?? '' );
+	$transcript_store = TranscriptStore::get();
+	if ( '' === $session_id || null === $transcript_store ) {
+		return array( 'projected' => false );
 	}
 
-	$chat_db      = \DataMachine\Core\Database\Chat\ConversationStoreFactory::get();
-	$session_lock = $chat_db->acquire_session_lock( $session_id, 60 );
+	$session_locker = $transcript_store instanceof \AgentsAPI\Core\Database\Chat\WP_Agent_Conversation_Lock
+		? $transcript_store
+		: new \AgentsAPI\Core\Database\Chat\WP_Agent_Null_Conversation_Lock();
+	$session_lock   = $session_locker->acquire_session_lock( $session_id, 60 );
 	if ( null === $session_lock ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
-			'scheduled'      => false,
+			'projected'      => false,
 			'request_id'     => $request_id,
 			'session_locked' => true,
 		);
 	}
-	$session = $chat_db->get_session( $session_id );
+	$session = $transcript_store->get_session( $session_id );
 	if ( ! is_array( $session ) ) {
-		$chat_db->release_session_lock( $session_id, $session_lock );
+		$session_locker->release_session_lock( $session_id, $session_lock );
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
-		return array( 'scheduled' => false );
+		return array( 'projected' => false );
 	}
 
 	$metadata                 = is_array( $session['metadata'] ?? null ) ? $session['metadata'] : array();
@@ -2041,18 +2049,18 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	$metadata['status']                   = $metadata['has_pending_tools'] ? 'processing' : 'processing';
 	$metadata['last_activity']            = function_exists( 'current_time' ) ? current_time( 'mysql', true ) : gmdate( 'Y-m-d H:i:s' );
 
-	$session_updated = $chat_db->update_session(
+	$session_updated = $transcript_store->update_session(
 		$session_id,
 		$messages,
 		$metadata,
 		(string) ( $session['provider'] ?? '' ),
 		(string) ( $session['model'] ?? '' )
 	);
-	$chat_db->release_session_lock( $session_id, $session_lock );
+	$session_locker->release_session_lock( $session_id, $session_lock );
 	if ( ! $session_updated ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
-			'scheduled'         => false,
+			'projected'         => false,
 			'request_id'        => $request_id,
 			'session_projected' => false,
 		);
@@ -2060,41 +2068,32 @@ function datamachine_continue_runtime_tool_request( array $request, array $canon
 	if ( empty( $phases['session_projected_at'] ) && ! datamachine_mark_runtime_tool_completion_phase( $job_id, $request_id, 'session_projected_at' ) ) {
 		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
 		return array(
-			'scheduled'               => false,
+			'projected'               => false,
 			'request_id'              => $request_id,
 			'session_phase_persisted' => false,
 		);
 	}
-	$session_projected_now          = empty( $phases['session_projected_at'] );
-	$phases['session_projected_at'] = (string) ( $phases['session_projected_at'] ?? gmdate( 'c' ) );
 
-	$scheduled = ! empty( $phases['resume_scheduled_at'] );
-	if ( ! $scheduled && function_exists( 'as_enqueue_async_action' ) ) {
-		$existing_action = function_exists( 'as_has_scheduled_action' )
-			? (int) as_has_scheduled_action( 'datamachine_runtime_tool_resume', array( $request_id ), 'datamachine-runtime-tools' )
-			: 0;
-		$scheduled       = $existing_action > 0 || (bool) as_enqueue_async_action( 'datamachine_runtime_tool_resume', array( $request_id ), 'datamachine-runtime-tools' );
-	}
-	if ( $scheduled && empty( $phases['resume_scheduled_at'] ) ) {
-		$scheduled = datamachine_mark_runtime_tool_completion_phase( $job_id, $request_id, 'resume_scheduled_at' );
-	}
-	if ( ! $scheduled ) {
-		datamachine_schedule_runtime_tool_continuation_recovery( $request_id );
-	}
-
-	if ( $session_projected_now ) {
+	if ( empty( $phases['session_projected_at'] ) ) {
+		/**
+		 * Fires once when a runtime-tool result has been projected into the
+		 * owning session transcript.
+		 *
+		 * @param array $request     Canonical runtime tool request.
+		 * @param array $tool_result Transcript-shaped tool result.
+		 */
 		do_action( 'datamachine_runtime_tool_result_submitted', $request, $tool_result );
 	}
 
 	return array(
-		'scheduled'  => $scheduled,
+		'projected'  => true,
 		'request_id' => $request_id,
 	);
 }
 
 /** Persist one idempotent runtime-tool completion phase on the canonical request. */
 function datamachine_mark_runtime_tool_completion_phase( int $job_id, string $request_id, string $phase ): bool {
-	if ( $job_id <= 0 || '' === $request_id || ! in_array( $phase, array( 'reservation_finalized_at', 'job_terminalized_at', 'session_projected_at', 'resume_scheduled_at' ), true ) ) {
+	if ( $job_id <= 0 || '' === $request_id || ! in_array( $phase, array( 'reservation_finalized_at', 'job_terminalized_at', 'session_projected_at' ), true ) ) {
 		return false;
 	}
 	$marked   = false;
@@ -2141,44 +2140,7 @@ function datamachine_schedule_runtime_tool_continuation_recovery( string $reques
 	return (bool) as_schedule_single_action( time() + 30, $hook, $args, $group );
 }
 
-/** Resume a deferred runtime tool conversation. */
-function datamachine_resume_runtime_tool_request( string $request_id ): void {
-	if ( ! class_exists( \DataMachine\Api\Chat\ChatOrchestrator::class ) ) {
-		return;
-	}
-
-	$request = datamachine_runtime_tool_request_store()->get( $request_id );
-	if ( null === $request ) {
-		return;
-	}
-	$datamachine_metadata = datamachine_runtime_tool_datamachine_metadata( $request );
-	if ( 'pending' === (string) ( $datamachine_metadata['persistence_status'] ?? '' ) ) {
-		return;
-	}
-
-	$job_id = datamachine_runtime_tool_job_id_from_request_id( $request_id );
-	if ( $job_id > 0 ) {
-		$resumed = ( new RuntimeToolRunStateStore() )->resume(
-			$job_id,
-			array(
-				'session_id'      => (string) ( $datamachine_metadata['session_id'] ?? '' ),
-				'user_id'         => (int) ( $datamachine_metadata['user_id'] ?? 0 ),
-				'calling_user_id' => array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : (int) ( $datamachine_metadata['user_id'] ?? 0 ),
-			)
-		);
-		if ( null === $resumed ) {
-			return;
-		}
-	}
-
-	\DataMachine\Api\Chat\ChatOrchestrator::processContinue(
-		(string) ( $datamachine_metadata['session_id'] ?? '' ),
-		(int) ( $datamachine_metadata['user_id'] ?? 0 ),
-		array_key_exists( 'calling_user_id', $datamachine_metadata ) ? max( 0, (int) $datamachine_metadata['calling_user_id'] ) : null
-	);
-}
-
-/** Fail and resume an expired runtime tool request. */
+/** Fail an expired runtime tool request, or re-run completion for a terminal one. */
 function datamachine_timeout_runtime_tool_request( string $request_id ): void {
 	$request = datamachine_runtime_tool_request_store()->get( $request_id );
 	if ( null === $request ) {
@@ -2264,7 +2226,6 @@ function datamachine_runtime_tool_datamachine_metadata( array $payload ): array 
 }
 
 if ( function_exists( 'add_action' ) ) {
-	add_action( 'datamachine_runtime_tool_resume', __NAMESPACE__ . '\\datamachine_resume_runtime_tool_request' );
 	add_action( 'datamachine_runtime_tool_timeout', __NAMESPACE__ . '\\datamachine_timeout_runtime_tool_request' );
 	add_action( 'datamachine_runtime_tool_recover', __NAMESPACE__ . '\\datamachine_timeout_runtime_tool_request' );
 }
@@ -2739,7 +2700,7 @@ function datamachine_resolve_completion_policy( array $modes, array $payload, ?D
 }
 
 /**
- * Resolve optional per-agent conversation compaction for the chat/system loop.
+ * Resolve optional per-agent conversation compaction for the system loop.
  *
  * Reads the acting agent's compaction policy from agent_config (via the
  * ConversationCompactionPolicyResolver) and, when enabled, builds the DM-owned
@@ -3152,7 +3113,7 @@ function datamachine_payload_without_runtime_objects( array $payload ): array {
  * "calling" the agent right now).
  *
  * Producer semantics:
- *   - Chat sessions set this to the chat caller's user ID.
+ *   - Interactive host-runtime sessions set this to the caller's user ID.
  *   - Pipeline executions set this to 0 (no human caller — the agent runs
  *     against a scheduled job).
  *   - System tasks (title gen, summaries, alt text) set this to 0.

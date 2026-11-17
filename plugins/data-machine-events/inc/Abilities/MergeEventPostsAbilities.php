@@ -8,7 +8,7 @@
  * CleanDuplicatesCommand so behavior is identical across operator-driven
  * cleanup and agent-driven merged-bill resolution.
  *
- * Callable from the chat tool path (merged_bill_decide) and the REST API.
+ * Callable from the merged-bill-decide ability and the REST API.
  *
  * @package DataMachineEvents\Abilities
  * @since   0.34.0

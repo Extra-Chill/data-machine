@@ -72,11 +72,14 @@ function datamachine_uninstall_site() {
 	// --- Database tables ---
 
 	if ( current_user_can( 'delete_plugins' ) || defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-		// Drop per-site tables in reverse dependency order. The chat sessions
-		// table is network-scoped (base_prefix) and is dropped once in
-		// datamachine_uninstall_network_tables(), not here — dropping it per-site
-		// would destroy the shared table on the first subsite uninstall.
+		// Drop per-site tables in reverse dependency order. Network-scoped
+		// tables (base_prefix) are dropped once in
+		// datamachine_uninstall_network_tables(), not here — dropping them
+		// per-site would destroy shared tables on the first subsite uninstall.
+		// The retired per-site chat table is included for installs that never
+		// ran the upgrade that drops it.
 		$datamachine_tables_to_drop = array(
+			$wpdb->prefix . 'datamachine_chat_sessions',
 			\DataMachine\Engine\AI\Actions\PendingActionStore::get_table_name(),
 			$wpdb->prefix . \DataMachine\Core\Database\RunMetadata\RunMetadata::TABLE_NAME,
 			$wpdb->prefix . \DataMachine\Core\Database\BundleArtifacts\InstalledBundleArtifacts::TABLE_NAME,
@@ -137,10 +140,10 @@ function datamachine_uninstall_site() {
 /**
  * Drop network-scoped tables once on multisite uninstall.
  *
- * Chat sessions live on base_prefix (shared across the network, like the
- * agent identity tables), so the table must be dropped exactly once after
- * every subsite's per-site cleanup has run — never per-site, which would
- * destroy the shared table on the first subsite uninstall.
+ * Agent identity tables live on base_prefix (shared across the network), so
+ * they must be dropped exactly once after every subsite's per-site cleanup has
+ * run — never per-site, which would destroy the shared tables on the first
+ * subsite uninstall.
  */
 function datamachine_uninstall_network_tables() {
 	if ( ! current_user_can( 'delete_plugins' ) && ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -166,7 +169,8 @@ function datamachine_get_network_table_names() {
 	global $wpdb;
 
 	return array(
-		\DataMachine\Core\Database\Chat\Chat::get_prefixed_table_name(),
+		// Retired chat-session table, for installs that never ran the upgrade that drops it.
+		$wpdb->base_prefix . 'datamachine_chat_sessions',
 		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentTokens::TABLE_NAME,
 		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::PRINCIPAL_TABLE_NAME,
 		$wpdb->base_prefix . \DataMachine\Core\Database\Agents\AgentAccess::TABLE_NAME,

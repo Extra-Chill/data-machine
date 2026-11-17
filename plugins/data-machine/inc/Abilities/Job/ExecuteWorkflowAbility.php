@@ -191,10 +191,10 @@ class ExecuteWorkflowAbility {
 		$requested_job_label  = $initial_data['job_label'] ?? null;
 		$job_source           = is_string( $requested_job_source ) && '' !== $requested_job_source
 			? $requested_job_source
-			: 'chat';
+			: 'direct';
 		$job_label            = is_string( $requested_job_label ) && '' !== $requested_job_label
 			? $requested_job_label
-			: 'Chat Workflow';
+			: 'Direct Workflow';
 
 		$create_args = array(
 			'pipeline_id'       => 'direct',

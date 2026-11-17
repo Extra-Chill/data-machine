@@ -3,7 +3,7 @@
  * Pipeline Step Abilities
  *
  * Abilities API primitives for pipeline step operations.
- * Centralizes pipeline step CRUD logic for REST API, CLI, and Chat tools.
+ * Centralizes pipeline step CRUD logic for REST API, CLI, and AI tools.
  *
  * @package DataMachine\Abilities
  */

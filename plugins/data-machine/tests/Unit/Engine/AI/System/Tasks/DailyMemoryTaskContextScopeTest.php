@@ -6,26 +6,22 @@
  * storage reads it delegates to — is bound to the authorized agent/user
  * principal before any record reaches the model:
  *
- * - Intended inclusion: same-agent, same-user, same-day jobs and sessions.
+ * - Intended inclusion: same-agent, same-user, same-day jobs.
  * - Cross-agent exclusion, including agents that share an owner.
  * - Cross-user exclusion, including users that share an agent.
  * - Calendar-day date bounds on both window edges.
  * - The explicitly authorized agent-wide aggregate path (exactly its
  *   documented records; ordinary compaction does not inherit that breadth).
  *
- * Uses persisted rows and the real query methods (Jobs::get_jobs_for_day,
- * Chat::list_sessions_for_day_scoped) so the database predicates themselves
- * are under test.
+ * Uses persisted rows and the real query method (Jobs::get_jobs_for_day) so
+ * the database predicates themselves are under test.
  *
  * @package DataMachine\Tests\Unit\Engine\AI\System\Tasks
  */
 
 namespace DataMachine\Tests\Unit\Engine\AI\System\Tasks;
 
-use AgentsAPI\Core\Workspace\WP_Agent_Workspace_Scope;
 use DataMachine\Core\Database\Agents\Agents;
-use DataMachine\Core\Database\Chat\Chat;
-use DataMachine\Core\Database\Chat\ConversationStoreFactory;
 use DataMachine\Core\Database\Jobs\Jobs;
 use DataMachine\Engine\AI\System\Tasks\DailyMemoryTask;
 use WP_UnitTestCase;
@@ -42,20 +38,15 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 	private int $agent_beta_id;
 
 	private Jobs $jobs_db;
-	private Chat $chat_store;
 
 	/** Job ids by fixture key. */
 	private array $job_ids = array();
-
-	/** Chat session ids by fixture key. */
-	private array $session_ids = array();
 
 	public function set_up(): void {
 		parent::set_up();
 		datamachine_test_prepare_site();
 
-		$this->jobs_db    = new Jobs();
-		$this->chat_store = new Chat();
+		$this->jobs_db = new Jobs();
 
 		$this->owner_user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		$this->other_user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
@@ -69,12 +60,6 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 		$this->agent_beta_id  = $agents_repo->create_if_missing( 'daily-scope-beta', 'Daily Scope Beta', $this->owner_user_id );
 
 		$this->seed_jobs();
-		$this->seed_chat_sessions();
-	}
-
-	public function tear_down(): void {
-		ConversationStoreFactory::reset();
-		parent::tear_down();
 	}
 
 	// -----------------------------------------------------------------
@@ -141,50 +126,6 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 	}
 
 	// -----------------------------------------------------------------
-	// Conversation storage predicates
-	// -----------------------------------------------------------------
-
-	public function test_chat_day_read_includes_principal_and_excludes_cross_agent_and_cross_user(): void {
-		$rows = $this->chat_store->list_sessions_for_day_scoped(
-			self::DAY,
-			array(
-				'user_id'  => $this->owner_user_id,
-				'agent_id' => $this->agent_alpha_id,
-			)
-		);
-
-		$this->assertSame( array( $this->session_ids['alpha_owner_day'] ), array_column( $rows, 'session_id' ) );
-		$this->assertSame( 'Alpha owner day session', $rows[0]['title'] );
-	}
-
-	public function test_chat_day_read_excludes_adjacent_days(): void {
-		$rows = $this->chat_store->list_sessions_for_day_scoped(
-			self::DAY,
-			array(
-				'user_id'  => $this->owner_user_id,
-				'agent_id' => $this->agent_alpha_id,
-			)
-		);
-
-		$titles = array_column( $rows, 'title' );
-		$this->assertNotContains( 'Alpha owner earlier session', $titles );
-
-		$this->assertSame(
-			array( 'Alpha owner earlier session' ),
-			array_column( $this->chat_store->list_sessions_for_day_scoped( '2026-03-09', array() ), 'title' )
-		);
-	}
-
-	public function test_chat_agent_wide_aggregate_includes_exactly_that_agent(): void {
-		$rows = $this->chat_store->list_sessions_for_day_scoped( self::DAY, array( 'agent_id' => $this->agent_alpha_id ) );
-
-		$this->assertSame(
-			array( 'Alpha owner day session', 'Alpha other-user day session' ),
-			array_column( $rows, 'title' )
-		);
-	}
-
-	// -----------------------------------------------------------------
 	// Task-level binding
 	// -----------------------------------------------------------------
 
@@ -199,19 +140,15 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 
 		// Intended inclusion.
 		$this->assertStringContainsString( 'Alpha owner day job', $context );
-		$this->assertStringContainsString( 'Alpha owner day session', $context );
 
 		// Cross-agent exclusion (beta shares the owner).
 		$this->assertStringNotContainsString( 'Beta owner day job', $context );
-		$this->assertStringNotContainsString( 'Beta owner day session', $context );
 
 		// Cross-user exclusion (the other user shares alpha).
 		$this->assertStringNotContainsString( 'Alpha other-user day job', $context );
-		$this->assertStringNotContainsString( 'Alpha other-user day session', $context );
 
 		// Date bounds.
 		$this->assertStringNotContainsString( 'Alpha owner earlier job', $context );
-		$this->assertStringNotContainsString( 'Alpha owner earlier session', $context );
 		$this->assertStringNotContainsString( 'Beta other-user later job', $context );
 	}
 
@@ -234,12 +171,9 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 		// The authorized agent-wide aggregate spans both of alpha's users...
 		$this->assertStringContainsString( 'Alpha owner day job', $context );
 		$this->assertStringContainsString( 'Alpha other-user day job', $context );
-		$this->assertStringContainsString( 'Alpha owner day session', $context );
-		$this->assertStringContainsString( 'Alpha other-user day session', $context );
 
 		// ...and nothing outside that agent.
 		$this->assertStringNotContainsString( 'Beta owner day job', $context );
-		$this->assertStringNotContainsString( 'Beta owner day session', $context );
 	}
 
 	public function test_gather_context_agentless_user_run_reads_own_records_only(): void {
@@ -254,10 +188,7 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 		// records across agents, and never another user's.
 		$this->assertStringContainsString( 'Alpha owner day job', $context );
 		$this->assertStringContainsString( 'Beta owner day job', $context );
-		$this->assertStringContainsString( 'Alpha owner day session', $context );
-		$this->assertStringContainsString( 'Beta owner day session', $context );
 		$this->assertStringNotContainsString( 'Alpha other-user day job', $context );
-		$this->assertStringNotContainsString( 'Alpha other-user day session', $context );
 	}
 
 	// -----------------------------------------------------------------
@@ -334,61 +265,5 @@ class DailyMemoryTaskContextScopeTest extends WP_UnitTestCase {
 		);
 
 		return (int) $job_id;
-	}
-
-	private function seed_chat_sessions(): void {
-		$this->session_ids['alpha_owner_day'] = $this->create_session_at(
-			'Alpha owner day session',
-			$this->owner_user_id,
-			$this->agent_alpha_id,
-			self::DAY . ' 09:30:00'
-		);
-		$this->session_ids['beta_owner_day'] = $this->create_session_at(
-			'Beta owner day session',
-			$this->owner_user_id,
-			$this->agent_beta_id,
-			self::DAY . ' 10:30:00'
-		);
-		$this->session_ids['alpha_other_day'] = $this->create_session_at(
-			'Alpha other-user day session',
-			$this->other_user_id,
-			$this->agent_alpha_id,
-			self::DAY . ' 11:30:00'
-		);
-		$this->session_ids['alpha_owner_earlier'] = $this->create_session_at(
-			'Alpha owner earlier session',
-			$this->owner_user_id,
-			$this->agent_alpha_id,
-			self::EARLIER
-		);
-	}
-
-	private function create_session_at( string $title, int $user_id, int $agent_id, string $created_at ): string {
-		global $wpdb;
-
-		$session_id = $this->chat_store->create_session(
-			$this->workspace(),
-			$user_id,
-			$agent_id,
-			array(),
-			'chat'
-		);
-
-		$this->assertNotSame( '', $session_id, "Failed to create session {$title}" );
-		$this->assertTrue( $this->chat_store->update_title( $session_id, $title ) );
-
-		$wpdb->update(
-			$this->chat_store->get_table_name(),
-			array( 'created_at' => $created_at ),
-			array( 'session_id' => $session_id ),
-			array( '%s' ),
-			array( '%s' )
-		);
-
-		return $session_id;
-	}
-
-	private function workspace(): WP_Agent_Workspace_Scope {
-		return WP_Agent_Workspace_Scope::from_parts( 'site', 'https://example.test' );
 	}
 }

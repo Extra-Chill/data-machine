@@ -56,7 +56,7 @@ class AgentDailyMemoryDirective implements DirectiveInterface {
 	 *
 	 * @param string      $provider_name AI provider identifier.
 	 * @param array       $tools         Available tools.
-	 * @param string|null $step_id       Pipeline step ID (null in chat).
+	 * @param string|null $step_id       Pipeline step ID (null outside pipelines).
 	 * @param array       $payload       Request payload including agent_id, user_id, context.
 	 * @return array Directive outputs (one system_text entry per daily file).
 	 */
@@ -179,7 +179,7 @@ add_filter(
 		$directives[] = array(
 			'class'    => AgentDailyMemoryDirective::class,
 			'priority' => 35,
-			'modes'    => array( 'chat', 'pipeline' ),
+			'modes'    => array( 'pipeline' ),
 		);
 		return $directives;
 	}

@@ -66,7 +66,7 @@ namespace {
 
 	$tool = new ExaSearch();
 	exa_check( 'exa_search' === $tool->configuration_id && 'exa_search' === $tool->registration[0], 'configuration and tool IDs' );
-	exa_check( array( 'chat', 'pipeline' ) === $tool->registration[2] && array( 'access_level' => 'admin' ) === $tool->registration[3], 'tool contexts and access' );
+	exa_check( array( 'pipeline' ) === $tool->registration[2] && array( 'access_level' => 'admin' ) === $tool->registration[3], 'tool contexts and access' );
 	$definition = $tool->getToolDefinition();
 	exa_check( ExaSearch::class === $definition['class'] && 'handle_tool_call' === $definition['method'] && $definition['requires_config'], 'tool definition' );
 	exa_check( E::input_schema() === $definition['parameters'], 'tool exposes all ability parameters' );

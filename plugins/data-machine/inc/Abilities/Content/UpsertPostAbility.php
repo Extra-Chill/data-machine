@@ -50,7 +50,7 @@ class UpsertPostAbility {
 		}
 
 		$this->register_ability();
-		$this->register_chat_tool();
+		$this->register_tool();
 		self::$registered = true;
 	}
 
@@ -192,19 +192,19 @@ class UpsertPostAbility {
 	}
 
 	/**
-	 * Register as a chat / pipeline tool.
+	 * Register as a pipeline / system tool.
 	 */
-	private function register_chat_tool(): void {
+	private function register_tool(): void {
 		add_filter(
 			'datamachine_tools',
 			function ( array $tools ): array {
 				$tools['upsert_post'] = array(
-					'_callable'                => array( self::class, 'getChatTool' ),
-					'modes'                    => array( 'chat', 'pipeline', 'system' ),
+					'_callable'                => array( self::class, 'getToolDefinition' ),
+					'modes'                    => array( 'pipeline', 'system' ),
 					'ability'                  => self::ABILITY_NAME,
 					// Generic content-writing tools are opt-in for pipeline AI
 					// steps so a model cannot improvise arbitrary publishes that
-					// bypass the flow's declared handler. Chat/system unaffected.
+					// bypass the flow's declared handler. System unaffected.
 					// See https://github.com/Extra-Chill/data-machine/issues/2852.
 					'requires_pipeline_opt_in' => true,
 				);
@@ -214,12 +214,12 @@ class UpsertPostAbility {
 	}
 
 	/**
-	 * Chat tool definition.
+	 * Model tool definition.
 	 */
-	public static function getChatTool(): array {
+	public static function getToolDefinition(): array {
 		return array(
 			'class'       => self::class,
-			'method'      => 'handleChatToolCall',
+			'method'      => 'handleToolCall',
 			'description' => 'Idempotently create or update a WordPress post. For normal authored prose, write content as markdown and omit content_format; Data Machine converts that authoring format to the post type stored format. Only set content_format when you are intentionally providing html or serialized block markup.',
 			'parameters'  => array(
 				'post_type'              => array(
@@ -278,9 +278,9 @@ class UpsertPostAbility {
 	}
 
 	/**
-	 * Handle chat tool call.
+	 * Handle a model tool call.
 	 */
-	public static function handleChatToolCall( array $params, array $tool_def = array() ): array {
+	public static function handleToolCall( array $params, array $tool_def = array() ): array {
 		unset( $tool_def );
 		if ( empty( $params['content_format'] ) ) {
 			$params['content_format'] = 'markdown';
@@ -456,7 +456,7 @@ class UpsertPostAbility {
 	/**
 	 * Ability permission callback.
 	 *
-	 * Requires the chat action plus WordPress object capabilities for the
+	 * Requires the use_tools action (or a management capability) plus WordPress object capabilities for the
 	 * requested write. Targets resolved later (slug, identity meta) are
 	 * re-checked at write time by execute().
 	 *
@@ -464,7 +464,7 @@ class UpsertPostAbility {
 	 * @return bool|\WP_Error
 	 */
 	public static function check_permission( $input = null ): bool|\WP_Error {
-		if ( ! PermissionHelper::can( 'chat' ) ) {
+		if ( ! PermissionHelper::can( 'use_tools' ) && ! PermissionHelper::can_manage() ) {
 			return false;
 		}
 

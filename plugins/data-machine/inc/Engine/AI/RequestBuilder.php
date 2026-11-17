@@ -2,7 +2,7 @@
 /**
  * AI Request Builder - Centralized AI request construction for all agents
  *
- * Single source of truth for building standardized AI requests across chat and pipeline modes.
+ * Single source of truth for building standardized AI requests across pipeline and system modes.
  * Ensures consistent request structure, tool formatting, and directive application to prevent
  * architectural drift between different AI agent types.
  *
@@ -26,7 +26,7 @@ class RequestBuilder {
 	/**
 	 * Build standardized AI request for any execution mode.
 	 *
-	 * Centralizes request construction logic to ensure chat and pipeline flows
+	 * Centralizes request construction logic to ensure pipeline and system flows
 	 * build identical request structures. Handles tool restructuring, directive
 	 * application via PromptBuilder, and request dispatch.
 	 *
@@ -299,7 +299,7 @@ class RequestBuilder {
 	 * MessagePart[] so multimodal context — including file/image attachments
 	 * for vision-capable models — survives the conversion. Prior to 0.118.x
 	 * this collapsed everything to a single text part, silently dropping
-	 * file blocks and causing vision tasks (alt text generation, chat media)
+	 * file blocks and causing vision tasks (alt text generation, image analysis)
 	 * to hallucinate from filename context. See #2053.
 	 *
 	 * @param array $message Provider-message array.
@@ -1031,7 +1031,7 @@ class RequestBuilder {
 	 * Machine adapter layer, so it maps the existing payload shape into the neutral
 	 * context consumed by directive validation/logging.
 	 *
-	 * @param array $payload Step or chat payload.
+	 * @param array $payload Step or system payload.
 	 * @return array Payload with directive_context populated when available.
 	 */
 	private static function withDirectiveContext( array $payload ): array {
