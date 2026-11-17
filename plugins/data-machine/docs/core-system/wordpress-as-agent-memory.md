@@ -73,7 +73,7 @@ This keeps MEMORY.md lean while preserving the full temporal record in daily fil
 
 **DailyMemoryTask** runs as a system task (`daily_memory_generation`) on a daily cron schedule. The `daily_memory` prompt is editable via the `getPromptDefinitions()` system.
 
-**Runtime integration:** The **AgentDailyMemoryDirective** (Priority 35) injects recent daily files into chat and pipeline AI requests only when the resolved agent opts in with `agent_config.daily_memory`:
+**Runtime integration:** The **AgentDailyMemoryDirective** (Priority 35) injects recent daily files into pipeline AI requests only when the resolved agent opts in with `agent_config.daily_memory`:
 
 ```json
 {
@@ -330,8 +330,8 @@ Data Machine uses a **directive system** — a priority-ordered chain that injec
 | Priority | Directive | Context | What It Injects |
 |----------|-----------|---------|-----------------|
 | **20** | **`CoreMemoryFilesDirective`** | **All** | **SITE.md, RULES.md (shared), SOUL.md, MEMORY.md (agent), USER.md (user) + custom registry files** |
-| **22** | **`AgentModeDirective`** | **All** | **Mode-specific guidance for chat, pipeline, and system** |
-| 35 | `AgentDailyMemoryDirective` | Chat, pipeline | Recent daily archives when enabled |
+| **22** | **`AgentModeDirective`** | **All** | **Mode-specific guidance for pipeline, system, and extension modes** |
+| 35 | `AgentDailyMemoryDirective` | Pipeline | Recent daily archives when enabled |
 | 40 | `PipelineMemoryFilesDirective` | Pipeline | Per-pipeline selected additional files |
 | **45** | **`FlowMemoryFilesDirective`** | **Pipeline** | **Per-flow selected additional files** |
 | 50 | `PipelineSystemPromptDirective` | Pipeline | Workflow instructions |
@@ -389,7 +389,7 @@ Different agents access different slices of temporal knowledge. This is delibera
 
 ## External Agent Integration
 
-Not every agent runs inside Data Machine's pipeline or chat system. An agent might be a CLI tool, a Discord bot, or a standalone script that uses the WordPress site as its memory backend.
+Not every agent runs inside Data Machine's pipeline or system-task runtime. An agent might be a CLI tool, a Discord bot, or a standalone script that uses the WordPress site as its memory backend.
 
 ### Reading Memory via AGENTS.md
 

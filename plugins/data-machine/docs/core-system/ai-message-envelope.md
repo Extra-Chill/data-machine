@@ -101,4 +101,4 @@ Canonical top-level result fields include `messages`, `final_content`, `turn_cou
 
 Runtime adapters and tests may return canonical envelopes or the supported `role/content/metadata` compatibility input. `WP_Agent_Conversation_Result::normalize()` normalizes every returned message to the canonical envelope before callers store or render the result. New runtime and storage writes use canonical Agents API envelopes.
 
-Conversation store adapters should normalize host messages to this envelope at their boundary and return envelopes to Data Machine's chat abilities and UI. Adapters that wrap a host-specific DTO should keep that DTO at the host boundary, not inside Data Machine storage.
+Conversation store adapters should normalize host messages to this envelope at their boundary and return envelopes to the host runtime and UI. Adapters that wrap a host-specific DTO should keep that DTO at the host boundary, not inside Data Machine storage.

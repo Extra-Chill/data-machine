@@ -187,7 +187,7 @@ Context files are uploaded against a pipeline. Memory files are selected by file
 The builder also reads current configuration inventories:
 
 - `getStepTypes()` -> `GET /step-types`.
-- `getTools(context)` -> `GET /tools`, optionally filtered by `context` (`pipeline`, `chat`, or `system`).
+- `getTools(context)` -> `GET /tools`, optionally filtered by `context` (`pipeline` or `system`).
 - `getHandlers(stepType)` -> `GET /handlers`, optionally filtered by step type.
 - `getSchedulingIntervals()` -> `GET /settings/scheduling-intervals`.
 

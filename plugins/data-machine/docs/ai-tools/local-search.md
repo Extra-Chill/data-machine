@@ -2,7 +2,7 @@
 
 **File Location**: `inc/Engine/AI/Tools/Global/LocalSearch.php`
 
-**Registration**: `datamachine_global_tools` filter (available to all AI agents - pipeline + chat)
+**Registration**: `datamachine_global_tools` filter (pipeline mode)
 
 Enables AI models to search the current WordPress site for context gathering, research enhancement, and content discovery using WordPress's built-in search functionality.
 

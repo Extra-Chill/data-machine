@@ -24,7 +24,7 @@ $directives = apply_filters( 'datamachine_directives', array() );
 $directive = [
     'class'    => DirectiveClass::class, // implements DirectiveInterface
     'priority' => 25,                    // lower = applied first
-    'modes'    => ['all'],               // 'all', or array of modes (chat, pipeline, system)
+    'modes'    => ['all'],               // 'all', or array of modes (pipeline, system, extension modes)
 ];
 ```
 
@@ -35,7 +35,7 @@ add_filter( 'datamachine_directives', function ( $directives ) {
     $directives[] = [
         'class'    => MyCustomDirective::class,
         'priority' => 30,
-        'modes'    => ['chat', 'pipeline'],
+        'modes'    => ['system', 'pipeline'],
     ];
     return $directives;
 } );
@@ -60,12 +60,12 @@ $content = apply_filters( "datamachine_agent_mode_{$mode}", $default_content, $p
 
 **Return**: Modified guidance text. Returning an empty string suppresses the directive.
 
-**Built-in modes**: `chat`, `pipeline`, `system`. Extensions can register additional modes (e.g. the editor plugin registers `editor` to inject diff-workflow instructions).
+**Built-in modes**: `pipeline`, `system`. Extensions can register additional modes (e.g. the editor plugin registers `editor` to inject diff-workflow instructions).
 
 **Implementation example**:
 
 ```php
-add_filter( 'datamachine_agent_mode_chat', function ( $content, $payload ) {
+add_filter( 'datamachine_agent_mode_system', function ( $content, $payload ) {
     if ( empty( $payload['agent_id'] ) ) {
         return $content;
     }
@@ -103,7 +103,7 @@ $tools = apply_filters( 'datamachine_tools', array() );
             'description' => 'Search query',
         ],
     ],
-    'modes'            => ['chat'],             // which modes can see this tool
+    'modes'            => ['system'],           // which modes can see this tool (required)
     'requires_config'  => true,                 // checked via datamachine_tool_configured
     'ability'          => 'my-plugin/search',   // optional Ability link for permissions/categories
     'access_level'     => 'admin',              // fallback when no ability is linked
@@ -125,14 +125,14 @@ add_filter( 'datamachine_tools', function ( $tools ) {
                 'description' => 'Search terms',
             ],
         ],
-        'modes'           => ['chat'],
+        'modes'           => ['system'],
         'requires_config' => false,
     ];
     return $tools;
 } );
 ```
 
-Use `pipeline` mode only when a static registry tool is useful inside an automated pipeline AI step. Add `requires_opt_in => true` for powerful tools that should stay hidden by default but can be explicitly granted through `enabled_tools`. Chat affordances and tools that duplicate engine-level validation should stay `chat`-only; pipeline AI steps already receive adjacent handler tools plus pipeline/flow memory directives.
+Use `pipeline` mode only when a static registry tool is useful inside an automated pipeline AI step. Add `requires_opt_in => true` for powerful tools that should stay hidden by default but can be explicitly granted through `enabled_tools`. Interactive affordances and tools that duplicate engine-level validation should not declare `pipeline`; pipeline AI steps already receive adjacent handler tools plus pipeline/flow memory directives.
 
 > Earlier per-mode tool filters were consolidated into `datamachine_tools` in v0.68.0 (PR #1130). Register current tools through the unified registry and declare `modes` on the tool definition.
 
@@ -191,7 +191,7 @@ Handlers (fetch / publish / upsert) are registered via the `HandlerRegistrationT
 
 - Provide a complete `parameters` schema — the AI relies on it for argument structure.
 - Set `requires_config => true` only when the tool genuinely needs configuration. Tools that always work (e.g. `web_fetch`) should leave it `false` so they don't get filtered out.
-- Declare `modes` so the tool only appears where it's useful (e.g. workflow-management tools should be `chat`-only, not exposed to pipeline AI steps).
+- Declare `modes` so the tool only appears where it's useful (e.g. workflow-management tools should be `system` or extension-mode tools, not exposed to pipeline AI steps). A tool without `modes` never resolves.
 
 ### Configuration Validation
 

@@ -35,14 +35,14 @@ $result = datamachine_run_conversation(
     $tools,           // Data Machine tool definitions keyed by tool name.
     $provider,        // wp-ai-client provider identifier.
     $model,           // wp-ai-client model identifier.
-    $mode,            // 'pipeline', 'chat', 'system', or extension mode.
+    $mode,            // 'pipeline', 'system', or extension mode.
     $payload,         // Data Machine runtime payload.
     $max_turns,       // Turn ceiling; resolved through IterationBudgetRegistry.
     $single_turn      // Stop after exactly one provider turn.
 );
 ```
 
-Current callers, including `AIStep`, system tasks, and host chat runtimes, call this function directly.
+Current callers, including `AIStep`, system tasks, and host agent runtimes, call this function directly.
 
 ## What Data Machine Owns
 
@@ -104,7 +104,7 @@ Natural completion is still a Data Machine policy decision. If there are no tool
 
 ## Completion Assertions
 
-Pipeline and chat payloads may include `completion_assertions`. Data Machine resolves them before entering the substrate loop.
+Pipeline and system payloads may include `completion_assertions`. Data Machine resolves them before entering the substrate loop.
 
 Simple required-tool assertions require named tools to run successfully:
 

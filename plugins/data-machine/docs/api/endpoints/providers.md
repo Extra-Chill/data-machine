@@ -337,7 +337,6 @@ for (const provider of preferredProviders) {
 ## Related Documentation
 
 - Execute Endpoint - Workflow execution with AI steps
-- Chat Endpoint - Conversational AI interface
 - Settings Endpoints - Configuration management
 - Authentication - Auth methods
 

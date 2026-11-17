@@ -39,9 +39,11 @@ curl https://example.com/wp-json/datamachine/v1/tools \
   "data": {
     "local_search": {
       "label": "Local Search",
+      "description": "Search WordPress content locally",
+      "requires_config": false,
       "configured": true,
-      "chat_enabled": false,
-      "description": "Search WordPress content locally"
+      "globally_enabled": true,
+      "modes": ["pipeline"]
     }
   }
 }
@@ -49,7 +51,7 @@ curl https://example.com/wp-json/datamachine/v1/tools \
 
 Notes:
 - The response payload is under `data`.
-- This endpoint returns global tools (UI discovery). Tools registered only for other modes (such as `chat` or `system`) are not guaranteed to appear here.
+- Without `context`, the endpoint returns every registered static tool. Pass `context=pipeline` or `context=system` to return only tools that resolve in that mode.
 
 **Response Fields**:
 - `success` (boolean): Request success status
@@ -57,9 +59,11 @@ Notes:
 
 **Tool Definition Fields**:
 - `label` (string): Human-readable tool name
-- `configured` (boolean): Whether tool is properly configured
-- `chat_enabled` (boolean): Whether tool is available in chat interface
 - `description` (string): Tool description
+- `requires_config` (boolean): Whether the tool needs configuration before use
+- `configured` (boolean): Whether tool is properly configured
+- `globally_enabled` (boolean): Whether the tool is enabled site-wide
+- `modes` (array): Agent modes the tool declares (`pipeline`, `system`, or extension modes)
 
 ## Available Tools
 
@@ -73,7 +77,7 @@ Available to all AI agents via `datamachine_global_tools` filter.
 
 **Configuration Required**: No
 
-**Chat Enabled**: No (available to pipeline AI steps only)
+**Modes**: `pipeline`
 
 **Purpose**: Search WordPress content locally
 
@@ -93,7 +97,7 @@ Available to all AI agents via `datamachine_global_tools` filter.
 
 **Configuration Required**: No
 
-**Chat Enabled**: No (available to pipeline AI steps only)
+**Modes**: `pipeline`
 
 **Purpose**: Fetch and extract content from web pages
 
@@ -117,7 +121,7 @@ Available to all AI agents via `datamachine_global_tools` filter.
 
 **Configuration Required**: No
 
-**Chat Enabled**: No (available to pipeline AI steps only)
+**Modes**: `pipeline`
 
 **Purpose**: Read and analyze single WordPress post content
 
@@ -139,8 +143,9 @@ Tools show `"configured": false` if required configuration is missing:
 {
   "image_generation": {
     "label": "Image Generation",
+    "requires_config": true,
     "configured": false,
-    "chat_enabled": false
+    "modes": ["pipeline"]
   }
 }
 ```
@@ -185,9 +190,9 @@ if response.status_code == 200:
     configured = {k: v for k, v in data['tools'].items() if v['configured']}
     print(f"Configured tools: {len(configured)}")
 
-    # List chat-enabled tools
-    chat_tools = {k: v for k, v in data['tools'].items() if v['chat_enabled']}
-    print(f"Chat-enabled tools: {', '.join(chat_tools.keys())}")
+    # List pipeline tools
+    pipeline_tools = {k: v for k, v in data['tools'].items() if 'pipeline' in v['modes']}
+    print(f"Pipeline tools: {', '.join(pipeline_tools.keys())}")
 
     # List unconfigured tools
     unconfigured = [k for k, v in data['tools'].items() if not v['configured']]
@@ -223,15 +228,15 @@ async function getConfiguredTools() {
     }, {});
 }
 
-// Get chat-enabled tools
-async function getChatTools() {
+// Get pipeline tools
+async function getPipelineTools() {
   const response = await axios.get(toolsAPI.baseURL, {
     auth: toolsAPI.auth
   });
 
   const tools = response.data.tools;
   return Object.entries(tools)
-    .filter(([_, tool]) => tool.chat_enabled)
+    .filter(([_, tool]) => tool.modes.includes('pipeline'))
     .map(([id, _]) => id);
 }
 
@@ -239,8 +244,8 @@ async function getChatTools() {
 const configured = await getConfiguredTools();
 console.log('Configured tools:', Object.keys(configured));
 
-const chatTools = await getChatTools();
-console.log('Chat tools:', chatTools);
+const pipelineTools = await getPipelineTools();
+console.log('Pipeline tools:', pipelineTools);
 ```
 
 ## Common Workflows

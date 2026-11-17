@@ -262,7 +262,7 @@ See Handler Registration Trait for complete documentation.
 add_filter('datamachine_tools', function($tools) {
     $tools['my_tool'] = [
         '_callable'     => [$this, 'getToolDefinition'],  // Lazy resolution
-        'modes'         => ['chat', 'pipeline'],
+        'modes'         => ['system', 'pipeline'],
         'ability'       => 'datamachine/my-ability',      // Links to an ability for permission resolution
         'access_level'  => 'admin',                       // Fallback when no ability is linked
     ];
@@ -363,7 +363,7 @@ $ai_response = RequestBuilder::build(
     $provider,      // AI provider name
     $model,         // Model identifier
     $tools,         // Raw tools array from filters
-    $agent_modes,   // ['chat'], ['pipeline', 'world'], etc.
+    $agent_modes,   // ['system'], ['pipeline', 'world'], etc.
     $context        // Agent-specific context
 );
 ```
@@ -371,7 +371,7 @@ $ai_response = RequestBuilder::build(
 **Current Directive Implementations**:
 
 - `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
-- `AgentModeDirective` - Mode-specific guidance for chat, pipeline, system, and extension modes (priority 22)
+- `AgentModeDirective` - Mode-specific guidance for pipeline, system, and extension modes (priority 22)
 - `AgentDailyMemoryDirective` - Optional daily memory (priority 35)
 - `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
 
@@ -383,7 +383,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class' => MyGlobalDirective::class,
         'priority' => 20,  // Lower = applied first
-        'modes' => ['all']  // 'all', 'pipeline', 'chat', 'system', or extension mode
+        'modes' => ['all']  // 'all', 'pipeline', 'system', or extension mode
     ];
 
     $directives[] = [
@@ -414,8 +414,8 @@ through the same lane.
 > your apply callback on `datamachine_pending_action_handlers`. The
 > `ResolvePendingActionAbility` (canonical ability slug
 > `agents/resolve-pending-action`, REST route
-> `POST /datamachine/v1/actions/resolve`, chat tool
-> `resolve_pending_action`) finalizes every kind.
+> `POST /datamachine/v1/actions/resolve`, CLI
+> `wp datamachine pending-actions accept|reject`) finalizes every kind.
 
 ### `datamachine_pending_action_handlers`
 
@@ -504,7 +504,7 @@ add_filter( 'datamachine_post_content_format', function ( string $format, string
 
 `content_format` on abilities is the caller's source format (`markdown`, `html`,
 or `blocks`). It is not the storage decision. For example, the `upsert_post`
-chat tool defaults omitted `content_format` to markdown so agents can author
+model-facing tool defaults omitted `content_format` to markdown so agents can author
 ordinary prose naturally; raw ability/API calls keep the legacy omitted-format
 default of block markup for compatibility.
 
@@ -1082,7 +1082,7 @@ This filter, the strategy definition shape, the callback signature, and the retu
 [
     'class' => DirectiveClass::class,   // Directive class name
     'priority' => 20,                    // Priority (lower = applied first)
-    'modes' => ['all']                   // 'all', 'pipeline', 'chat', 'system', or extension mode
+    'modes' => ['all']                   // 'all', 'pipeline', 'system', or extension mode
 ]
 ```
 
@@ -1289,7 +1289,7 @@ With this filter and a `DATAMACHINE_A8C_GHE_TOKEN` env var (or PHP constant) con
 **Since**: 0.2.0
 **Location**: `/inc/Engine/AI/`
 
-Data Machine's Universal Engine provides shared AI infrastructure serving both Pipeline and Chat agents. See `/docs/core-system/universal-engine.md` for complete architecture documentation.
+Data Machine's Universal Engine provides shared AI infrastructure serving Pipeline and System agents. See `/docs/core-system/universal-engine.md` for complete architecture documentation.
 
 ### WP_Agent_Tool_Parameters (`/inc/Engine/AI/Tools/ToolParameters.php`)
 
@@ -1360,13 +1360,13 @@ Builds parameters for handler-specific tools with engine data merging (source_ur
 
 #### `ToolPolicyResolver::resolve()`
 
-Tool discovery uses `ToolPolicyResolver::resolve()`. This is the single entry point for chat, pipeline, system, and custom modes.
+Tool discovery uses `ToolPolicyResolver::resolve()`. This is the single entry point for pipeline, system, and custom modes.
 
 ```php
 $resolver = new \DataMachine\Engine\AI\Tools\ToolPolicyResolver();
 
 $tools = $resolver->resolve( array(
-    'mode'                 => ToolPolicyResolver::MODE_PIPELINE, // or MODE_CHAT, MODE_SYSTEM
+    'mode'                 => ToolPolicyResolver::MODE_PIPELINE, // or MODE_SYSTEM
     'previous_step_config' => $previous_step_config,
     'next_step_config'     => $next_step_config,
     'pipeline_step_id'     => $flow_step_id,
@@ -1379,7 +1379,7 @@ $tools = $resolver->resolve( array(
 1. Source composition - `ToolSourceRegistry` gathers `adjacent_handlers` and/or `static_registry` for the mode.
 2. Static registry - `DataMachineToolRegistrySource` adapts `datamachine_tools`, filters by `modes`, and checks source-level availability/configuration.
 3. Adjacent handlers - `AdjacentHandlerToolSource` resolves `_handler_callable` entries from previous/next pipeline steps.
-4. Policy resolution - Agents API tool policy applies deny, allow-only, category, mode, mandatory-tool, and chat access rules.
+4. Policy resolution - Agents API tool policy applies deny, allow-only, category, mode, mandatory-tool, and access-level rules.
 5. Final filter - `datamachine_resolved_tools` can adjust the resolved set.
 
 ### Conversation Loop (`/inc/Engine/AI/conversation-loop.php`)
@@ -1394,7 +1394,7 @@ $final_response = \DataMachine\Engine\AI\datamachine_run_conversation(
     array $tools,
     string $provider,
     string $model,
-    array $modes,           // 'pipeline', 'chat', etc.
+    array $modes,           // 'pipeline', 'system', etc.
     array $payload = [],
     int $max_turns = 25,
     bool $single_turn = false
@@ -1533,14 +1533,14 @@ $response = \DataMachine\Engine\AI\RequestBuilder::build(
     string $provider,
     string $model,
     array $tools,
-    string $agent_type,      // 'pipeline' or 'chat'
+    string $agent_type,      // 'pipeline' or 'system'
     array $context
 ): array
 ```
 
 **Features**:
 
-- Directive application system (global, agent-specific, pipeline, chat)
+- Directive application system (global, agent-specific, pipeline, system)
 - Tool restructuring for AI provider compatibility
 - Integration with the wp-ai-client runtime adapter
 - Unified request format across all providers

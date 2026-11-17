@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Modes | chat, pipeline |
+| Modes | pipeline |
 | Mutation risk | Low mutation |
 | Registered in | `ToolServiceProvider.php` via `ImageGeneration` |
 | Backing ability | `datamachine/generate-image` |

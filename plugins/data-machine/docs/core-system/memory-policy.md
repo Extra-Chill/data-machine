@@ -107,7 +107,7 @@ Returns a `filename => metadata` map of registered files after policy is applied
 ```php
 $resolver = new MemoryPolicyResolver();
 $files    = $resolver->resolveRegistered( array(
-    'mode'     => MemoryPolicyResolver::MODE_CHAT,
+    'mode'     => MemoryPolicyResolver::MODE_SYSTEM,
     'agent_id' => $agent_id,
 ) );
 ```
@@ -143,7 +143,6 @@ Match `ToolPolicyResolver` for consistency across the policy layer:
 
 ```php
 MemoryPolicyResolver::MODE_PIPELINE  // pipeline step AI execution
-MemoryPolicyResolver::MODE_CHAT      // host chat runtime session
 MemoryPolicyResolver::MODE_SYSTEM    // system task execution
 ```
 
@@ -157,7 +156,7 @@ Parallel structure, parallel mental model:
 |---|---|---|
 | What is scoped | Tools available to agent | Memory files injected into agent |
 | Storage | `agent_config.tool_policy` | `agent_config.memory_policy` |
-| Contexts | pipeline / chat / system | pipeline / chat / system |
+| Contexts | pipeline / system / extension modes | pipeline / system / extension modes |
 | Modes | `deny`, `allow` | `default`, `deny`, `allow_only` |
 | Resolver | `ToolPolicyResolver` | `MemoryPolicyResolver` |
 | Export path | Travels via `agent_config` in `AgentBundler` | Travels via `agent_config` in `AgentBundler` |

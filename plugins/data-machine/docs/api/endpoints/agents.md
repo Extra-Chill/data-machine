@@ -8,7 +8,7 @@ Agent record and token management is exposed as REST-visible Data Machine abilit
 
 ## Authentication
 
-- All agent abilities use the current WordPress user and Data Machine agent capabilities via `PermissionHelper` (`manage_agents`, `create_own_agent`, or `chat` depending on the ability).
+- All agent abilities use the current WordPress user and Data Machine agent capabilities via `PermissionHelper` (`manage_agents`, `create_own_agent`, or `use_tools` depending on the ability).
 - Agent bearer tokens populate `PermissionHelper` agent context. Token capabilities can be restricted by a capability ceiling, so a token can be narrower than the owning agent's full Data Machine capability set.
 - The `/agent/authorize` and `/agent/auth/callback` routes are browser-facing flow endpoints with open REST permissions, then validate login cookies, nonces, redirect URIs, or callback payloads inside the handler.
 
@@ -18,7 +18,7 @@ Token values are sensitive. `create-agent-token` returns `raw_token` once; `list
 
 | Ability | Permission | Purpose |
 |---|---|---|
-| `datamachine/list-agents` | `chat` or `manage_agents` | List agents accessible to the caller. `scope=mine` (default, owned + granted) or `scope=all` (admin only). `user_id` for admin queries, `site_id` to filter by site scope, `include_role` to enrich rows with the resolved user's role. |
+| `datamachine/list-agents` | `use_tools`, `create_own_agent`, or `manage_agents` | List agents accessible to the caller. `scope=mine` (default, owned + granted) or `scope=all` (admin only). `user_id` for admin queries, `site_id` to filter by site scope, `include_role` to enrich rows with the resolved user's role. |
 | `datamachine/get-agent` | `manage_agents` | Fetch one agent by `agent_slug` or `agent_id`, including access grants and directory info. `me: true` resolves the acting principal's own agent (agent-token context, else the user's default agent) and includes `site` metadata — replaces the retired `GET /agents/me`. |
 | `datamachine/create-agent` | `manage_agents` or `create_own_agent` | Create an agent. `agent_slug` required; `agent_name` defaults to the slug; `owner_id` defaults to the acting user (admins may pass another user); `config` and `site_scope` optional. Non-admins can only create for themselves, subject to a per-user limit. |
 | `datamachine/update-agent` | `manage_agents` | Update `agent_name` and/or `agent_config` on `agent` (slug or ID). |

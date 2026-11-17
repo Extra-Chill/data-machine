@@ -2,7 +2,7 @@
 
 AI tools should be exposed as WordPress Ability projections whenever a single registered ability already owns the execution contract. `inc/Engine/AI/Tools/ToolServiceProvider.php` still instantiates tool classes so they can register configuration handlers and ability projections, but the model-facing declaration should use `datamachine_register_ability_tool()` instead of a class/method handler when possible.
 
-The `datamachine_tools` class/method registry serves composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`chat`, `pipeline`, or pipeline-policy mode) and the ability or access level required to execute them.
+The `datamachine_tools` class/method registry serves composite orchestration tools and adjacent handler tools that do not map cleanly to one public ability. Tools declare where they can run (`pipeline`, `system`, or pipeline-policy mode). Tools without an explicit mode list are not available in any mode and the ability or access level required to execute them.
 
 ## Registered Tool Inventory
 
@@ -14,36 +14,32 @@ Mutation risk means what the tool can change when called successfully:
 - **Content mutation**: creates, updates, assigns, merges, or deletes WordPress content/taxonomy/files.
 - **Destructive**: deletes durable workflow objects, files, logs, jobs, or terms.
 
-### Chat And Pipeline Tools
+### Pipeline Tools
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `image_generation` | chat, pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
-| `internal_link_audit` | chat, pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
-| `local_search` | chat, pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
-| `web_fetch` | chat, pipeline | Read-only | Fetch readable content from a URL. | [Web Fetch](web-fetch.md) |
-| `wordpress_post_reader` | chat, pipeline | Read-only | Read a WordPress post by permalink URL. | [WordPress Post Reader](wordpress-post-reader.md) |
+| `image_generation` | pipeline | Low mutation | Create image-generation jobs and sideload generated media. | [Image Generation](image-generation.md) |
+| `internal_link_audit` | pipeline | Low mutation | Audit internal links, backlinks, orphans, and broken URLs. | [Internal Link Audit](internal-link-audit.md) |
+| `local_search` | pipeline | Read-only | Search local WordPress posts/pages. | [Local Search](local-search.md) |
+| `web_fetch` | pipeline | Read-only | Fetch readable content from a URL. | [Web Fetch](web-fetch.md) |
+| `wordpress_post_reader` | pipeline | Read-only | Read a WordPress post by permalink URL. | [WordPress Post Reader](wordpress-post-reader.md) |
 
-### Chat And Pipeline-Policy Tools
+### Pipeline-Policy Tools
 
 Pipeline-policy tools are available while resolving pipeline tool policy, not as regular adjacent handler tools.
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `agent_daily_memory` | chat, pipeline policy | Low mutation | Read, write, list, and search daily memory journal files. | [Agent Daily Memory](agent-daily-memory.md) |
-| `agent_memory` | chat, pipeline policy | Low mutation | Read and update agent markdown files by section. | [Agent Memory](agent-memory.md) |
+| `agent_daily_memory` | pipeline policy (opt-in) | Low mutation | Read, write, list, and search daily memory journal files. | [Agent Daily Memory](agent-daily-memory.md) |
+| `agent_memory` | pipeline policy (opt-in) | Low mutation | Read and update agent markdown files by section. | [Agent Memory](agent-memory.md) |
 
-### Chat And System Tools
+### System Tools
 
 | Tool | Modes | Mutation risk | Purpose | Docs |
 | --- | --- | --- | --- | --- |
-| `consult_agent` | chat, system (opt-in) | Read-only | Ask another registered agent a question and return its answer. Implemented in `inc/Engine/AI/Tools/Global/ConsultAgent.php`; must be enabled explicitly through the step's `enabled_tools`. | — |
+| `consult_agent` | system (opt-in) | Read-only | Ask another registered agent a question through the Agents API `agents/chat` ability and return its answer. Implemented in `inc/Engine/AI/Tools/Global/ConsultAgent.php`; must be enabled explicitly through the task's `enabled_tools`. | — |
 
-### Chat-Only Duplicate Prevention Tool
-
-| Tool | Mutation risk | Purpose | Docs |
-| --- | --- | --- | --- |
-| `queue_validator` | Read-only | Check if a topic exists in published content or a flow queue. | [Queue Validator](queue-validator.md) |
+Topic duplicate checks are no longer a model tool. Use the `datamachine/check-duplicate` ability or `wp datamachine flows queue validate` (backed by `DataMachine\Core\Similarity\QueueTopicValidator`).
 
 ## Handler-Specific Tools
 
@@ -66,9 +62,9 @@ Common extension tools include:
 - `list_github_pulls`, `list_github_repos`
 - `workspace_path`, `workspace_list`, `workspace_show`, `workspace_ls`, `workspace_read`
 
-## Removed Chat-Only Tools
+## Removed Interactive Tools
 
-The chat-only admin/workflow tools that lived under `inc/Api/Chat/Tools/` (pipeline/flow configuration, taxonomy mutation, logs, jobs, `api_query`, `execute_workflow`, `send_ping`, and similar) were removed together with Data Machine's built-in chat. Chat is owned by Agents API (`agents/chat`) and host chat runtimes; those runtimes can project the underlying `datamachine/*` abilities as tools directly.
+Data Machine no longer has an interactive agent mode. The admin/workflow tools that used to live under `inc/Api/Chat/Tools/` and the `queue_validator` tool were removed. Interactive agent runtimes (for example the Agents API `agents/chat` ability) can project the underlying `datamachine/*` abilities as tools directly.
 
 ## Tool Architecture
 
@@ -82,7 +78,6 @@ Class/method tool declarations are still explicit exceptions:
 
 - `agent_memory` and `agent_daily_memory` compose several file/memory abilities behind one action router and resolve agent/user scope before dispatch.
 - `internal_link_audit` composes several internal-link abilities behind one action router and strips internal response keys.
-- `queue_validator` contains duplicate-prevention orchestration across published posts and queue state that is reused by queue-add behavior.
 - `web_fetch` has no registered WordPress ability yet; it remains a class/method tool until a first-class fetch ability exists.
 - Adjacent handler tools remain runtime-generated class/method declarations because their schemas depend on neighboring pipeline handler configuration.
 

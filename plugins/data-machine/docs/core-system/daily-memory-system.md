@@ -9,8 +9,8 @@ Daily memory has six components:
 1. **DailyMemory service** — filesystem storage with CRUD, search, and date-range queries
 2. **DailyMemoryTask** — AI-powered system task that synthesizes daily summaries and cleans MEMORY.md
 3. **DailyMemoryAbilities** — WordPress 6.9 Abilities API registration
-4. **AgentDailyMemoryDirective** — opt-in injection at Priority 35 for agents that enable it via `agent_config.daily_memory` (chat + pipeline contexts)
-5. **AgentDailyMemory tool** — AI chat tool for agent self-service
+4. **AgentDailyMemoryDirective** — opt-in injection at Priority 35 for agents that enable it via `agent_config.daily_memory` (pipeline context)
+5. **AgentDailyMemory tool** — model-facing tool for agent self-service
 6. **CLI and REST endpoints** — human and programmatic access
 
 ## File Storage
@@ -95,7 +95,7 @@ The task gathers same-day Data Machine activity and injects it into the single m
 **Data source:**
 - `datamachine_jobs` — pipeline and system jobs created on the target date (job_id, pipeline_id, flow_id, source, label, status)
 
-Chat sessions are owned by Agents API and host chat runtimes, so they are not part of the activity context.
+Conversation transcripts are owned by Agents API and host runtimes, so they are not part of the activity context.
 
 **Process:**
 1. Query jobs for the target date.
@@ -248,7 +248,7 @@ wp_execute_ability('datamachine/search-daily-memory', [
 **Source:** `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php`
 **Since:** v0.71.0
 **Priority:** 35
-**Contexts:** `chat`, `pipeline`
+**Contexts:** `pipeline`
 
 Opt-in directive that reads recent daily archive files directly from disk and injects each one as its own `system_text` block into the AI context.
 
@@ -284,7 +284,7 @@ Enable per agent via `agent_config`:
 ```
 Priority 10 — Plugin Core (agent identity)
 Priority 20 — Core Memory Files (SOUL.md, USER.md, MEMORY.md, etc.)
-Priority 35 — Agent Daily Memory (THIS; chat + pipeline, opt-in)
+Priority 35 — Agent Daily Memory (THIS; pipeline, opt-in)
 Priority 40 — Pipeline Memory Files
 Priority 45 — Flow Memory Files
 Priority 50 — Pipeline System Prompt
@@ -301,9 +301,9 @@ The directive only injects recent days on a rolling window. The `agent_daily_mem
 
 **Source:** `inc/Engine/AI/Tools/Global/AgentDailyMemory.php`
 **Tool ID:** `agent_daily_memory`
-**Contexts:** `chat`, `pipeline`, `standalone`
+**Contexts:** `pipeline`
 
-An AI chat tool that lets agents manage their own daily memory during conversations. It is registered for chat and pipeline-policy contexts, then gated by normal tool policy and by the underlying daily-memory abilities. Read/list/search availability follows the ability permission path; writes also respect `daily_memory_enabled` through `DailyMemoryAbilities`.
+A model-facing tool that lets agents manage their own daily memory during a run. It is registered for the pipeline mode, then gated by normal tool policy and by the underlying daily-memory abilities. Read/list/search availability follows the ability permission path; writes also respect `daily_memory_enabled` through `DailyMemoryAbilities`.
 
 ### Tool Schema
 
@@ -394,7 +394,7 @@ All commands resolve agent scoping via `AgentResolver` (from `--agent` flag) wit
 All three interfaces delegate to the same storage layer, but through different paths:
 
 ```
-AI Chat Tool                  REST API                CLI
+AI Tool                       REST API                CLI
      |                           |                     |
      v                           v                     |
 WP Abilities API          DailyMemoryAbilities         |
@@ -418,7 +418,7 @@ The AI tool and REST API go through the Abilities layer. The CLI accesses the `D
 | `inc/Core/FilesRepository/DailyMemory.php` | Core service — file storage, CRUD, search |
 | `inc/Engine/AI/System/Tasks/DailyMemoryTask.php` | System task — AI synthesis and MEMORY.md cleanup |
 | `inc/Abilities/DailyMemoryAbilities.php` | WordPress 6.9 Abilities (5 abilities) |
-| `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Opt-in chat + pipeline context injection (Priority 35, since v0.71.0) |
-| `inc/Engine/AI/Tools/Global/AgentDailyMemory.php` | AI chat tool for daily memory access |
+| `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Opt-in pipeline context injection (Priority 35, since v0.71.0) |
+| `inc/Engine/AI/Tools/Global/AgentDailyMemory.php` | Model-facing tool for daily memory access |
 | `inc/Cli/Commands/MemoryCommand.php` | CLI subcommands (daily list/read/write/append/delete/search) |
 | `inc/Abilities/DailyMemoryAbilities.php` | REST-visible daily memory abilities |

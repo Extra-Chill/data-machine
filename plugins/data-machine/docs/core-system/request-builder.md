@@ -13,7 +13,7 @@ Data Machine has two separate runtime layers:
 - **wp-ai-client** owns provider/model prompt execution.
 - **RequestBuilder** is the Data Machine adapter from product payloads to `wp-ai-client` provider requests.
 
-Pipeline AI steps and Data Machine chat turns use `RequestBuilder::build()` so directives, metadata, request inspection, tool declarations, and timeout behavior stay consistent. Plugins that only need one-shot AI operations may call `wp-ai-client` directly; they do not need to route through Data Machine or Agents API.
+Pipeline AI steps and system task turns use `RequestBuilder::build()` so directives, metadata, request inspection, tool declarations, and timeout behavior stay consistent. Plugins that only need one-shot AI operations may call `wp-ai-client` directly; they do not need to route through Data Machine or Agents API.
 
 ## Flow
 
@@ -52,7 +52,7 @@ $ai_response = RequestBuilder::build(
     $provider,          // wp-ai-client provider identifier.
     $model,             // wp-ai-client model identifier.
     $tools,             // Data Machine tool definitions keyed by name.
-    $mode,              // 'chat', 'pipeline', 'system', or extension mode.
+    $mode,              // 'pipeline', 'system', or extension mode.
     $payload,           // Runtime payload: session, job, flow step, agent, etc.
     $request_metadata   // Output parameter populated before dispatch.
 );
@@ -124,7 +124,7 @@ Current directive priorities:
 - **22**: Runtime agent-mode guidance.
 - **25**: Authenticated caller context.
 - **35**: Daily memory and client-reported context.
-- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives.
+- **40-50**: Pipeline, flow, and workflow-specific directives.
 
 ## Tool Declarations
 
@@ -249,7 +249,7 @@ Representative tests:
 
 ## Best Practices
 
-- Use `RequestBuilder::build()` for Data Machine chat, pipeline, and system runtime turns.
+- Use `RequestBuilder::build()` for Data Machine pipeline, system, and extension-mode runtime turns.
 - Treat `GenerativeAiResult` and `WP_Error` as the public return contract.
 - Use the `$request_metadata` output parameter when a caller needs request diagnostics.
 - Keep tool execution outside RequestBuilder.

@@ -157,9 +157,9 @@ wp datamachine jobs undo <job_id> --dry-run --allow-root
 
 ## AI Integration
 
-- **Tool-first architecture** enables AI agents (pipeline, chat, and system) to call tools resolved through `ToolPolicyResolver`, `ToolSourceRegistry`, and the Data Machine `datamachine_tools` registry.
+- **Tool-first architecture** enables AI agents (pipeline and system) to call tools resolved through `ToolPolicyResolver`, `ToolSourceRegistry`, and the Data Machine `datamachine_tools` registry.
 - **PromptBuilder + RequestBuilder** apply layered directives via the `datamachine_directives` filter so every request includes identity, context, and site-specific instructions.
-- **Static registry tools** include research, site operations, memory, and workflow-management tools whose `modes` decide whether they appear in chat, pipeline, or system requests.
+- **Static registry tools** include research, site operations, memory, and workflow-management tools whose `modes` decide whether they appear in pipeline, system, or extension-mode requests.
 - **Adjacent handler tools** are generated from previous/next pipeline steps so AI steps can publish, upsert, or skip items using the neighboring handler configuration.
 - **Tool declarations + ToolResultFinder** provide tool parameter metadata and interpret results inside data packets to keep conversations consistent.
 

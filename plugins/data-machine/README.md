@@ -68,7 +68,6 @@ One agent, three operational modes — same identity and memory, different guida
 | Mode | Purpose | Tools |
 |---------|---------|-------|
 | **Pipeline** | Automated workflow execution | Handler-specific tools scoped to the current step |
-| **Chat** | Conversations run by a host chat runtime (Agents API owns chat) | Tools registered for chat mode by extensions and host runtimes |
 | **System** | Background infrastructure tasks | Alt text, daily memory, image generation, internal linking, meta descriptions, retention (GitHub issues in data-machine-code extension) |
 
 Built-in mode guidance is injected by `AgentModeDirective` at runtime and extensions can register more modes through `AgentModeRegistry`. Configure AI provider and model per mode in Settings. Each mode falls back to the global default if no override is set.
@@ -287,13 +286,13 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 
 ## AI Providers
 
-Configure any provider registered with `wp-ai-client`, then choose a global default per site with optional per-mode overrides for pipeline, chat, and system. Data Machine reads provider/model metadata from the wp-ai-client provider registry and Connectors-shaped settings via `WpAiClientProviderAdmin`; runtime dispatch goes through `RequestBuilder` and has no fallback to `chubes_ai_request` or `ai-http-client`.
+Configure any provider registered with `wp-ai-client`, then choose a global default per site with optional per-mode overrides for pipeline, system, and the default agent model (`agent`). Data Machine reads provider/model metadata from the wp-ai-client provider registry and Connectors-shaped settings via `WpAiClientProviderAdmin`; runtime dispatch goes through `RequestBuilder` and has no fallback to `chubes_ai_request` or `ai-http-client`.
 
 ## Runtime Architecture
 
 Data Machine's runtime seam uses Agents API vocabulary but keeps Data Machine product policy in Data Machine:
 
-- `datamachine_run_conversation()` is the Data Machine entry point for chat and pipeline AI turns.
+- `datamachine_run_conversation()` is the Data Machine entry point for pipeline and system AI turns.
 - `AgentsAPI\AI\WP_Agent_Conversation_Loop::run()` owns generic turn sequencing, budgets, transcript persistence, locks, event callbacks, and normalized result fields.
 - Data Machine's turn runner owns request assembly, wp-ai-client dispatch, Data Machine tool execution, duplicate-call protection, tool runtime rules, completion assertions, job artifacts, and product logging.
 - `RequestBuilder::build()` returns `WordPress\AiClient\Results\DTO\GenerativeAiResult` or `WP_Error`; the old `success/data/error` array shape is historical.

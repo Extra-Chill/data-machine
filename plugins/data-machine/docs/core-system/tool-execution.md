@@ -65,11 +65,11 @@ $tools = $resolver->resolve( array(
 ) );
 ```
 
-Chat example:
+System task example:
 
 ```php
 $tools = $resolver->resolve( array(
-    'mode'           => ToolPolicyResolver::MODE_CHAT,
+    'mode'           => ToolPolicyResolver::MODE_SYSTEM,
     'agent_id'       => $agent_id,
     'client_context' => array(
         'session_id' => $session_id,
@@ -108,7 +108,7 @@ public static function executeTool(
     array $tool_parameters,
     array $available_tools,
     array $payload,
-    string $mode = ActionPolicyResolver::MODE_CHAT,
+    string $mode = ActionPolicyResolver::MODE_SYSTEM,
     int $agent_id = 0,
     array $client_context = array()
 ): array
@@ -152,7 +152,7 @@ Common payload values include:
 | `flow_step_id` | Current flow-step identifier. |
 | `flow_step_config` | Current flow-step snapshot. |
 | `handler_config` | Handler-specific runtime configuration. |
-| `session_id` | Chat session identifier when called from chat. |
+| `session_id` | Transcript session identifier when the host runtime provides one. |
 
 The AI's tool parameters win over defaults extracted from the payload. Handler tools also receive `handler_config`, engine data such as `source_url` and `image_url`, and the resolved `tool_definition`.
 
@@ -175,12 +175,12 @@ Resolution order is:
 1. Explicit deny list.
 2. Per-agent `agent_config.action_policy.tools[tool_name]`.
 3. Per-agent `agent_config.action_policy.categories[category]`.
-4. Tool-declared default, including per-mode keys such as `action_policy_chat`.
+4. Tool-declared default, including per-mode keys such as `action_policy_system`.
 5. Mode preset from `DataMachineModeActionPolicyProvider`.
 6. Global default from Agents API.
 7. `datamachine_tool_action_policy` filter.
 
-Chat can stage publish-family tools for preview because a user is present. Pipeline and system modes default to direct for automation unless a tool or policy says otherwise.
+Pipeline and system modes default to direct for automation. A tool declaration (`action_policy` or `action_policy_<mode>`), a per-agent policy, or the filter can still stage a tool for preview.
 
 ## Pending Actions
 
@@ -196,7 +196,7 @@ $staged = PendingActionHelper::stage( array(
     ),
     'agent_id'     => $agent_id,
     'context'      => array(
-        'mode'      => 'chat',
+        'mode'      => 'system',
         'tool_name' => 'publish_instagram',
         'session_id' => $session_id,
     ),
@@ -210,7 +210,7 @@ The result is an Agents API `approval_required` message with:
 | `payload.pending_action.action_id` | Identifier to resolve later. |
 | `payload.pending_action.summary` | Human-readable preview summary. |
 | `payload.pending_action.preview` | Renderable preview data. |
-| `payload.resolve_with` | Chat tool name to call for resolution, currently `resolve_pending_action`, backed by `agents/resolve-pending-action`. |
+| `payload.resolve_with` | Ability a human uses to resolve the action: `agents/resolve-pending-action` (also REST `POST /datamachine/v1/actions/resolve` and `wp datamachine pending-actions accept\|reject`). The model does not resolve its own staged actions. |
 | `payload.resolve_params` | Required resolution arguments. |
 | top-level `staged` and `action_id` | Data Machine compatibility fields for internal callers. |
 

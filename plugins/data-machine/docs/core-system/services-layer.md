@@ -1,19 +1,19 @@
 # Abilities-First Service Layer
 
-Data Machine's public service layer is the WordPress Abilities API. REST controllers, WP-CLI commands, chat tools, system tasks, and extension integrations call `datamachine/*` abilities instead of reaching into manager classes or controller internals.
+Data Machine's public service layer is the WordPress Abilities API. REST controllers, WP-CLI commands, AI tools, system tasks, and extension integrations call `datamachine/*` abilities instead of reaching into manager classes or controller internals.
 
 Current business operations live in focused ability classes under `inc/Abilities/`, with lower-level repositories and core classes kept as implementation details behind those abilities.
 
 ## Abilities Overview
 
-Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, chat tools, background jobs, and external integrations. The current registry includes 204 `datamachine/*` abilities across domains including:
+Ability classes under `inc/Abilities/` register the operations Data Machine exposes to REST, WP-CLI, AI tools, background jobs, and external integrations. The current registry includes 204 `datamachine/*` abilities across domains including:
 
 - Pipeline and pipeline-step CRUD, duplication, import, and export
 - Flow CRUD, scheduling, duplication, pause/resume, webhook triggers, and per-step configuration
 - Prompt queues, fetch config-patch queues, and queue mode management
 - Job execution, retry/fail/delete/recovery, flow health, and summaries
 - Agent identity, access grants, tokens, active-agent selection, remote calls, memory, and self-memory writes
-- File, scaffold, chat, email, media, SEO, taxonomy CRUD/resolution/merge, settings, auth, logs, source inventory, and analytics operations
+- File, scaffold, chat identity, email, media, SEO, taxonomy CRUD/resolution/merge, settings, auth, logs, source inventory, and analytics operations
 
 ## Architecture Principles
 
@@ -69,8 +69,8 @@ $result = $ability->execute([
 ]);
 ```
 
-### Chat Tools
-Chat tools delegate to abilities:
+### AI Tools
+Model-facing tools delegate to abilities:
 
 ```php
 // Tool execution via ability

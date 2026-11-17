@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Modes | chat, pipeline policy |
+| Modes | pipeline policy |
 | Mutation risk | Low mutation |
 | Registered in | `ToolServiceProvider.php` via `AgentDailyMemory` |
 | Backing abilities | `datamachine/daily-memory-read`, `datamachine/daily-memory-write`, `datamachine/daily-memory-list`, `datamachine/search-daily-memory` |

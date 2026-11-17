@@ -8,7 +8,7 @@ Complete REST API reference for Data Machine.
 
 **Authentication**: WordPress application password, WordPress admin cookie authentication, or endpoint-specific bearer-token authentication where noted.
 
-**Permissions**: REST controllers use `DataMachine\Abilities\PermissionHelper`, not a single generic `manage_options` check. WordPress administrators still pass because `manage_options` grants the mapped Data Machine capabilities, but the canonical permissions are scoped actions such as `manage_flows`, `manage_agents`, `manage_settings`, `chat`, `use_tools`, `view_logs`, and `create_own_agent`.
+**Permissions**: REST controllers use `DataMachine\Abilities\PermissionHelper`, not a single generic `manage_options` check. WordPress administrators still pass because `manage_options` grants the mapped Data Machine capabilities, but the canonical permissions are scoped actions such as `manage_flows`, `manage_agents`, `manage_settings`, `use_tools`, `view_logs`, and `create_own_agent`.
 
 **Implementation**: All REST route registrations live in `inc/Api/`. This inventory is sourced from `register_routes()` implementations in that directory.
 
@@ -16,7 +16,7 @@ Complete REST API reference for Data Machine.
 
 | Group | Routes | Permission model | Source | Docs |
 |-------|--------|------------------|--------|------|
-| Agents | Retired in #3456 — agent CRUD and tokens are REST-visible abilities; access grants go through Agents API's `agents/list-agent-users` / `grant-agent-access` / `revoke-agent-access` run through `/wp-abilities/v1/abilities/datamachine/<slug>/run`; `/agents/me` is `datamachine/get-agent` with `me: true` (see [Agents](endpoints/agents.md)). The browser authorization routes (`/agent/authorize`, `/agent/auth/*`) remain on `datamachine/v1`. | Each ability's permission callback (`manage_agents`, `create_own_agent`, or `chat` through `PermissionHelper`, plus per-agent access checks on tokens and access management). | `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentTokenAbilities.php` | [Agents](endpoints/agents.md) |
+| Agents | Retired in #3456 — agent CRUD and tokens are REST-visible abilities; access grants go through Agents API's `agents/list-agent-users` / `grant-agent-access` / `revoke-agent-access` run through `/wp-abilities/v1/abilities/datamachine/<slug>/run`; `/agents/me` is `datamachine/get-agent` with `me: true` (see [Agents](endpoints/agents.md)). The browser authorization routes (`/agent/authorize`, `/agent/auth/*`) remain on `datamachine/v1`. | Each ability's permission callback (`manage_agents`, `create_own_agent`, or `use_tools` through `PermissionHelper`, plus per-agent access checks on tokens and access management). | `inc/Abilities/AgentAbilities.php`, `inc/Abilities/AgentTokenAbilities.php` | [Agents](endpoints/agents.md) |
 | Agent Ping | `/agent-ping/confirm`, `/agent-ping/callback/{callback_id}` | Bearer-token callback auth using the configured agent-ping callback token. No WordPress capability check. | `inc/Api/AgentPing.php` | [Agent Ping](endpoints/agent-ping.md) |
 | Analytics | Extension-provided analytics routes via `datamachine_analytics_ability_map` | `manage_flows` via `PermissionHelper::can( 'manage_flows' )`. | `inc/Api/Analytics.php` | [Analytics](endpoints/analytics.md) |
 | Auth | `/auth/providers`, `/auth/{handler_slug}`, `/auth/{handler_slug}/status`, `/auth/{handler_slug}/token`, `/auth/{handler_slug}/refresh` | `manage_settings` through `Auth::check_permission()`. | `inc/Api/Auth.php` | [Auth](endpoints/auth.md) |
@@ -105,7 +105,6 @@ See [Authentication](endpoints/authentication.md).
 | `manage_agents` | `datamachine_manage_agents` |
 | `manage_flows` | `datamachine_manage_flows` |
 | `manage_settings` | `datamachine_manage_settings` |
-| `chat` | `datamachine_chat` |
 | `use_tools` | `datamachine_use_tools` |
 | `view_logs` | `datamachine_view_logs` |
 | `create_own_agent` | `datamachine_create_own_agent` |

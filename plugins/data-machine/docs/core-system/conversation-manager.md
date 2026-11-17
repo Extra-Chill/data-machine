@@ -8,11 +8,11 @@
 
 ## Overview
 
-ConversationManager provides standardized message formatting utilities for all AI agents (Pipeline and Chat). All methods are static with no state management, enabling consistent conversation structure across the Data Machine ecosystem.
+ConversationManager provides standardized message formatting utilities for all AI agents (pipeline and system modes). All methods are static with no state management, enabling consistent conversation structure across the Data Machine ecosystem.
 
 ## Purpose
 
-Centralizes conversation message building, tool call formatting, result messaging, and duplicate detection logic used by AIConversationLoop, RequestBuilder, and both Pipeline and Chat agents.
+Centralizes conversation message building, tool call formatting, result messaging, and duplicate detection logic used by AIConversationLoop, RequestBuilder, and pipeline and system agents.
 
 ## Core Methods
 
@@ -350,37 +350,37 @@ appropriate to the current execution mode.
 public static function generateDuplicateToolCallMessage(
     string $tool_name,
     int $turn_count = 0,
-    string $mode = 'chat'
+    string $mode = 'system'
 ): array
 ```
 
 **Parameters**:
 - `$tool_name` (string) - Tool name that was duplicated
 - `$turn_count` (int) - Current conversation turn (0 = no turn display)
-- `$mode` (string) - Execution mode (`'chat'`, `'pipeline'`, `'bridge'`, ...). Defaults to `'chat'` so existing callers retain prior behavior.
+- `$mode` (string) - Execution mode (`'system'`, `'pipeline'`, `'bridge'`, ...). Defaults to `'system'`.
 
 **Returns**: Formatted tool-result envelope (`success: false`, `error: <mode-shaped guidance>`)
 
 **Mode behavior**:
-- `'chat'` (default) — instructs the AI to **end the conversation**. The tool's success IS the answer to the user's question.
+- `'system'` (default) — instructs the AI to **end the conversation**. The tool's success IS the answer.
 - `'pipeline'` — instructs the AI to **call the publish handler tool now** to complete the step. Pipeline conversations have downstream work after the duplicated tool call.
 - `'bridge'` — instructs the AI to **continue its response to the user** using the result it already has.
-- Unknown modes fall back to chat semantics.
+- Unknown modes fall back to system semantics.
 
 **Example**:
 ```php
-// Chat: AI is told the task is done.
+// System: AI is told the task is done.
 $msg = ConversationManager::generateDuplicateToolCallMessage('local_search');
 
 // Pipeline: AI is told to move on to the publish handler.
 $msg = ConversationManager::generateDuplicateToolCallMessage(
-    'queue_validator',
+    'local_search',
     $turn_count,
     'pipeline'
 );
 ```
 
-**Background**: see [data-machine #1441](https://github.com/Extra-Chill/data-machine/issues/1441) — chat-shaped guidance was previously emitted for every mode, which caused pipeline AI steps to silently end mid-conversation after a duplicate tool call instead of finishing the publish step.
+**Background**: see [data-machine #1441](https://github.com/Extra-Chill/data-machine/issues/1441) — end-the-conversation guidance was previously emitted for every mode, which caused pipeline AI steps to silently end mid-conversation after a duplicate tool call instead of finishing the publish step.
 
 ---
 

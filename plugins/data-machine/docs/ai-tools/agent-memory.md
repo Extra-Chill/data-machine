@@ -4,7 +4,7 @@
 
 | Field | Value |
 | --- | --- |
-| Modes | chat, pipeline policy |
+| Modes | pipeline policy |
 | Mutation risk | Low mutation |
 | Registered in | `ToolServiceProvider.php` via `AgentMemory` |
 | Backing abilities | `datamachine/get-agent-memory`, `datamachine/update-agent-memory`, `datamachine/list-agent-memory-sections` |

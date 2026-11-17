@@ -27,7 +27,7 @@ Directive outputs are validated by `DirectiveOutputValidator`:
 
 ### Modes
 
-Each registered directive declares which agent **modes** it applies to via the `modes` array. The current built-in modes are `chat`, `pipeline`, and `system`. The literal string `all` matches every mode.
+Each registered directive declares which agent **modes** it applies to via the `modes` array. The current built-in modes are `pipeline` and `system`; extensions can register more (for example `editor`). The literal string `all` matches every mode.
 
 ### Priority System
 
@@ -36,8 +36,8 @@ Directives are applied in ascending priority order (lowest number = highest prio
 | Priority | Directive | Modes | Source | Purpose |
 |----------|-----------|-------|--------|---------|
 | **20** | `CoreMemoryFilesDirective` | all | `inc/Engine/AI/Directives/CoreMemoryFilesDirective.php` | SITE.md, RULES.md, SOUL.md, MEMORY.md, USER.md, custom registered files |
-| **22** | `AgentModeDirective` | all | `inc/Engine/AI/Directives/AgentModeDirective.php` | Mode-specific guidance (chat / pipeline / system) injected as runtime directive |
-| **35** | `AgentDailyMemoryDirective` | chat, pipeline | `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Recent daily archives for agents that opt in via `agent_config.daily_memory` |
+| **22** | `AgentModeDirective` | all | `inc/Engine/AI/Directives/AgentModeDirective.php` | Mode-specific guidance (pipeline / system / extension modes) injected as runtime directive |
+| **35** | `AgentDailyMemoryDirective` | pipeline | `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php` | Recent daily archives for agents that opt in via `agent_config.daily_memory` |
 | **40** | `PipelineMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php` | Per-pipeline selectable memory files |
 | **45** | `FlowMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php` | Per-flow selectable memory files (additive to pipeline memory) |
 | **50** | `PipelineSystemPromptDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php` | User-configured task instructions + workflow visualization |
@@ -81,10 +81,9 @@ Reads core memory files from three directory layers and injects them as system m
 **Modes**: All
 **Since**: 0.68.0 (replaced per-agent context files in #1129/#1130)
 
-Injects execution-mode guidance (chat, pipeline, system) as a runtime directive rather than per-agent disk files. Mode guidance is platform knowledge, not agent-specific state — shipping it as a directive removes per-agent disk clutter and enables hook-based composition.
+Injects execution-mode guidance (pipeline, system, extension modes) as a runtime directive rather than per-agent disk files. Mode guidance is platform knowledge, not agent-specific state — shipping it as a directive removes per-agent disk clutter and enables hook-based composition.
 
 **Built-in modes**:
-- `chat` — Live interactive chat session run by a host chat runtime (Agents API owns chat). Short identity-first guidance.
 - `pipeline` — Automated pipeline step execution. Includes data packet structure and analysis-before-action principles.
 - `system` — Background system task execution. Includes "return only what's asked" behavior.
 
@@ -95,7 +94,7 @@ Injects execution-mode guidance (chat, pipeline, system) as a runtime directive 
 ### AgentDailyMemoryDirective (Priority 35)
 
 **Source**: `inc/Engine/AI/Directives/AgentDailyMemoryDirective.php`
-**Modes**: chat, pipeline
+**Modes**: pipeline
 **Since**: 0.71.0
 
 Injects recent daily archive files for agents that explicitly opt in.
@@ -182,13 +181,6 @@ Two parts:
 
 ### Mode-Specific Stacks
 
-**Chat agents** receive (in order):
-
-1. P20 — CoreMemoryFilesDirective
-2. P22 — AgentModeDirective (chat guidance)
-3. P35 — AgentDailyMemoryDirective (opt-in per agent)
-4. (Tools are injected separately by RequestBuilder)
-
 **Pipeline agents** receive (in order):
 
 1. P20 — CoreMemoryFilesDirective
@@ -197,13 +189,14 @@ Two parts:
 4. P40 — PipelineMemoryFilesDirective
 5. P45 — FlowMemoryFilesDirective
 6. P50 — PipelineSystemPromptDirective
+7. (Tools are injected separately by RequestBuilder)
 
 **System agents** receive (in order):
 
 1. P20 — CoreMemoryFilesDirective
 2. P22 — AgentModeDirective (system guidance)
 
-System agents do not receive `AgentDailyMemoryDirective` (its registered modes are `chat` and `pipeline` only) and do not receive any pipeline-only memory directives.
+System agents do not receive `AgentDailyMemoryDirective` (its only registered mode is `pipeline`) and do not receive any pipeline-only memory directives.
 
 ## Configuration & Extensibility
 
@@ -223,7 +216,7 @@ add_filter('datamachine_directives', function($directives) {
     $directives[] = [
         'class'    => MyDirective::class,
         'priority' => 25,
-        'modes'    => ['chat', 'pipeline'], // or ['all']
+        'modes'    => ['system', 'pipeline'], // or ['all']
     ];
     return $directives;
 });
@@ -240,7 +233,7 @@ Use this for eval or training runners that need a provider request with no hidde
 **`datamachine_agent_mode_{slug}`** — Append or modify mode-specific guidance:
 
 ```php
-add_filter('datamachine_agent_mode_chat', function($content, $payload) {
+add_filter('datamachine_agent_mode_system', function($content, $payload) {
     return $content . "\n\n# Plugin extension\n\nExtra rules for this site.";
 }, 10, 2);
 ```
@@ -250,7 +243,6 @@ add_filter('datamachine_agent_mode_chat', function($content, $payload) {
 ### Caching Strategy
 
 - **Memory files**: Read from filesystem on each request (no caching).
-- **Pipeline inventory**: Queried from database on each chat request.
 
 ## Support Infrastructure
 

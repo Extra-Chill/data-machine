@@ -65,7 +65,7 @@ public static function applyDefaults(array $args): array {
 
 ## AI Agent Integration
 
-AI agents (Chat and Pipeline) can interact with this system through specialized tools:
+AI agents can interact with this system through specialized tools:
 
 - `get_handler_defaults`: Allows the agent to query current site standards.
 - `set_handler_defaults`: Enables the agent to establish new site-wide standards based on user instructions.

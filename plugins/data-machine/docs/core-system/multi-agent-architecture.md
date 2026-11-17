@@ -211,7 +211,7 @@ Agent management executes through the core ability runner at `POST /wp-json/wp-a
 
 | Ability | Description | Permission |
 |--------|-------------|------------|
-| `datamachine/list-agents` | List agents (owned + granted for non-admins; `scope=all` for admins) | `chat` or `manage_agents` |
+| `datamachine/list-agents` | List agents (owned + granted for non-admins; `scope=all` for admins) | `use_tools`, `create_own_agent`, or `manage_agents` |
 | `datamachine/get-agent` | Get single agent with details; `me: true` resolves the acting principal's own agent | `manage_agents` |
 | `datamachine/create-agent` | Create new agent (owner defaults to the acting user) | `manage_agents` or `create_own_agent` |
 | `datamachine/update-agent` | Update agent fields (`agent_name`, `agent_config`) | `manage_agents` |
@@ -220,7 +220,7 @@ Agent management executes through the core ability runner at `POST /wp-json/wp-a
 | `datamachine/list-agent-tokens` | List token metadata | `manage_agents` plus operator agent access |
 | `datamachine/revoke-agent-token` | Revoke a token | `manage_agents` plus admin agent access |
 
-**List scoping:** `datamachine/list-agents` is accessible to any caller with `chat` or `manage_agents`. Admins see all agents (with `scope=all`). Non-admin users only see agents they own or have explicit access grants for — the ability unions `Agents::get_all_by_owner_id()` with `AgentAccess::get_agent_ids_for_user()`.
+**List scoping:** `datamachine/list-agents` is accessible to any caller with `use_tools`, `create_own_agent`, or `manage_agents`. Admins see all agents (with `scope=all`). Non-admin users only see agents they own or have explicit access grants for — the ability unions `Agents::get_all_by_owner_id()` with `AgentAccess::get_agent_ids_for_user()`.
 
 **Owner protection:** `DELETE /agents/{id}/access/{user_id}` refuses to revoke the owner's grant. Ownership must be transferred first.
 
@@ -273,7 +273,7 @@ This is used across many CLI commands (`memory`, `workspace`, `flows`, etc.) to 
 ## Architecture Diagram
 
 ```
-                    REST API                CLI                  AI Chat
+                    REST API                CLI                  AI Tools
                        |                    |                      |
                        v                    v                      v
         AgentAbilities.php (+Access/Tokens)   AgentsCommand.php      (tools via Abilities)

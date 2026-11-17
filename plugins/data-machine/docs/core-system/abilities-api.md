@@ -1,10 +1,10 @@
 # Abilities API
 
-WordPress 6.9 Abilities API provides standardized capability discovery and execution for Data Machine operations. All REST API, CLI, and Chat tool operations delegate to registered abilities.
+WordPress 6.9 Abilities API provides standardized capability discovery and execution for Data Machine operations. All REST API, CLI, and AI tool operations delegate to registered abilities.
 
 ## Overview
 
-The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and Chat tools.
+The Abilities API in `inc/Abilities/` provides a unified interface for Data Machine operations. Each ability implements `execute_callback` with `permission_callback` for consistent access control across REST API, CLI commands, and AI tools.
 
 **Total registered abilities**: 205
 
@@ -97,7 +97,7 @@ PermissionHelper::resolve_scoped_user_id($params);
 
 ### Delegation Pattern
 
-REST API endpoints, CLI commands, and Chat tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; implementation classes below an ability are internal details.
+REST API endpoints, CLI commands, and AI tools delegate to abilities for business logic. Abilities are the canonical, public-facing primitive; implementation classes below an ability are internal details.
 
 ```
 REST API Endpoint → Ability → Database / WordPress API
@@ -124,7 +124,7 @@ public function register(): void {
 
 ## Testing
 
-Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, chat/tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through the repository's configured test command or directly through the PHP smoke harness:
+Ability coverage lives in focused smoke tests under `tests/` rather than a separate `tests/Unit/Abilities/` tree. The ability-related smoke tests cover registration, schema contracts, permission contexts, tool integration, source inventory, queue behavior, taxonomy cleanup, auth scoping, and wp-ai-client runtime boundaries. Run them through the repository's configured test command or directly through the PHP smoke harness:
 
 ```bash
 php tests/lightweight-ability-manifest-smoke.php

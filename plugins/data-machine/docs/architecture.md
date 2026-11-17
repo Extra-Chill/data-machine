@@ -61,7 +61,7 @@ Step constructors register definitions through `StepTypeRegistrationTrait`; `Ste
 
 ### Persistence
 
-Workflow definitions and execution state use Data Machine tables. Packet payloads and flow files use `FilesRepository` beneath the WordPress uploads directory. Job `engine_data` stores the resolved execution snapshot and runtime metadata. Run artifacts and bundle artifacts have dedicated persistence. Agent identity, access, and tokens are network-scoped on multisite; most workflow tables are site-scoped, while chat uses its network-aware repository.
+Workflow definitions and execution state use Data Machine tables. Packet payloads and flow files use `FilesRepository` beneath the WordPress uploads directory. Job `engine_data` stores the resolved execution snapshot and runtime metadata. Run artifacts and bundle artifacts have dedicated persistence. Agent identity, access, and tokens are network-scoped on multisite; most workflow tables are site-scoped. Conversation transcripts are stored by the Agents API conversation store, not Data Machine.
 
 `ActivationServiceProvider::ensure_all_tables()` and each repository's `TABLE_NAME`/`create_table()` implementation define the current persistence inventory. See [Database Schema](core-system/database-schema.md) for table scope and relationships.
 
@@ -77,7 +77,7 @@ Data Machine core owns generic automation primitives and core WordPress/email/fi
 
 Choose discovery by boundary instead of treating filters as a service locator:
 
-- Use `wp_get_ability()` or the documented REST, CLI, or chat adapter for executable business operations.
+- Use `wp_get_ability()` or the documented REST, CLI, or agent-runtime adapter for executable business operations.
 - Use `StepTypeAbilities` and `HandlerAbilities` for resolved step and handler metadata.
 - Use documented WordPress filters when registering extension-owned definitions or altering an explicit extension point.
 - Read `data-machine.php` and `inc/bootstrap.php` for runtime loading and registration order.

@@ -254,7 +254,7 @@ The resolved hook receives the same canonical value-object signature as `WP_Agen
 - Ability: `agents/resolve-pending-action`
 - Ability: `datamachine/sign-pending-action-resolution`
 - Compatibility alias: `datamachine/resolve-pending-action`
-- Chat tool: `resolve_pending_action`
+- CLI: `wp datamachine pending-actions accept|reject <action_id>`
 - REST: `GET /datamachine/v1/actions`
 - REST: `GET /datamachine/v1/actions/{action_id}`
 - REST: `GET /datamachine/v1/actions/summary`

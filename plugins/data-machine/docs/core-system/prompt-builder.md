@@ -23,7 +23,7 @@ PromptBuilder centralizes directive application in a single, priority-ordered sy
 │  │ Agent Type       │      │ Sequential       │   │
 │  │ Targeting        │      │ Application      │   │
 │  │ ('all', 'pipeline│      │ (build method)   │   │
-│  │  'chat')         │      └──────────────────┘   │
+│  │  'system')       │      └──────────────────┘   │
 │  └──────────────────┘                             │
 └─────────────────────────────────────────────────────┘
 ```
@@ -31,7 +31,7 @@ PromptBuilder centralizes directive application in a single, priority-ordered sy
 ## Key Features
 
 - **Priority-Based Ordering**: Lower priority numbers applied first (10=core, 20=global, 30=pipeline, 40=context, 50=site)
-- **Agent Targeting**: Directives can target 'all' agents or specific types ('pipeline', 'chat')
+- **Agent Targeting**: Directives can target 'all' agents or specific modes ('pipeline', 'system', or extension modes)
 - **Unified Registration**: Directives register through `datamachine_directives`
 - **Structured Builder Pattern**: Fluent interface for directive configuration and request building
 
@@ -80,12 +80,12 @@ add_filter('datamachine_directives', function($directives) {
 - **20**: Registered memory files
 - **22**: Runtime agent-mode guidance
 - **25-35**: Caller, daily memory, and client-reported context
-- **40-50**: Pipeline, flow, chat inventory, and workflow-specific directives
+- **40-50**: Pipeline, flow, and workflow-specific directives
 
 ## Current Directive Implementations
 
 - `CoreMemoryFilesDirective` - Registered memory files from shared, agent, and user layers (priority 20)
-- `AgentModeDirective` - Runtime mode guidance for chat, pipeline, system, and extension modes (priority 22)
+- `AgentModeDirective` - Runtime mode guidance for pipeline, system, and extension modes (priority 22)
 - `AgentDailyMemoryDirective` - Optional daily memory (priority 35)
 - `PipelineMemoryFilesDirective`, `FlowMemoryFilesDirective`, and `PipelineSystemPromptDirective` - Pipeline-specific context (priorities 40, 45, 50)
 

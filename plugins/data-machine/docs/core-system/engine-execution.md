@@ -11,7 +11,7 @@ Data Machine executes the `pipeline -> flow -> job -> packets/artifacts` portion
 | `datamachine_schedule_next_step` | `datamachine/schedule-next-step` | Persist packets and enqueue the next `datamachine_execute_step` action. |
 | `datamachine_run_flow_later` | `datamachine/schedule-flow` | Reconcile manual, one-time, or recurring flow scheduling. |
 
-The hooks are durable queue adapters, not an alternative business-logic layer. Direct consumers should use abilities or a purpose-built REST, CLI, or chat adapter rather than firing scheduler hooks as service discovery.
+The hooks are durable queue adapters, not an alternative business-logic layer. Direct consumers should use abilities or a purpose-built REST, CLI, or agent-runtime adapter rather than firing scheduler hooks as service discovery.
 
 ## Run Flow
 
@@ -76,5 +76,5 @@ Common terminal states include `completed`, `completed_no_items`, `agent_skipped
 - Add reusable operations as abilities.
 - Add step or handler definitions through their documented registration contracts.
 - Use Action Scheduler hooks only when a durable callback bridge is required.
-- Give REST, CLI, and chat consumers purpose-built adapters that own their namespace and presentation semantics.
+- Give REST, CLI, and agent-runtime consumers purpose-built adapters that own their namespace and presentation semantics.
 - Keep domain handlers and tools in their owning extension plugin.
