@@ -257,9 +257,14 @@ class SettingsAbilities {
 					'type'       => 'object',
 					'required'   => array( 'tool_id' ),
 					'properties' => array(
-						'tool_id' => array(
+						'tool_id'      => array(
 							'type'        => 'string',
 							'description' => __( 'Tool identifier', 'data-machine' ),
+						),
+						'show_secrets' => array(
+							'type'        => 'boolean',
+							'default'     => false,
+							'description' => __( 'Return unmasked configuration values. Requires settings management permission.', 'data-machine' ),
 						),
 					),
 				),
@@ -813,7 +818,7 @@ class SettingsAbilities {
 				}
 
 				$field_type = $field['type'] ?? '';
-				if ( in_array( $field_type, array( 'password', 'secret' ), true ) && ! empty( $config[ $field_key ] ) ) {
+				if ( empty( $input['show_secrets'] ) && in_array( $field_type, array( 'password', 'secret' ), true ) && ! empty( $config[ $field_key ] ) ) {
 					$value = (string) $config[ $field_key ];
 					if ( strlen( $value ) > 12 ) {
 						$config[ $field_key ] = substr( $value, 0, 4 ) . '****************' . substr( $value, -4 );
