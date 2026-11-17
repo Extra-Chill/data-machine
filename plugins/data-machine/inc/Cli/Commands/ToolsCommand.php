@@ -95,16 +95,19 @@ class ToolsCommand extends BaseCommand {
 	 */
 	public function config( array $args, array $assoc_args ): void {
 		if ( empty( $args[0] ) ) {
-			WP_CLI::error( 'Tool ID is required.' );
+			$this->fail( 'Tool ID is required.' );
 			return;
 		}
 
 		$tool_id = $args[0];
-		// Fetch raw values through the permission-checked ability, then apply the
-		// same field-name heuristics and masking as auth config for CLI display.
+		// Raw values are requested only for --show-secrets. Otherwise the ability's
+		// own masking applies, and the CLI also masks key/token-named fields.
 		$result = $this->executeAbility(
 			'datamachine/get-tool-config',
-			array( 'tool_id' => $tool_id, 'show_secrets' => true )
+			array(
+				'tool_id'      => $tool_id,
+				'show_secrets' => isset( $assoc_args['show-secrets'] ),
+			)
 		);
 		if ( null === $result ) {
 			return;
@@ -116,7 +119,7 @@ class ToolsCommand extends BaseCommand {
 		foreach ( $input as $key => $value ) {
 			$name = array_key_exists( $key, $fields ) ? $key : str_replace( '-', '_', $key );
 			if ( ! array_key_exists( $name, $fields ) ) {
-				WP_CLI::error( sprintf( 'Unknown configuration field: %s', $key ) );
+				$this->fail( sprintf( 'Unknown configuration field: %s', $key ) );
 				return;
 			}
 			$config[ $name ] = $value;
@@ -136,9 +139,9 @@ class ToolsCommand extends BaseCommand {
 			);
 			if ( null !== $saved ) {
 				if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-					WP_CLI::log( wp_json_encode( $saved, JSON_PRETTY_PRINT ) );
+					$this->emit( wp_json_encode( $saved, JSON_PRETTY_PRINT ) );
 				} else {
-					WP_CLI::success( $saved['message'] ?? 'Tool configuration saved.' );
+					$this->succeed( $saved['message'] ?? 'Tool configuration saved.' );
 				}
 			}
 			return;
@@ -168,11 +171,26 @@ class ToolsCommand extends BaseCommand {
 		$this->displayRows( $rows, array( 'name', 'label', 'required', 'status', 'value' ), $assoc_args );
 	}
 
+	/** Report a fatal CLI error. Overridable so tests need no global WP_CLI double. */
+	protected function fail( string $message ): void {
+		WP_CLI::error( $message );
+	}
+
+	/** Write a line of output. */
+	protected function emit( string $message ): void {
+		WP_CLI::log( $message );
+	}
+
+	/** Report success. */
+	protected function succeed( string $message ): void {
+		WP_CLI::success( $message );
+	}
+
 	/** Read STDIN separately so tests can supply credential input. */
 	protected function readStdin(): string {
 		$value = stream_get_contents( STDIN );
 		if ( false === $value ) {
-			WP_CLI::error( 'Unable to read STDIN.' );
+			$this->fail( 'Unable to read STDIN.' );
 			return '';
 		}
 		return $value;
@@ -182,16 +200,16 @@ class ToolsCommand extends BaseCommand {
 	protected function executeAbility( string $name, array $input ): ?array {
 		$ability = wp_get_ability( $name );
 		if ( ! $ability ) {
-			WP_CLI::error( sprintf( 'Ability not available: %s', $name ) );
+			$this->fail( sprintf( 'Ability not available: %s', $name ) );
 			return null;
 		}
 		$result = $ability->execute( $input );
 		if ( is_wp_error( $result ) ) {
-			WP_CLI::error( $result->get_error_message() );
+			$this->fail( $result->get_error_message() );
 			return null;
 		}
 		if ( empty( $result['success'] ) ) {
-			WP_CLI::error( $result['error'] ?? 'Tool operation failed.' );
+			$this->fail( $result['error'] ?? 'Tool operation failed.' );
 			return null;
 		}
 		return $result;
@@ -200,7 +218,7 @@ class ToolsCommand extends BaseCommand {
 	/** Keep empty JSON lists machine-readable too. */
 	private function displayRows( array $rows, array $fields, array $assoc_args ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			WP_CLI::log( wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
+			$this->emit( wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
 			return;
 		}
 		$this->format_items( $rows, $fields, $assoc_args );

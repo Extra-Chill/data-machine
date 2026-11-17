@@ -13,12 +13,10 @@ use PHPUnit\Framework\TestCase;
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', '/tmp/' );
 }
-if ( ! class_exists( 'WP_CLI_Command' ) ) {
+if ( ! class_exists( 'WP_CLI_Command', false ) ) {
 	require_once dirname( __DIR__, 3 ) . '/Doubles/AccessActionsCliCommand.php';
 }
-if ( ! class_exists( 'WP_CLI' ) ) {
-	require_once dirname( __DIR__, 3 ) . '/Doubles/ToolsCli.php';
-}
+require_once dirname( __DIR__, 3 ) . '/Doubles/WpJsonEncode.php';
 require_once dirname( __DIR__, 4 ) . '/inc/Cli/BaseCommand.php';
 require_once dirname( __DIR__, 4 ) . '/inc/Cli/Commands/ToolsCommand.php';
 
@@ -30,6 +28,19 @@ class ToolsCommandTest extends TestCase {
 			public array $rows = array();
 			public int $reads = 0;
 			public string $stdin = "  stdin-secret  \r\n";
+			public array $messages = array();
+
+			protected function fail( string $message ): void {
+				throw new \RuntimeException( $message );
+			}
+
+			protected function emit( string $message ): void {
+				$this->messages[] = $message;
+			}
+
+			protected function succeed( string $message ): void {
+				$this->messages[] = $message;
+			}
 
 			protected function readStdin(): string {
 				++$this->reads;
@@ -92,6 +103,15 @@ class ToolsCommandTest extends TestCase {
 		$this->assertSame( '****', $command->rows[3]['value'] );
 	}
 
+	public function test_raw_secrets_requested_only_with_show_secrets(): void {
+		$command = $this->command();
+		$command->config( array( 'exa_search' ), array() );
+		$this->assertFalse( $command->calls[0][1]['show_secrets'] );
+		$command = $this->command();
+		$command->config( array( 'exa_search' ), array( 'show-secrets' => true ) );
+		$this->assertTrue( $command->calls[0][1]['show_secrets'] );
+	}
+
 	public function test_show_secrets_displays_original_values_without_saving(): void {
 		$command = $this->command();
 		$command->config( array( 'exa_search' ), array( 'show-secrets' => true ) );
@@ -112,12 +132,11 @@ class ToolsCommandTest extends TestCase {
 	}
 
 	public function test_json_masks_values_too(): void {
-		\WP_CLI::$messages = array();
 		$command = $this->command();
 		$command->config( array( 'exa_search' ), array( 'format' => 'json' ) );
-		$rows = json_decode( \WP_CLI::$messages[0], true );
+		$rows = json_decode( $command->messages[0], true );
 		$this->assertSame( '***********5678', $rows[0]['value'] );
-		$this->assertStringNotContainsString( 'secret-12345678', \WP_CLI::$messages[0] );
+		$this->assertStringNotContainsString( 'secret-12345678', $command->messages[0] );
 	}
 
 	public function test_list_reuses_settings_tool_projection_and_filters(): void {
