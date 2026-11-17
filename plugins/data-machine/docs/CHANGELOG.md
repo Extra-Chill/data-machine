@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.204.0] - 2026-11-17
+
+### Added
+- add wp datamachine tools list/config
+
 ## [0.203.2] - 2026-11-16
 
 ### Fixed
