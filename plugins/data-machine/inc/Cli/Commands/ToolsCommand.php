@@ -135,11 +135,14 @@ class ToolsCommand extends BaseCommand {
 			}
 			$saved = $this->executeAbility(
 				'datamachine/save-tool-config',
-				array( 'tool_id' => $tool_id, 'config_data' => $config )
+				array(
+					'tool_id'     => $tool_id,
+					'config_data' => $config,
+				)
 			);
 			if ( null !== $saved ) {
 				if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-					$this->emit( wp_json_encode( $saved, JSON_PRETTY_PRINT ) );
+					$this->emit( (string) wp_json_encode( $saved, JSON_PRETTY_PRINT ) );
 				} else {
 					$this->succeed( $saved['message'] ?? 'Tool configuration saved.' );
 				}
@@ -149,8 +152,8 @@ class ToolsCommand extends BaseCommand {
 
 		$rows = array();
 		foreach ( $fields as $name => $field ) {
-			$value = $result['config'][ $name ] ?? '';
-			$is_set = '' !== $value && null !== $value;
+			$value  = $result['config'][ $name ] ?? '';
+			$is_set = '' !== $value;
 			$secret = in_array( $field['type'] ?? '', array( 'password', 'secret' ), true );
 			foreach ( array( 'secret', 'password', 'token', 'key' ) as $pattern ) {
 				$secret = $secret || str_contains( strtolower( $name ), $pattern );
@@ -218,7 +221,7 @@ class ToolsCommand extends BaseCommand {
 	/** Keep empty JSON lists machine-readable too. */
 	private function displayRows( array $rows, array $fields, array $assoc_args ): void {
 		if ( 'json' === ( $assoc_args['format'] ?? 'table' ) ) {
-			$this->emit( wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
+			$this->emit( (string) wp_json_encode( $rows, JSON_PRETTY_PRINT ) );
 			return;
 		}
 		$this->format_items( $rows, $fields, $assoc_args );

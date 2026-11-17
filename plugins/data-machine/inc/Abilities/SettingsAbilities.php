@@ -257,7 +257,7 @@ class SettingsAbilities {
 					'type'       => 'object',
 					'required'   => array( 'tool_id' ),
 					'properties' => array(
-						'tool_id' => array(
+						'tool_id'      => array(
 							'type'        => 'string',
 							'description' => __( 'Tool identifier', 'data-machine' ),
 						),
