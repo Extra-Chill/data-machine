@@ -44,8 +44,37 @@ final class AbstractSocialAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 401, $result->get_error_data()['status'] );
 	}
 
-	public function test_resolve_access_token_returns_missing_auth_when_unauthenticated(): void {
-		$this->stubProvider( false, 'example-token' );
+	public function test_resolve_access_token_refreshes_hard_expired_token(): void {
+		// An expired token reports unauthenticated, but the provider can still
+		// refresh it on demand. The ability must not bail before refreshing.
+		$this->stubProvider( false, 'refreshed-token' );
+
+		$this->assertSame( 'refreshed-token', $this->ability()->token( 'example', 'Example' ) );
+	}
+
+	public function test_resolve_access_token_returns_missing_auth_when_expired_refresh_fails(): void {
+		$this->stubProvider( false, null );
+
+		$result = $this->ability()->token( 'example', 'Example' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
+	}
+
+	public function test_resolve_access_token_returns_missing_auth_without_token_lifecycle(): void {
+		$provider = new class() {
+			public function is_authenticated(): bool {
+				return true;
+			}
+		};
+
+		$this->provider_filter = static function ( $providers ) use ( $provider ) {
+			$providers['example'] = $provider;
+			return $providers;
+		};
+		add_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
 
 		$result = $this->ability()->token( 'example', 'Example' );
 
