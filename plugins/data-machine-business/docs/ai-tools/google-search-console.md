@@ -10,7 +10,7 @@
 - REST route: `inc/Api/GoogleSearchConsoleAnalytics.php`
 - WP-CLI command: `inc/Cli/GoogleSearchConsoleCommand.php`
 
-**Registration**: Data Machine Business registers the tool with the core `datamachine_tools` filter (available to all AI agents — pipeline + chat)
+**Registration**: Data Machine Business registers the tool with the core `datamachine_tools` filter (available to pipeline AI steps)
 
 **@since**: 0.25.0
 
