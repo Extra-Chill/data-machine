@@ -429,7 +429,11 @@ class EventUpsert extends UpsertHandler {
 			if ( null === $event_status || '' === $event_status ) {
 				$event_status = $parameters['eventStatus'] ?? '';
 			}
-			$rejection = $this->validator->validateForCreate( $startDate, (string) $event_status );
+			$rejection = $this->validator->validateForCreate(
+				$startDate,
+				(string) $event_status,
+				! empty( $handler_config['allow_past_create'] )
+			);
 			if ( null !== $rejection ) {
 				return $rejection;
 			}

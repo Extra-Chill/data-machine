@@ -234,9 +234,11 @@ class EventUpsertValidator {
 	 *
 	 * @param string $start_date Validated event start date or datetime.
 	 * @param string $event_status Normalized source event status.
+	 * @param bool   $allow_past   Explicit caller opt-in for a deliberate backfill of a
+	 *                             past event. Skips only the past-date check.
 	 * @return array|null Tool rejection, or null when creation is allowed.
 	 */
-	public function validateForCreate( string $start_date, string $event_status = '' ): ?array {
+	public function validateForCreate( string $start_date, string $event_status = '', bool $allow_past = false ): ?array {
 		// Cancelled and postponed source items exist to update a listing we
 		// already have; on their own they are not a show to publish.
 		if ( in_array( $event_status, array( 'EventCancelled', 'EventPostponed' ), true ) ) {
@@ -245,6 +247,10 @@ class EventUpsertValidator {
 				array( 'eventStatus' => $event_status ),
 				'cancelled_event_create'
 			);
+		}
+
+		if ( $allow_past ) {
+			return null;
 		}
 
 		$timezone = wp_timezone();

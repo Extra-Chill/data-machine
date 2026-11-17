@@ -121,6 +121,12 @@ class EventUpsertAbilities {
 			'include_images' => false,
 		);
 
+		// Deliberate backfills of past events are explicit caller intent; imports
+		// and pipelines never set this, so their stale-create guard is unchanged.
+		if ( true === ( $input['allow_past_create'] ?? false ) ) {
+			$config['allow_past_create'] = true;
+		}
+
 		// Explicit organizer is caller intent, not an AI guess (#849).
 		if ( '' !== trim( (string) ( $event['organizer'] ?? '' ) ) ) {
 			$config['promoter_explicit_organizer'] = true;
@@ -215,31 +221,36 @@ class EventUpsertAbilities {
 			'type'       => 'object',
 			'required'   => array( 'source', 'source_id', 'event' ),
 			'properties' => array(
-				'source'      => array(
+				'source'            => array(
 					'type'        => 'string',
 					'minLength'   => 1,
 					'description' => 'Stable caller/source namespace.',
 				),
-				'source_id'   => array(
+				'source_id'         => array(
 					'type'        => 'string',
 					'minLength'   => 1,
 					'description' => 'Stable item ID within the source namespace.',
 				),
-				'post_status' => array(
+				'post_status'       => array(
 					'type'    => 'string',
 					'enum'    => array( 'draft', 'publish', 'pending', 'private' ),
 					'default' => 'publish',
 				),
-				'post_author' => array(
+				'post_author'       => array(
 					'type'    => 'integer',
 					'minimum' => 1,
 				),
-				'event_id'    => array(
+				'allow_past_create' => array(
+					'type'        => 'boolean',
+					'default'     => false,
+					'description' => 'Allow creating an event whose start date has passed (deliberate backfill). Cancelled and postponed creates are still refused.',
+				),
+				'event_id'          => array(
 					'type'        => 'integer',
 					'minimum'     => 1,
 					'description' => 'Existing canonical event candidate to adopt for this source identity.',
 				),
-				'event'       => array(
+				'event'             => array(
 					'type'       => 'object',
 					'required'   => array( 'title', 'startDate' ),
 					'properties' => array(

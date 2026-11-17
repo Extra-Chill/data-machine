@@ -32,6 +32,23 @@ class EventUpsertPastCreateTest extends EventUpsertTestCase {
 		$this->assertSame( 0, $this->countEventsWithTitle( 'Evening Concert' ) );
 	}
 
+	public function test_past_create_is_allowed_with_explicit_opt_in(): void {
+		$result = $this->invoke_upsert( $this->event( '-4 days' ), array( 'allow_past_create' => true ) );
+
+		$this->assertTrue( $result['success'], wp_json_encode( $result ) );
+		$this->assertSame( 'created', $result['data']['action'] );
+	}
+
+	public function test_opt_in_still_refuses_cancelled_past_create(): void {
+		$event                = $this->event( '-4 days' );
+		$event['eventStatus'] = 'EventCancelled';
+
+		$result = $this->invoke_upsert( $event, array( 'allow_past_create' => true ) );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'cancelled_event_create', $result['rule'] );
+	}
+
 	public function test_today_create_is_allowed_even_after_start_time(): void {
 		$result = $this->invoke_upsert( $this->event( 'today' ) );
 
