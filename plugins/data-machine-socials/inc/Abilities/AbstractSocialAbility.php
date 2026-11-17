@@ -103,21 +103,30 @@ abstract class AbstractSocialAbility {
 	/**
 	 * Resolve a valid OAuth access token for a platform, entirely server-side.
 	 *
-	 * Resolves + authenticates the provider, then asks it for a valid
-	 * (refreshed if needed) access token. Secrets never travel through
-	 * ability input.
+	 * Resolves the provider, then asks it for a valid (refreshed if needed)
+	 * access token. Secrets never travel through ability input.
+	 *
+	 * Providers with a token lifecycle skip the is_authenticated() gate:
+	 * is_authenticated() reports false once a token hard-expires, which would
+	 * reject the request before get_valid_access_token() could use the stored
+	 * refresh token. get_valid_access_token() is the authority here and
+	 * returns null when no usable token can be obtained.
 	 *
 	 * @param string $platform Provider key (e.g. 'reddit').
 	 * @param string $label    Human-readable platform label for errors.
 	 * @return string|\WP_Error Access token, or a missing_auth WP_Error.
 	 */
 	protected function resolveAccessToken( string $platform, string $label ): string|\WP_Error {
-		$provider = $this->resolveProvider( $platform, $label );
+		$provider = $this->resolveProvider( $platform, $label, false );
 		if ( is_wp_error( $provider ) ) {
 			return $provider;
 		}
 
-		$token = method_exists( $provider, 'get_valid_access_token' ) ? $provider->get_valid_access_token() : null;
+		if ( ! method_exists( $provider, 'get_valid_access_token' ) ) {
+			return new \WP_Error( 'missing_auth', $label . ' not authenticated', array( 'status' => 401 ) );
+		}
+
+		$token = $provider->get_valid_access_token();
 		if ( ! is_string( $token ) || '' === trim( $token ) ) {
 			return new \WP_Error( 'missing_auth', 'Could not obtain a valid ' . $label . ' access token.', array( 'status' => 401 ) );
 		}
