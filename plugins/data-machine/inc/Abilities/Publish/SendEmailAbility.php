@@ -9,7 +9,7 @@
  * via `switch_to_blog()`.
  *
  * This is the bottom layer — pure business logic, no handler config,
- * no engine data, no pipeline context. Any caller (REST, CLI, chat tool,
+ * no engine data, no pipeline context. Any caller (REST, CLI, AI tool,
  * pipeline handler) can invoke this directly.
  *
  * Placeholder ordering: template render runs FIRST, then placeholder

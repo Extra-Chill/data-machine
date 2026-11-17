@@ -230,6 +230,10 @@ namespace {
 			public function add_cap( string $capability ): void {
 				unset( $capability );
 			}
+
+			public function remove_cap( string $capability ): void {
+				unset( $capability );
+			}
 		};
 	}
 

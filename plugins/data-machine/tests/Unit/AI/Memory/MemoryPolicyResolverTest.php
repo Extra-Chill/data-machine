@@ -31,7 +31,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		MemoryFileRegistry::reset();
 		AgentModeRegistry::reset();
 		AgentModeRegistry::register(
-			MemoryPolicyResolver::MODE_CHAT,
+			'editor',
 			10,
 			array(
 				'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
@@ -80,11 +80,11 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 		MemoryFileRegistry::register(
-			'CHAT_ONLY.md',
+			'EDITOR_ONLY.md',
 			40,
 			array(
 				'layer' => MemoryFileRegistry::LAYER_AGENT,
-				'modes' => array( 'chat' ),
+				'modes' => array( 'editor' ),
 			)
 		);
 		MemoryFileRegistry::register(
@@ -105,7 +105,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		// Re-register the production defaults wiped by reset(). Core files and
 		// modes register once per process (plugins_loaded / init 0), so leaving
 		// the registries empty pollutes every later test in the same process
-		// that depends on SOUL.md, MEMORY.md, USER_MEMORY.md, chat mode, etc.
+		// that depends on SOUL.md, MEMORY.md, USER_MEMORY.md, the core modes, etc.
 		datamachine_register_default_memory_files();
 		\DataMachine\Core\Bootstrap\HostIntegrationServiceProvider::register_agent_modes();
 
@@ -118,21 +118,21 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// resolveRegistered() — context filtering (no agent)
 	// ============================================
 
-	public function test_registered_chat_context_includes_all_and_chat_files(): void {
+	public function test_registered_editor_context_includes_all_and_editor_files(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
 		$this->assertArrayHasKey( 'USER.md', $files );
-		$this->assertArrayHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayHasKey( 'EDITOR_ONLY.md', $files );
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
 	}
 
-	public function test_registered_pipeline_context_excludes_chat_only(): void {
+	public function test_registered_pipeline_context_excludes_editor_only(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
 				'mode' => MemoryPolicyResolver::MODE_PIPELINE,
@@ -142,7 +142,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
 		$this->assertArrayNotHasKey( 'USER.md', $files );
-		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayNotHasKey( 'EDITOR_ONLY.md', $files );
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $files );
 	}
 
@@ -156,7 +156,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 		$this->assertArrayHasKey( 'SOUL.md', $files );
 		$this->assertArrayHasKey( 'MEMORY.md', $files );
 		$this->assertArrayNotHasKey( 'USER.md', $files );
-		$this->assertArrayNotHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayNotHasKey( 'EDITOR_ONLY.md', $files );
 	}
 
 	public function test_registered_custom_mode_without_memory_contexts_does_not_guess(): void {
@@ -174,9 +174,9 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	}
 
 	public function test_registered_file_without_modes_is_not_injected_in_any_mode(): void {
-		$chat_files = $this->resolver->resolveRegistered(
+		$editor_files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 		$pipeline_files = $this->resolver->resolveRegistered(
@@ -185,7 +185,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $chat_files );
+		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $editor_files );
 		$this->assertArrayNotHasKey( 'EXTERNAL_RUNTIME.md', $pipeline_files );
 		$this->assertArrayHasKey( 'EXTERNAL_RUNTIME.md', MemoryFileRegistry::get_all() );
 		$this->assertSame( \WP_Agent_Context_Injection_Policy::NEVER, MemoryFileRegistry::get_all()['EXTERNAL_RUNTIME.md']['retrieval_policy'] );
@@ -194,7 +194,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_registered_preserves_metadata(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
@@ -209,7 +209,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_context_deny_removes_files(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 				'deny' => array( 'MEMORY.md' ),
 			)
 		);
@@ -221,7 +221,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_context_allow_only_narrows_to_subset(): void {
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'       => MemoryPolicyResolver::MODE_CHAT,
+				'mode'       => 'editor',
 				'allow_only' => array( 'SOUL.md' ),
 			)
 		);
@@ -238,13 +238,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	public function test_no_agent_id_means_no_agent_filter(): void {
 		$without = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
 		$with_zero = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => 0,
 			)
 		);
@@ -257,13 +257,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$without = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
 		$with = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
@@ -281,13 +281,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
 
 		$this->assertArrayHasKey( 'SOUL.md', $files );
-		$this->assertArrayHasKey( 'CHAT_ONLY.md', $files );
+		$this->assertArrayHasKey( 'EDITOR_ONLY.md', $files );
 		$this->assertArrayNotHasKey( 'MEMORY.md', $files );
 		$this->assertArrayNotHasKey( 'USER.md', $files );
 	}
@@ -302,7 +302,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
@@ -322,7 +322,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
@@ -340,13 +340,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$without = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
 		$with = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
@@ -364,7 +364,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 			)
 		);
@@ -388,7 +388,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => $agent_id,
 				'deny'     => array( 'MEMORY.md' ),
 			)
@@ -420,13 +420,13 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$this->resolver->resolveRegistered(
 			array(
-				'mode'     => MemoryPolicyResolver::MODE_CHAT,
+				'mode'     => 'editor',
 				'agent_id' => 0,
 			)
 		);
 
 		$this->assertNotNull( $captured );
-		$this->assertSame( MemoryPolicyResolver::MODE_CHAT, $captured['mode'] );
+		$this->assertSame( 'editor', $captured['mode'] );
 		$this->assertArrayHasKey( 'SOUL.md', $captured['files'] );
 	}
 
@@ -441,7 +441,7 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 
 		$files = $this->resolver->resolveRegistered(
 			array(
-				'mode' => MemoryPolicyResolver::MODE_CHAT,
+				'mode' => 'editor',
 			)
 		);
 
@@ -613,12 +613,12 @@ class MemoryPolicyResolverTest extends WP_UnitTestCase {
 	// getModes()
 	// ============================================
 
-	public function test_get_modes_returns_all_three_presets(): void {
+	public function test_get_modes_returns_pipeline_and_system_presets(): void {
 		$modes = MemoryPolicyResolver::getModes();
 
 		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_PIPELINE, $modes );
-		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_CHAT, $modes );
 		$this->assertArrayHasKey( MemoryPolicyResolver::MODE_SYSTEM, $modes );
+		$this->assertCount( 2, $modes );
 	}
 
 	// ============================================

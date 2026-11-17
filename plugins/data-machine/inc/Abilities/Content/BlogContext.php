@@ -5,8 +5,8 @@
  * The block-content abilities (`get_post_blocks`, `edit_post_blocks`,
  * `replace_post_blocks`, `insert_content`) operate on a post by `post_id`.
  * On a single-site install that post always lives on the only blog there is.
- * On a multisite network the chat surface and the post can live on different
- * blogs — e.g. a chat drawer running on one subsite editing a draft that was
+ * On a multisite network the caller and the post can live on different
+ * blogs — e.g. an agent running on one subsite editing a draft that was
  * authored on the main site.
  *
  * Without a blog dimension the abilities silently resolve `post_id` against

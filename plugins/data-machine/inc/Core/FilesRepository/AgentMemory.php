@@ -250,7 +250,7 @@ class AgentMemory {
 	 *
 	 * Static facade over {@see WP_Agent_Memory_Store::list_subtree()}.
 	 * Recursive — entries' filenames are full relative paths from the
-	 * layer root (e.g. `daily/2026/04/17.md`, `contexts/chat.md`).
+	 * layer root (e.g. `daily/2026/04/17.md`, `contexts/pipeline.md`).
 	 *
 	 * Used for path-namespaced file families that don't fit the
 	 * top-level layer model: daily memory under `daily/YYYY/MM/`, context
@@ -834,7 +834,7 @@ class AgentMemory {
 	 * Sanitize a filename to prevent directory traversal.
 	 *
 	 * Allows forward-slashes so callers can address relative paths within
-	 * a layer (e.g. 'contexts/chat.md', 'daily/2026/04/17.md'); each
+	 * a layer (e.g. 'contexts/pipeline.md', 'daily/2026/04/17.md'); each
 	 * segment is run through basename's allow-list.
 	 *
 	 * @since 0.45.0

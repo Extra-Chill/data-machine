@@ -33,7 +33,6 @@
  *
  * REST surface: POST /datamachine/v1/actions/resolve
  * Ability slug: agents/resolve-pending-action
- * Chat tool:    resolve_pending_action (registered separately by ResolvePendingAction BaseTool)
  *
  * @package DataMachine\Engine\AI\Actions
  * @since   0.72.0
@@ -98,7 +97,7 @@ class ResolvePendingActionAbility {
 					array(
 						'methods'             => 'POST',
 						'callback'            => array( self::class, 'handle_rest' ),
-						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+						'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 						'args'                => array(
 							'action_id' => array(
 								'required'          => true,

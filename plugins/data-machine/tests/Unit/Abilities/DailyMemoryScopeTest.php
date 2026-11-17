@@ -91,7 +91,7 @@ class DailyMemoryScopeTest extends WP_UnitTestCase {
 	 * excludes Data Machine management.
 	 */
 	private function actAsScopedAgent(): void {
-		PermissionHelper::set_agent_context( 42, $this->owner_id, array( 'datamachine_chat' ), 7 );
+		PermissionHelper::set_agent_context( 42, $this->owner_id, array( 'datamachine_use_tools' ), 7 );
 	}
 
 	/**

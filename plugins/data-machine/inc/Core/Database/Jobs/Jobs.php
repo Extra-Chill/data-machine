@@ -90,7 +90,7 @@ class Jobs extends BaseRepository {
 	 * Create a new job record.
 	 *
 	 * Supports three execution modes:
-	 * - Direct execution: pipeline_id='direct', flow_id='direct' (chat/API workflows without saved pipeline/flow)
+	 * - Direct execution: pipeline_id='direct', flow_id='direct' (API workflows without saved pipeline/flow)
 	 * - Database flow: pipeline_id and flow_id are numeric strings (saved pipelines and flows)
 	 * - Standalone: pipeline_id=null, flow_id=null (jobs without pipeline/flow context)
 	 *

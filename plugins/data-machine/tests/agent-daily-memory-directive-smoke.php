@@ -115,9 +115,9 @@ namespace {
                 ),
             )
         )
-        ->addDirective( \DataMachine\Engine\AI\Directives\AgentDailyMemoryDirective::class, 35, array( 'chat' ) )
+        ->addDirective( \DataMachine\Engine\AI\Directives\AgentDailyMemoryDirective::class, 35, array( 'system' ) )
         ->buildDetailed(
-			array( 'chat' ),
+			array( 'system' ),
             'openai',
             array(
                 'agent_id' => 123,

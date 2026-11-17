@@ -190,7 +190,7 @@ assert_callsite( 'whitespace input → empty queue', array() === $cfg['prompt_qu
 // queue_mode replace the dead user_message read. Override block:
 // user_message override input is converted to a 1-entry static
 // prompt_queue (matches the public-facing override contract used by
-// `flow copy` and chat tools).
+// `flow copy` and the flow abilities).
 
 function build_copied_flow_step_for_test( array $source_step, ?array $override = null ): array {
 	$new_step_config = array(

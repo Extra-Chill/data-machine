@@ -2,7 +2,7 @@
 /**
  * Base Tool
  *
- * Abstract base class for all AI tools (global and chat). Provides standardized
+ * Abstract base class for all AI tools. Provides standardized
  * error handling and tool registration through inheritance.
  *
  * @package DataMachine\Engine\AI\Tools
@@ -27,7 +27,7 @@ abstract class BaseTool {
 	 *
 	 * All tools register via the single `datamachine_tools` filter. Each tool
 	 * must declare its modes — the agent modes where it's available (e.g.
-	 * 'chat', 'pipeline'). Tools that should be available only when explicitly
+	 * 'pipeline', 'system'). Tools that should be available only when explicitly
 	 * allowlisted may declare `requires_opt_in` in metadata.
 	 *
 	 * Tools should also declare which ability they wrap via the `ability` key
@@ -56,7 +56,7 @@ abstract class BaseTool {
 	 *
 	 * @param string         $toolName       Tool identifier.
 	 * @param array|callable $toolDefinition Tool definition array OR callable that returns it.
-	 * @param array          $modes          Agent modes where this tool is available (e.g. ['chat', 'pipeline']).
+	 * @param array          $modes          Agent modes where this tool is available (e.g. ['pipeline', 'system']).
 	 * @param array          $meta           Optional metadata for permission resolution. {
 	 *     @type string   $ability      Single ability slug this tool wraps for permission checks (e.g. 'datamachine/local-search').
 	 *     @type string   $execution_ability Ability slug to execute directly instead of a class/method wrapper.

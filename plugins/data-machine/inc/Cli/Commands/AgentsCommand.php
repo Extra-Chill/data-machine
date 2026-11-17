@@ -559,7 +559,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 * Prune agent rows with zero references.
 	 *
 	 * Lists candidates by default. Use --yes to actually delete. A candidate
-	 * is an agent row with no chat sessions, no jobs, no access grants, no
+	 * is an agent row with no jobs, no access grants, no
 	 * on-disk directory, no bundle install config, and is not the install's
 	 * default agent.
 	 *
@@ -896,7 +896,7 @@ class AgentsCommand extends AgentBundleCommand {
 	 *     wp datamachine agents token create content-agent --label="ci" --expires-in=7776000
 	 *
 	 *     # Create a token with restricted capabilities
-	 *     wp datamachine agents token create content-agent --capabilities='["datamachine_chat","datamachine_use_tools"]'
+	 *     wp datamachine agents token create content-agent --capabilities='["datamachine_use_tools"]'
 	 *
 	 *     # List tokens for an agent
 	 *     wp datamachine agents token list content-agent

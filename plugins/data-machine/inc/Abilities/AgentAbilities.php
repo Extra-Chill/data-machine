@@ -261,7 +261,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'listAgents' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -293,7 +293,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'getActiveAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -329,7 +329,7 @@ class AgentAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'setActiveAgent' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ) || PermissionHelper::can_manage(),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

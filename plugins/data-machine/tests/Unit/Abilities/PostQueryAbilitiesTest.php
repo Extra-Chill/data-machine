@@ -466,28 +466,4 @@ class PostQueryAbilitiesTest extends WP_UnitTestCase {
 		$user_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $user_id );
 	}
-
-	public function test_handle_query_posts_tool(): void {
-		$post_id = self::factory()->post->create(
-			array(
-				'post_type'   => 'post',
-				'post_status' => 'publish',
-				'post_title'  => 'Test Post for Tool',
-			)
-		);
-
-		update_post_meta( $post_id, '_datamachine_post_handler', 'rss' );
-
-		$result = $this->post_query_abilities->handleQueryPosts(
-			array(
-				'filter_by'    => 'handler',
-				'filter_value' => 'rss',
-			)
-		);
-
-		$this->assertTrue( $result['success'] );
-		$this->assertEquals( 'query_posts', $result['tool_name'] );
-		$this->assertArrayHasKey( 'data', $result );
-		$this->assertArrayHasKey( 'posts', $result['data'] );
-	}
 }

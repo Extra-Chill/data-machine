@@ -486,9 +486,9 @@ class ExternalCommand extends BaseCommand {
 	 *     # List wiki articles
 	 *     wp datamachine external call remote.example/content-agent GET /wp-json/wp/v2/wiki
 	 *
-	 *     # Send a chat message to the peer agent
-	 *     wp datamachine external call remote.example/content-agent POST /wp-json/datamachine/v1/chat \
-	 *         --body='{"message":"hello from local-agent"}'
+	 *     # Trigger a flow on the peer site
+	 *     wp datamachine external call remote.example/content-agent POST /wp-json/datamachine/v1/trigger/42 \
+	 *         --body='{"source":"local-agent"}'
 	 *
 	 * @subcommand call
 	 */

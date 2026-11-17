@@ -5,9 +5,9 @@
  * Lets an agent consult another registered agent through the canonical Agents
  * API `agents/chat` ability.
  *
- * Registered for chat and system modes. It stays opt-in (`requires_opt_in`),
- * so it only resolves when a step or session names it in `enabled_tools`, as
- * the Intelligence wiki graph maintenance system task does.
+ * Registered for system mode only. It stays opt-in (`requires_opt_in`), so it
+ * only resolves when a system task names it in `enabled_tools`, as the
+ * Intelligence wiki graph maintenance system task does.
  *
  * @package DataMachine\Engine\AI\Tools\Global
  */
@@ -25,7 +25,7 @@ class ConsultAgent extends BaseTool {
 		$this->registerTool(
 			'consult_agent',
 			array( $this, 'getToolDefinition' ),
-			array( 'chat', 'system' ),
+			array( 'system' ),
 			array(
 				'access_level'    => 'public',
 				'requires_opt_in' => true,
@@ -69,7 +69,7 @@ class ConsultAgent extends BaseTool {
 	}
 
 	/**
-	 * Execute the peer agent chat turn.
+	 * Execute the peer agent consultation turn.
 	 *
 	 * @param array $parameters Tool parameters plus Data Machine runtime payload.
 	 * @param array $tool_def   Tool definition.
@@ -100,7 +100,7 @@ class ConsultAgent extends BaseTool {
 			return $this->buildErrorResponse( 'agents/chat ability is not available.', 'consult_agent' );
 		}
 
-		$chat_input = array(
+		$consult_input = array(
 			'agent'          => $target_agent,
 			'message'        => $question,
 			'client_context' => $this->peer_client_context( $parameters, $client_context, $current_agent ),
@@ -108,15 +108,15 @@ class ConsultAgent extends BaseTool {
 
 		$session_id = sanitize_text_field( (string) ( $parameters['peer_session_id'] ?? '' ) );
 		if ( '' !== $session_id ) {
-			$chat_input['session_id'] = $session_id;
+			$consult_input['session_id'] = $session_id;
 		}
 
 		$modes = $this->resolve_peer_modes( $parameters, $client_context );
 		if ( ! empty( $modes ) ) {
-			$chat_input['modes'] = $modes;
+			$consult_input['modes'] = $modes;
 		}
 
-		$permission = $ability->check_permissions( $chat_input );
+		$permission = $ability->check_permissions( $consult_input );
 		if ( is_wp_error( $permission ) ) {
 			return $this->buildErrorResponse( $permission->get_error_message(), 'consult_agent' );
 		}
@@ -124,7 +124,7 @@ class ConsultAgent extends BaseTool {
 			return $this->buildErrorResponse( 'agents/chat denied access to the target agent.', 'consult_agent' );
 		}
 
-		$result = $ability->execute( $chat_input );
+		$result = $ability->execute( $consult_input );
 		if ( is_wp_error( $result ) ) {
 			return $this->buildErrorResponse( $result->get_error_message(), 'consult_agent' );
 		}
@@ -173,7 +173,7 @@ class ConsultAgent extends BaseTool {
 	}
 
 	/**
-	 * Build client context for the peer chat request.
+	 * Build client context for the peer consultation request.
 	 *
 	 * @param array  $parameters      Tool parameters plus runtime payload.
 	 * @param array  $client_context  Current client context.

@@ -123,7 +123,7 @@ final class HostIntegrationServiceProvider {
 
 	/** Check pending-action permission. */
 	public static function pending_action_permission(): bool {
-		return \DataMachine\Abilities\PermissionHelper::can( 'chat' );
+		return \DataMachine\Abilities\PermissionHelper::can( 'use_tools' ) || \DataMachine\Abilities\PermissionHelper::can_manage();
 	}
 
 	/** @param array<string, class-string> $templates Image template classes. */
@@ -136,10 +136,12 @@ final class HostIntegrationServiceProvider {
 
 	/** Register core agent modes. */
 	public static function register_agent_modes(): void {
-		AgentModeRegistry::register( 'chat', 10, array(
-			'label'           => __( 'Chat Agent', 'data-machine' ),
-			'description'     => __( 'Interactive chat conversations run by a host chat runtime. Benefits from capable models for complex reasoning.', 'data-machine' ),
-			'memory_contexts' => array( 'agent_identity', 'agent_memory', 'user_profile' ),
+		// `agent` is a model key, not a runtime surface: it selects the default
+		// model for agents Data Machine provisions (Agents API registrations and
+		// per-user default agents). No tool or directive targets it.
+		AgentModeRegistry::register( 'agent', 10, array(
+			'label'       => __( 'Default Agent', 'data-machine' ),
+			'description' => __( 'Default model for agents Data Machine provisions. Runtimes that call these agents use this model unless they choose their own.', 'data-machine' ),
 		) );
 		AgentModeRegistry::register( 'pipeline', 20, array(
 			'label'           => __( 'Pipeline Agent', 'data-machine' ),

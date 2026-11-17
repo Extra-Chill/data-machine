@@ -3,7 +3,7 @@
 /**
  * Flow Formatter Utility
  *
- * Centralized flow formatting for REST API and CLI/Chat contexts.
+ * Centralized flow formatting for REST API and CLI contexts.
  * Provides consistent flow data representation across all interfaces.
  *
  * @package DataMachine\Core\Admin

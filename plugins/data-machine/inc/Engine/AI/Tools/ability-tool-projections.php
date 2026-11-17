@@ -13,7 +13,8 @@ if ( ! function_exists( 'datamachine_register_ability_tool' ) ) {
 	 *
 	 * The declaration must include an `ability` slug or non-empty `ability_map`.
 	 * AbilityToolSource uses the primary slug for projection metadata.
-	 * Optional keys such as `modes`, `description`, `parameters`,
+	 * Optional keys such as `modes` (required for the projection to be
+	 * available in any mode), `description`, `parameters`,
 	 * `requires_opt_in`, `action_policy`, and `runtime` are passed through.
 	 *
 	 * @param string $tool_name   Model-facing tool name.
@@ -68,7 +69,7 @@ if ( ! function_exists( 'datamachine_register_global_ability_tools' ) ) {
 					'required'   => array( 'prompt' ),
 				),
 				'ability'         => 'datamachine/generate-image',
-				'modes'           => array( 'chat', 'pipeline' ),
+				'modes'           => array( 'pipeline' ),
 			)
 		);
 
@@ -124,7 +125,7 @@ if ( ! function_exists( 'datamachine_register_global_ability_tools' ) ) {
 					'backlinks' => 'datamachine/get-backlinks',
 					'broken'    => 'datamachine/check-broken-links',
 				),
-				'modes'                      => array( 'chat', 'pipeline' ),
+				'modes'                      => array( 'pipeline' ),
 				'strip_action_parameter'     => true,
 				'strip_internal_result_keys' => true,
 			)
@@ -155,7 +156,7 @@ if ( ! function_exists( 'datamachine_register_global_ability_tools' ) ) {
 					'required'   => array( 'query' ),
 				),
 				'ability'         => 'datamachine/local-search',
-				'modes'           => array( 'chat', 'pipeline' ),
+				'modes'           => array( 'pipeline' ),
 			)
 		);
 
@@ -180,7 +181,7 @@ if ( ! function_exists( 'datamachine_register_global_ability_tools' ) ) {
 					'required'   => array( 'source_url' ),
 				),
 				'ability'         => 'datamachine/get-wordpress-post',
-				'modes'           => array( 'chat', 'pipeline' ),
+				'modes'           => array( 'pipeline' ),
 			)
 		);
 	}

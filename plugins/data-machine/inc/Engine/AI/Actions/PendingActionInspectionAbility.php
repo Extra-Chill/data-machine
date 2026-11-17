@@ -43,7 +43,7 @@ final class PendingActionInspectionAbility {
 					'input_schema'        => self::query_schema(),
 					'output_schema'       => self::list_output_schema(),
 					'execute_callback'    => array( self::class, 'list_actions' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -63,7 +63,7 @@ final class PendingActionInspectionAbility {
 					),
 					'output_schema'       => array( 'type' => 'object' ),
 					'execute_callback'    => array( self::class, 'get_action' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -77,7 +77,7 @@ final class PendingActionInspectionAbility {
 					'input_schema'        => self::query_schema(),
 					'output_schema'       => array( 'type' => 'object' ),
 					'execute_callback'    => array( self::class, 'summary' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);
@@ -103,7 +103,7 @@ final class PendingActionInspectionAbility {
 					array(
 						'methods'             => 'GET',
 						'callback'            => static fn( \WP_REST_Request $request ) => new \WP_REST_Response( self::list_actions( self::request_to_filters( $request ) ), 200 ),
-						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+						'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					)
 				);
 
@@ -113,7 +113,7 @@ final class PendingActionInspectionAbility {
 					array(
 						'methods'             => 'GET',
 						'callback'            => static fn( \WP_REST_Request $request ) => new \WP_REST_Response( self::summary( self::request_to_filters( $request ) ), 200 ),
-						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+						'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					)
 				);
 
@@ -126,7 +126,7 @@ final class PendingActionInspectionAbility {
 					array(
 						'methods'             => 'GET',
 						'callback'            => array( self::class, 'handle_get_rest' ),
-						'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+						'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage(),
 					)
 				);
 			}
@@ -237,7 +237,7 @@ final class PendingActionInspectionAbility {
 		$action['resolved_at_iso']   = isset( $action['resolved_at'] ) ? $action['resolved_at'] : null;
 		$action['audit_context']     = isset( $datamachine['audit_context'] ) && is_array( $datamachine['audit_context'] ) ? $datamachine['audit_context'] : array();
 		$action['principal_context'] = isset( $action['audit_context']['principal_context'] ) && is_array( $action['audit_context']['principal_context'] ) ? $action['audit_context']['principal_context'] : array();
-		$action['resolve_with']      = isset( $datamachine['resolve_with'] ) ? (string) $datamachine['resolve_with'] : 'resolve_pending_action';
+		$action['resolve_with']      = isset( $datamachine['resolve_with'] ) ? (string) $datamachine['resolve_with'] : 'agents/resolve-pending-action';
 		$action['resolve_params']    = array(
 			'action_id' => (string) ( $action['action_id'] ?? '' ),
 			'decision'  => '<accepted|rejected>',

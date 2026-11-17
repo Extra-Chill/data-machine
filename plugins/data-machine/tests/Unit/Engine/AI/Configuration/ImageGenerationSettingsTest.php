@@ -118,7 +118,7 @@ class ImageGenerationSettingsTest extends WP_UnitTestCase {
 		$tools = apply_filters( 'datamachine_ability_tool_projections', [] );
 		$this->assertArrayHasKey( 'image_generation', $tools );
 		$this->assertSame( 'datamachine/generate-image', $tools['image_generation']['ability'] );
-		$this->assertSame( array( 'chat', 'pipeline' ), $tools['image_generation']['modes'] );
+		$this->assertSame( array( 'pipeline' ), $tools['image_generation']['modes'] );
 	}
 
 	public function test_config_option_key(): void {

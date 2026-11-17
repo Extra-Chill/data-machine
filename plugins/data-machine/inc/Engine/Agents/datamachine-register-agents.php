@@ -143,7 +143,7 @@ function datamachine_register_default_admin_agent(): void {
 
 	$default_config = array();
 	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
-		$resolved = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
+		$resolved = \DataMachine\Core\PluginSettings::getModelForMode( 'agent' );
 		$provider = isset( $resolved['provider'] ) ? (string) $resolved['provider'] : ''; // @phpstan-ignore isset.offset
 		$model    = isset( $resolved['model'] ) ? (string) $resolved['model'] : ''; // @phpstan-ignore isset.offset
 
@@ -179,12 +179,12 @@ function datamachine_register_persisted_agents(): void {
 add_action( 'wp_agents_api_init', 'datamachine_register_persisted_agents', 20 );
 
 /**
- * Materialize runtime-imported Agents API bundles for Data Machine chat.
+ * Materialize runtime-imported Agents API bundles as Data Machine agents.
  *
  * Browser runtimes can import a request-local agent bundle immediately before
  * calling `agents/chat`. The generic importer registers that definition in the
  * Agents API registry; Data Machine still needs a persisted identity row so its
- * chat handler can resolve owner, model config, and tool policy.
+ * Agents API runtime can resolve owner, model config, and tool policy.
  *
  * @param mixed $result Runtime bundle import result.
  * @return mixed Import result.

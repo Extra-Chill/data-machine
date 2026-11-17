@@ -84,7 +84,6 @@ final class RuntimeServiceProvider {
 		new \DataMachine\Engine\AI\Tools\Global\AgentMemory();
 		new \DataMachine\Engine\AI\Configuration\ImageGenerationSettings();
 		\datamachine_register_global_ability_tools();
-		new \DataMachine\Engine\AI\Tools\Global\QueueValidator();
 		new \DataMachine\Engine\AI\Tools\Global\WebFetch();
 		new \DataMachine\Engine\AI\Tools\Global\ConsultAgent();
 

@@ -6,7 +6,7 @@
  * a stored bearer token (from the authorize flow or manual registration).
  *
  * This is the agent-facing surface on top of {@see RemoteAgentClient}.
- * Pipelines, chat tools, and REST consumers all go through this ability
+ * Pipelines, system tools, and REST consumers all go through this ability
  * instead of instantiating the client directly.
  *
  * @package DataMachine\Abilities\AgentRemoteCall
@@ -32,7 +32,7 @@ class AgentRemoteCallAbility {
 				'datamachine/agent-remote-call',
 				array(
 					'label'               => __( 'Call Remote Agent Site', 'data-machine' ),
-					'description'         => __( 'Make an authenticated HTTP request to another Data Machine site using a stored bearer token. Used for cross-site agent workflows (publishing, reading wiki, querying abilities, chatting with a peer agent).', 'data-machine' ),
+					'description'         => __( 'Make an authenticated HTTP request to another Data Machine site using a stored bearer token. Used for cross-site agent workflows (publishing, reading wiki, querying abilities, consulting a peer agent).', 'data-machine' ),
 					'category'            => 'datamachine-agent',
 					'input_schema'        => array(
 						'type'       => 'object',

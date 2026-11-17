@@ -16,7 +16,7 @@
  *
  * Extended for Extra-Chill/data-machine #3555: an explicit `system_agent_slug`
  * setting can pin system-task attribution to a fixed agent identity instead of
- * depending on the install default owner's active-agent chat preference. That
+ * depending on the install default owner's active-agent preference. That
  * setting is checked first; an unset or invalid (nonexistent agent) value falls
  * back to the existing owner/active-agent/single-agent chain unchanged.
  *

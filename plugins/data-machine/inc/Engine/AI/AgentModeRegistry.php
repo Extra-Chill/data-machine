@@ -2,7 +2,7 @@
 /**
  * Agent Mode Registry
  *
- * Central registry for AI execution modes (chat, pipeline, system, editor, etc.).
+ * Central registry for AI execution modes (agent, pipeline, system, editor, etc.).
 	 * Each mode has an ID, label, description, priority for sort order, and
 	 * optional memory contexts activated by that mode. Runtime requests can
 	 * activate multiple registered modes additively.
@@ -40,7 +40,7 @@ class AgentModeRegistry {
 	 *
 	 * @since 0.68.0
 	 *
-	 * @param string $id       Mode identifier (e.g. 'chat', 'pipeline', 'editor').
+	 * @param string $id       Mode identifier (e.g. 'pipeline', 'system', 'editor').
 	 * @param int    $priority Sort order. Lower numbers appear first.
 	 * @param array  $args     {
 	 *     Registration arguments.

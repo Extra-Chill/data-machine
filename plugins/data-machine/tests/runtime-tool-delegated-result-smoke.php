@@ -117,8 +117,8 @@ $run_delegated_tool = static function ( string $call_id, string $value, array $p
 	$mediator = datamachine_build_pre_tool_mediator(
 		$delegated_tools,
 		$payload,
-		'chat',
-		array( 'chat' ),
+		'system',
+		array( 'system' ),
 		new DataMachineToolRuntimeRules(),
 		$sink,
 		array()

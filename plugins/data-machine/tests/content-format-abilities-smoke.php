@@ -672,26 +672,26 @@ namespace {
 	assert_content_ability( 'upsert-future-original-date-ignored', '' === get_post_meta( $future_source_id, '_datamachine_original_date_gmt', true ) );
 	assert_content_ability( 'upsert-future-original-date-does-not-set-post-date-gmt', '2999-01-01 00:00:00' !== ( $future_source_post->post_date_gmt ?? '' ) );
 
-	$chat_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleChatToolCall(
+	$tool_upsert   = DataMachine\Abilities\Content\UpsertPostAbility::handleToolCall(
 		array(
 			'post_type' => 'post',
 			'title'     => 'AI Markdown Default',
 			'content'   => "# AI Heading\n\nAI paragraph.",
 		)
 	);
-	$chat_id       = $chat_upsert['data']['post_id'] ?? 0;
-	$chat_post     = get_post( (int) $chat_id );
-	$chat_content  = $chat_post->post_content ?? '';
+	$tool_id       = $tool_upsert['data']['post_id'] ?? 0;
+	$tool_post     = get_post( (int) $tool_id );
+	$tool_content  = $tool_post->post_content ?? '';
 	/** @var array<int, array{0:string, 1:string, 2:string}> $conversions */
 	$conversions   = $GLOBALS['__content_ability_conversions'];
 	$last_convert  = array();
 	if ( count( $conversions ) > 0 ) {
 		$last_convert = $conversions[ count( $conversions ) - 1 ];
 	}
-	assert_content_ability( 'chat-upsert-default-succeeds', true === $chat_upsert['success'] );
-	assert_content_ability( 'chat-upsert-defaults-authoring-format-to-markdown', array( 'markdown', 'blocks', "# AI Heading\n\nAI paragraph." ) === $last_convert );
-	assert_content_ability( 'chat-upsert-markdown-default-stores-blocks-for-block-backed-post-type', false !== strpos( $chat_content, '<!-- wp:heading -->' ) );
-	assert_content_ability( 'chat-upsert-markdown-default-has-paragraph', false !== strpos( $chat_content, 'AI paragraph.' ) );
+	assert_content_ability( 'tool-upsert-default-succeeds', true === $tool_upsert['success'] );
+	assert_content_ability( 'tool-upsert-defaults-authoring-format-to-markdown', array( 'markdown', 'blocks', "# AI Heading\n\nAI paragraph." ) === $last_convert );
+	assert_content_ability( 'tool-upsert-markdown-default-stores-blocks-for-block-backed-post-type', false !== strpos( $tool_content, '<!-- wp:heading -->' ) );
+	assert_content_ability( 'tool-upsert-markdown-default-has-paragraph', false !== strpos( $tool_content, 'AI paragraph.' ) );
 
 	$raw_blocks = "<!-- wp:paragraph -->\n<p>Programmatic block content.</p>\n<!-- /wp:paragraph -->";
 	$raw_upsert = DataMachine\Abilities\Content\UpsertPostAbility::execute(
@@ -765,11 +765,11 @@ namespace {
 	assert_content_ability( 'blocks-engine-conversion-error-fails', is_wp_error( $conversion_error ) );
 	assert_content_ability( 'blocks-engine-conversion-error-code-is-distinct-from-missing-transformer', 'datamachine_content_format_blocks_engine_conversion_failed' === $conversion_error->get_error_code() );
 
-	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getChatTool();
-	assert_content_ability( 'chat-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );
-	assert_content_ability( 'chat-tool-description-prefers-markdown-authoring', false !== strpos( $tool['description'], 'write content as markdown' ) );
-	assert_content_ability( 'chat-tool-content-format-description-defaults-markdown', false !== strpos( $tool['parameters']['content_format']['description'] ?? '', 'default to markdown' ) );
-	assert_content_ability( 'chat-tool-guidance-does-not-default-to-blocks', false === strpos( $tool['parameters']['content_format']['description'] ?? '', 'Defaults to blocks' ) );
+	$tool = DataMachine\Abilities\Content\UpsertPostAbility::getToolDefinition();
+	assert_content_ability( 'model-tool-content-format-is-optional', ! in_array( 'content_format', $tool['required'] ?? array(), true ) );
+	assert_content_ability( 'model-tool-description-prefers-markdown-authoring', false !== strpos( $tool['description'], 'write content as markdown' ) );
+	assert_content_ability( 'model-tool-content-format-description-defaults-markdown', false !== strpos( $tool['parameters']['content_format']['description'] ?? '', 'default to markdown' ) );
+	assert_content_ability( 'model-tool-guidance-does-not-default-to-blocks', false === strpos( $tool['parameters']['content_format']['description'] ?? '', 'Defaults to blocks' ) );
 
 	echo "\nContentFormat abilities smoke: {$total} assertions, {$failed} failures.\n";
 

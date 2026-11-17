@@ -83,21 +83,21 @@ $pipeline_opt_in = $policy->can_store_transcript(
 $assert_true( $pipeline_opt_in->is_allowed(), 'non-interactive transcript storage is allowed only when configured' );
 $assert_true( 'datamachine_transcript_opt_in' === $pipeline_opt_in->reason(), 'configured pipeline transcript consent has stable audit reason' );
 
-$chat_decision = $policy->can_store_transcript(
+$interactive_default = $policy->can_store_transcript(
 	array(
-		'mode'        => 'chat',
+		'mode'        => 'rest',
 		'interactive' => true,
 		'agent_id'    => 3,
 		'user_id'     => 7,
 	)
 );
-$assert_true( $chat_decision->is_allowed(), 'interactive chat transcript storage preserves chat session behavior' );
+$assert_true( ! $interactive_default->is_allowed(), 'interactive transcript storage is denied without an explicit opt-in' );
 
-$share_default = $policy->can_share_transcript( array( 'mode' => 'chat', 'interactive' => true ) );
+$share_default = $policy->can_share_transcript( array( 'mode' => 'rest', 'interactive' => true ) );
 $assert_true( ! $share_default->is_allowed(), 'transcript sharing is independently denied without explicit consent' );
 $assert_true( WP_Agent_Consent_Operation::SHARE_TRANSCRIPT === $share_default->operation(), 'sharing decision uses Agents API share_transcript operation' );
 
-$escalation_default = $policy->can_escalate_to_human( array( 'mode' => 'chat', 'interactive' => true ) );
+$escalation_default = $policy->can_escalate_to_human( array( 'mode' => 'rest', 'interactive' => true ) );
 $assert_true( ! $escalation_default->is_allowed(), 'human escalation is independently denied without explicit consent' );
 $assert_true( WP_Agent_Consent_Operation::ESCALATE_TO_HUMAN === $escalation_default->operation(), 'escalation decision uses Agents API escalate_to_human operation' );
 

@@ -2,7 +2,7 @@
 /**
  * Object-capability authorization for datamachine/upsert-post.
  *
- * The chat action alone must not authorize content writes: inserts need the
+ * Data Machine tool access alone must not authorize content writes: inserts need the
  * post type's create/publish capabilities and updates need edit_post on the
  * resolved target, bounded by any agent token capability ceiling.
  *
@@ -25,10 +25,10 @@ class UpsertPostPermissionTest extends WP_UnitTestCase {
 		parent::tear_down();
 	}
 
-	/** Create a user holding the chat capability and make them current. */
+	/** Create a user holding the tool-use capability and make them current. */
 	private function act_as( string $role ): int {
 		$user_id = self::factory()->user->create( array( 'role' => $role ) );
-		get_user_by( 'id', $user_id )->add_cap( 'datamachine_chat' );
+		get_user_by( 'id', $user_id )->add_cap( 'datamachine_use_tools' );
 		wp_set_current_user( $user_id );
 		return $user_id;
 	}
@@ -66,9 +66,9 @@ class UpsertPostPermissionTest extends WP_UnitTestCase {
 		);
 	}
 
-	public function test_subscriber_with_chat_cannot_insert_draft_or_publish(): void {
+	public function test_subscriber_with_tool_access_cannot_insert_draft_or_publish(): void {
 		$this->act_as( 'subscriber' );
-		$this->assertTrue( PermissionHelper::can( 'chat' ) );
+		$this->assertTrue( PermissionHelper::can( 'use_tools' ) );
 
 		foreach ( array( 'draft', 'publish', 'pending' ) as $status ) {
 			$input = $this->input( array( 'post_status' => $status ) );
@@ -81,7 +81,7 @@ class UpsertPostPermissionTest extends WP_UnitTestCase {
 		$this->assertSame( 0, (int) ( new \WP_Query( array( 'title' => 'Upsert permission', 'post_status' => 'any', 'fields' => 'ids' ) ) )->found_posts );
 	}
 
-	public function test_subscriber_with_chat_cannot_update_existing_post(): void {
+	public function test_subscriber_with_tool_access_cannot_update_existing_post(): void {
 		$post_id = $this->foreign_post();
 		$this->act_as( 'subscriber' );
 
@@ -244,12 +244,12 @@ class UpsertPostPermissionTest extends WP_UnitTestCase {
 
 	public function test_agent_token_ceiling_bounds_owner_capabilities(): void {
 		$owner = self::factory()->user->create( array( 'role' => 'author' ) );
-		get_user_by( 'id', $owner )->add_cap( 'datamachine_chat' );
+		get_user_by( 'id', $owner )->add_cap( 'datamachine_use_tools' );
 		// Bearer-token requests authenticate as the agent owner.
 		wp_set_current_user( $owner );
 
 		// Token scope allows drafting but not publishing.
-		PermissionHelper::set_agent_context( 77, $owner, array( 'read', 'datamachine_chat', 'edit_posts' ) );
+		PermissionHelper::set_agent_context( 77, $owner, array( 'read', 'datamachine_use_tools', 'edit_posts' ) );
 
 		$this->assertForbidden( UpsertPostAbility::execute( $this->input( array( 'post_status' => 'publish' ) ) ) );
 

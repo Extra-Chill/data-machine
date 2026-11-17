@@ -37,8 +37,10 @@ final class AbilityToolSource {
 	 *
 	 *     $tools['my_tool'] = array(
 	 *         'ability' => 'my-plugin/my-ability',
-	 *         'modes'   => array( 'chat', 'pipeline' ),
+	 *         'modes'   => array( 'pipeline', 'system' ),
 	 *     );
+	 *
+	 * A projection that declares no modes is available in no mode.
 	 *
 	 * @param array $modes Active agent modes.
 	 * @param array $args  Resolution args.
@@ -233,7 +235,7 @@ final class AbilityToolSource {
 			$tool['parameters'] = array();
 		}
 
-		$tool['modes'] = ToolPolicyResolver::normalizeModes( $tool['modes'] ?? array( ToolPolicyResolver::MODE_CHAT ) );
+		$tool['modes'] = ToolPolicyResolver::normalizeDeclaredModes( $tool['modes'] ?? array() );
 
 		return $tool;
 	}
@@ -249,7 +251,7 @@ final class AbilityToolSource {
 		$tool_modes = $tool['modes'] ?? array();
 		$tool_modes = is_array( $tool_modes ) ? $tool_modes : array( $tool_modes );
 
-		return ! empty( array_intersect( ToolPolicyResolver::normalizeModes( $tool_modes ), $modes ) );
+		return ! empty( array_intersect( ToolPolicyResolver::normalizeDeclaredModes( $tool_modes ), $modes ) );
 	}
 
 	/**

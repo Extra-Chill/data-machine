@@ -27,7 +27,6 @@ final class AbilityToolAdapter {
 		'access_level',
 		'action_kind',
 		'action_policy',
-		'action_policy_chat',
 		'action_policy_pipeline',
 		'action_policy_system',
 		'action_preview_redact',
@@ -81,7 +80,7 @@ final class AbilityToolAdapter {
 			'annotations'       => $annotations,
 			'description'       => method_exists( $ability, 'get_description' ) ? (string) $ability->get_description() : '',
 			'label'             => method_exists( $ability, 'get_label' ) ? (string) $ability->get_label() : $tool_name,
-			'modes'             => array( ToolPolicyResolver::MODE_CHAT ),
+			'modes'             => array(),
 			'parameters'        => self::normalizeParameters( method_exists( $ability, 'get_input_schema' ) ? $ability->get_input_schema() : array() ),
 		);
 
@@ -97,7 +96,7 @@ final class AbilityToolAdapter {
 		}
 
 		$tool['parameters'] = self::normalizeParameters( $tool['parameters'] ?? array() );
-		$tool['modes']      = ToolPolicyResolver::normalizeModes( $tool['modes'] ?? array( ToolPolicyResolver::MODE_CHAT ) );
+		$tool['modes']      = ToolPolicyResolver::normalizeDeclaredModes( $tool['modes'] ?? array() );
 
 		try {
 			$canonical = WP_Agent_Tool_Declaration::normalizeForServer(

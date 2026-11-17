@@ -514,7 +514,7 @@ $text_action_result = datamachine_run_conversation(
 	array(),
 	'openai',
 	'gpt-smoke',
-	array( 'sandbox', 'chat' ),
+	array( 'sandbox', 'system' ),
 	array(),
 	3
 );
@@ -565,7 +565,7 @@ $max_turn_tool_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	array( 'sandbox', 'chat' ),
+	array( 'sandbox', 'system' ),
 	array(),
 	1
 );
@@ -1016,7 +1016,7 @@ $runtime_result = datamachine_run_conversation(
 	),
 	'openai',
 	'gpt-smoke',
-	array( 'chat' ),
+	array( 'system' ),
 	array(
 		'event_sink' => $runtime_sink,
 	),

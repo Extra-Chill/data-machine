@@ -24,7 +24,7 @@ $tool_source = (string) file_get_contents( $root . '/inc/Engine/AI/Tools/Global/
 $provider    = (string) file_get_contents( $root . '/inc/Core/Bootstrap/RuntimeServiceProvider.php' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Host smoke reads source fixtures.
 
 $assert( 'consult_agent tool source exists', '' !== $tool_source );
-$assert( 'consult_agent registers as opt-in chat and system tool', false !== strpos( $tool_source, "array( 'chat', 'system' )" ) && false !== strpos( $tool_source, "'consult_agent'" ) && false !== strpos( $tool_source, "'requires_opt_in' => true" ) );
+$assert( 'consult_agent registers as opt-in system-only tool', false !== strpos( $tool_source, "array( 'system' )" ) && false === strpos( $tool_source, "'chat', 'system'" ) && false !== strpos( $tool_source, "'consult_agent'" ) && false !== strpos( $tool_source, "'requires_opt_in' => true" ) );
 $assert( 'consult_agent is backed by canonical agents/chat', false !== strpos( $tool_source, "wp_get_ability( 'agents/chat' )" ) );
 $assert( 'consult_agent blocks self calls', false !== strpos( $tool_source, 'consult_agent cannot call the current agent' ) );
 $assert( 'consult_agent enforces optional peer allowlist', false !== strpos( $tool_source, 'allowed_agents' ) && false !== strpos( $tool_source, 'approved peer agents' ) );

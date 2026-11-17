@@ -2,7 +2,7 @@
 /**
  * Agent Mode Directive - Priority 22
  *
- * Injects execution-mode guidance (chat, pipeline, system, etc.) into AI
+ * Injects execution-mode guidance (pipeline, system, etc.) into AI
  * calls as a runtime directive rather than per-agent disk files.
  *
  * Replaces the former contexts/{mode}.md per-agent file system. Mode
@@ -28,17 +28,6 @@ defined( 'ABSPATH' ) || exit;
 class AgentModeDirective implements DirectiveInterface {
 
 	/**
-	 * Default chat mode guidance.
-	 *
-	 * @since 0.68.0
-	 */
-	private const CHAT_MODE = <<<'MD'
-# Chat Session Context
-
-This is a live interactive chat session with a user. Your identity, voice, and knowledge come from your memory files above.
-MD;
-
-	/**
 	 * Default pipeline mode guidance.
 	 *
 	 * @since 0.68.0
@@ -46,7 +35,7 @@ MD;
 	private const PIPELINE_MODE = <<<'MD'
 # Pipeline Execution Context
 
-This is an automated pipeline step — not a chat session. You're processing data through a multi-step workflow. Your identity and knowledge come from your memory files above. Apply that context to the content you process.
+This is an automated pipeline step. You're processing data through a multi-step workflow. Your identity and knowledge come from your memory files above. Apply that context to the content you process.
 
 ## How Pipelines Work
 
@@ -71,7 +60,7 @@ MD;
 	private const SYSTEM_MODE = <<<'MD'
 # System Task Context
 
-This is a background system task — not a chat session. You are the internal agent responsible for automated housekeeping: summarizing content, generating metadata, and other system-level operations.
+This is a background system task. You are the internal agent responsible for automated housekeeping: summarizing content, generating metadata, and other system-level operations.
 
 Your identity and knowledge are already loaded from your memory files above. Use that context.
 
@@ -113,7 +102,7 @@ MD;
 			 * when the 'editor' mode is active).
 			 *
 			 * Fires as datamachine_agent_mode_{mode}, e.g.
-			 * datamachine_agent_mode_chat.
+			 * datamachine_agent_mode_pipeline.
 			 *
 			 * @since 0.68.0
 			 *
@@ -156,7 +145,6 @@ MD;
 	 */
 	private static function get_default_for_mode( string $mode ): string {
 		return match ( $mode ) {
-			'chat'     => self::CHAT_MODE,
 			'pipeline' => self::PIPELINE_MODE,
 			'system'   => self::SYSTEM_MODE,
 			default    => '',

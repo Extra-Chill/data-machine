@@ -37,7 +37,6 @@ class MemoryPolicyResolver {
 	 * Agent mode presets, aligned with ToolPolicyResolver for consistency.
 	 */
 	public const MODE_PIPELINE = 'pipeline';
-	public const MODE_CHAT     = 'chat';
 	public const MODE_SYSTEM   = 'system';
 
 	/**
@@ -52,7 +51,7 @@ class MemoryPolicyResolver {
 	 * @param array $args {
 	 *     Resolution arguments describing the request.
 	 *
-	 *     @type string[] $modes      Required. Agent mode slugs (e.g. 'chat', 'pipeline').
+	 *     @type string[] $modes      Required. Agent mode slugs (e.g. 'pipeline', 'system').
 	 *     @type int|null $agent_id   Optional agent ID for per-agent policy filtering.
 	 *     @type array    $deny       Filenames to explicitly deny (highest precedence).
 	 *     @type array    $allow_only Mode-level allowlist narrowing.
@@ -329,7 +328,6 @@ class MemoryPolicyResolver {
 	public static function getModes(): array {
 		return array(
 			self::MODE_PIPELINE => 'Pipeline step AI execution',
-			self::MODE_CHAT     => 'Admin chat session',
 			self::MODE_SYSTEM   => 'System task execution',
 		);
 	}

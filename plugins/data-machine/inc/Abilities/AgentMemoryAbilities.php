@@ -199,7 +199,7 @@ class AgentMemoryAbilities {
 						),
 					),
 					'execute_callback'    => array( self::class, 'writeSelfMemory' ),
-					'permission_callback' => fn() => PermissionHelper::can( 'chat' ),
+					'permission_callback' => fn() => PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage(),
 					'meta'                => array( 'show_in_rest' => true ),
 				)
 			);

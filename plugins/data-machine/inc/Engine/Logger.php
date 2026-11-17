@@ -33,7 +33,7 @@ use DataMachine\Abilities\PermissionHelper;
  *
  * Priority 2 is the authoritative answer for any code path that runs
  * inside an agent context — pipeline jobs, REST bearer-token requests,
- * chat-orchestrator turns. Without it, log lines from inside a tool call
+ * host-runtime agent turns. Without it, log lines from inside a tool call
  * fall through to the user→first-agent guess at priority 3, which is
  * wrong on any site where the owner runs more than one agent (the lookup
  * picks whichever agent the database returns first, not the one that

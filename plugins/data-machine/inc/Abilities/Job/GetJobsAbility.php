@@ -61,7 +61,7 @@ class GetJobsAbility {
 							),
 							'source'              => array(
 								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),
-								'description' => __( 'Filter jobs by source (pipeline, chat, system, api, direct)', 'data-machine' ),
+								'description' => __( 'Filter jobs by source (pipeline, system, api, direct)', 'data-machine' ),
 							),
 							'handler'             => array(
 								'anyOf'       => array( array( 'type' => 'string' ), array( 'type' => 'null' ) ),

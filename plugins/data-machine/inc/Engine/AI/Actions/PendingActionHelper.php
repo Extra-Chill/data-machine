@@ -101,7 +101,7 @@ class PendingActionHelper {
 				'created_by'      => $user_id,
 				'context'         => $context,
 				'resolver_grants' => $grants,
-				'resolve_with'    => 'resolve_pending_action',
+				'resolve_with'    => 'agents/resolve-pending-action',
 			)
 		);
 		$authorization                            = isset( $args['authorization'] ) && is_array( $args['authorization'] ) ? $args['authorization'] : array();
@@ -144,7 +144,7 @@ class PendingActionHelper {
 		/**
 		 * Fires when a pending action has been staged and is awaiting resolution.
 		 *
-		 * Hook this to notify users (email, chat ping, etc.), log audit trails,
+		 * Hook this to notify users (email, messaging ping, etc.), log audit trails,
 		 * or mirror the pending action into a visible queue.
 		 *
 		 * @since 0.72.0
@@ -173,7 +173,7 @@ class PendingActionHelper {
 		);
 
 		$instruction = sprintf(
-			'Show this preview to the user and wait for their confirmation. Do not resolve until they explicitly approve or reject. To resolve, call resolve_pending_action with action_id "%s" and decision "accepted" or "rejected". If the user asks to modify, call the original tool again with updated parameters instead of resolving this action.',
+			'This action is staged for human approval and has not been applied. Report the preview and stop; do not retry the action. A human resolves it through the agents/resolve-pending-action ability (REST POST /datamachine/v1/actions/resolve or wp datamachine pending-actions accept|reject) with action_id "%s".',
 			$action_id
 		);
 
@@ -181,7 +181,7 @@ class PendingActionHelper {
 			'adapter'     => 'data-machine',
 			'datamachine' => array(
 				'kind'         => $kind,
-				'resolve_with' => 'resolve_pending_action',
+				'resolve_with' => 'agents/resolve-pending-action',
 			),
 		);
 

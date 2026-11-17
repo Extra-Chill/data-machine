@@ -92,7 +92,7 @@ class ScaffoldAbilities {
 					),
 				),
 				'permission_callback' => function () {
-					return PermissionHelper::can( 'chat' );
+					return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can( 'create_own_agent' ) || PermissionHelper::can_manage();
 				},
 				'execute_callback'    => array( __CLASS__, 'execute' ),
 			)

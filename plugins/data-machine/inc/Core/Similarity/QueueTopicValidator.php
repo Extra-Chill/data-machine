@@ -1,58 +1,28 @@
 <?php
 /**
- * Queue Validator tool for duplicate detection.
+ * Queue topic validator for duplicate detection.
  *
- * AI-facing tool that checks whether a topic already exists as a published
- * post or in a Data Machine queue before content generation begins.
+ * Checks whether a topic already exists as a published post or in a Data
+ * Machine flow queue. Backs `wp datamachine flows queue validate`.
  *
- * Delegates all similarity math to the unified SimilarityEngine.
- * The published-post check can also be routed through the
- * DuplicateCheckAbility for strategy-aware checking.
+ * Delegates all similarity math to the unified SimilarityEngine. Strategy-
+ * aware checks (extension strategies, lookback windows) live in the
+ * `datamachine/check-duplicate` ability.
  *
- * @package DataMachine\Engine\AI\Tools\Global
+ * @package DataMachine\Core\Similarity
  */
 
-namespace DataMachine\Engine\AI\Tools\Global;
+namespace DataMachine\Core\Similarity;
 
 defined( 'ABSPATH' ) || exit;
 
 use DataMachine\Core\Database\Flows\Flows as DB_Flows;
-use DataMachine\Core\Similarity\SimilarityEngine;
-use DataMachine\Engine\AI\Tools\BaseTool;
 
-class QueueValidator extends BaseTool {
-
-	public function __construct() {
-		$this->registerTool( 'queue_validator', array( $this, 'getToolDefinition' ), array( 'chat' ), array( 'access_level' => 'admin' ) );
-	}
+class QueueTopicValidator {
 
 	/**
-	 * Check if queue validator is configured.
-	 *
-	 * @return bool
-	 */
-	public static function is_configured(): bool {
-		return class_exists( DB_Flows::class );
-	}
-
-	/**
-	 * Check if queue validator should be considered configured.
-	 *
-	 * @param bool   $configured Current configuration status.
-	 * @param string $tool_id    Tool identifier.
-	 * @return bool
-	 */
-	public function check_configuration( $configured, $tool_id ) {
-		if ( 'queue_validator' !== $tool_id ) {
-			return $configured;
-		}
-
-		return self::is_configured();
-	}
-
-	/**
-	 * Core duplicate-check logic. Returns a structured result usable by
-	 * both the AI tool interface and the queue-add ability.
+	 * Core duplicate-check logic. Returns a structured result used by
+	 * `wp datamachine flows queue validate`.
 	 *
 	 * @param array $params {
 	 *     @type string $topic          Topic to validate (required).
@@ -180,25 +150,6 @@ class QueueValidator extends BaseTool {
 			'verdict' => 'clear',
 			'topic'   => $topic,
 			'reason'  => sprintf( 'No duplicates found for "%s".', $topic ),
-		);
-	}
-
-	/**
-	 * AI tool interface. Wraps validate() with tool-specific response shape.
-	 */
-	public function handle_tool_call( array $parameters, array $tool_def = array() ): array {
-		$result = $this->validate( $parameters );
-
-		if ( 'error' === $result['verdict'] ) {
-			return $this->buildErrorResponse( $result['reason'], 'queue_validator' );
-		}
-
-		return array_merge(
-			array(
-				'success'   => true,
-				'tool_name' => 'queue_validator',
-			),
-			$result
 		);
 	}
 
@@ -332,44 +283,5 @@ class QueueValidator extends BaseTool {
 		}
 
 		return SimilarityEngine::DEFAULT_JACCARD_THRESHOLD;
-	}
-
-	/**
-	 * Get tool definition for AI agents.
-	 *
-	 * @return array Tool definition array.
-	 */
-	public function getToolDefinition(): array {
-		return array(
-			'class'       => __CLASS__,
-			'method'      => 'handle_tool_call',
-			'description' => 'Check if a topic already exists as a published post or in a Data Machine queue before generating content. Returns "clear" if no duplicates found, or "duplicate" with match details (title, similarity score, source). Always use this before adding topics to the queue or starting content generation to avoid duplicate work.',
-			'parameters'  => array(
-				'type'       => 'object',
-				'properties' => array(
-					'topic'                => array(
-					'type'        => 'string',
-					'description' => 'Topic or title to validate against existing content and queue items.',
-				),
-					'post_type'            => array(
-					'type'        => 'string',
-					'description' => 'WordPress post type to check against (default: "post"). Use "recipe" for recipe validation, or any registered custom post type.',
-				),
-					'flow_id'              => array(
-					'type'        => 'integer',
-					'description' => 'Data Machine flow ID to check queue against. Required together with flow_step_id to enable queue checking.',
-				),
-					'flow_step_id'         => array(
-					'type'        => 'string',
-					'description' => 'Flow step ID to check queue against. Required together with flow_id to enable queue checking.',
-				),
-					'similarity_threshold' => array(
-					'type'        => 'number',
-					'description' => 'Jaccard similarity threshold between 0.0 and 1.0 (default: 0.65). Lower values catch more potential duplicates.',
-				),
-				),
-				'required'   => array( 'topic' ),
-			),
-		);
 	}
 }

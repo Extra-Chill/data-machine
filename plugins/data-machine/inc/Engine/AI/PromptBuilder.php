@@ -102,7 +102,7 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request with directives applied
 	 *
-	 * @param array  $modes    Agent modes ('pipeline', 'chat', etc.)
+	 * @param array  $modes    Agent modes ('pipeline', 'system', etc.)
 	 * @param string $provider AI provider name
 	 * @param array  $payload  Request payload
 	 * @return array Request array with messages, tools, and directive metadata
@@ -121,7 +121,7 @@ class PromptBuilder {
 	/**
 	 * Build the final AI request and include directive-level inspection metadata.
 	 *
-	 * @param array  $modes    Agent modes ('pipeline', 'chat', etc.).
+	 * @param array  $modes    Agent modes ('pipeline', 'system', etc.).
 	 * @param string $provider AI provider name.
 	 * @param array  $payload  Request payload.
 	 * @return array Request array with messages, tools, applied_directives, directive_metadata,

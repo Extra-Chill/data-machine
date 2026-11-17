@@ -4,9 +4,8 @@
  *
  * Regression coverage for #1441: when a pipeline AI step double-calls a tool,
  * the correction message must instruct the model to keep going to the next
- * pipeline action rather than the chat-shaped "task is done — end the
- * conversation". The chat-mode behavior must remain identical to the
- * pre-fix-1441 message so existing chat callers are unaffected.
+ * pipeline action rather than the system-mode "task is done — end the
+ * conversation". System mode (the default) keeps the pre-fix-1441 message.
  *
  * Run with: php tests/duplicate-tool-call-mode-aware-smoke.php
  *
@@ -33,17 +32,17 @@ $extract_error = static function ( array $envelope ): string {
 	return (string) ( $envelope['payload']['error'] ?? '' );
 };
 
-// --- Default arg keeps chat semantics. ---------------------------------------
+// --- Default arg keeps system semantics. -------------------------------------
 
-$default_envelope = ConversationManager::generateDuplicateToolCallMessage( 'queue_validator' );
+$default_envelope = ConversationManager::generateDuplicateToolCallMessage( 'local_search' );
 $default_error    = $extract_error( $default_envelope );
 
 datamachine_dup_msg_assert(
 	str_contains( $default_error, 'end the conversation' ),
-	'Default arg (no mode) preserves chat-mode "end the conversation" message.'
+	'Default arg (no mode) preserves system-mode "end the conversation" message.'
 );
 datamachine_dup_msg_assert(
-	str_contains( $default_error, 'queue_validator' ),
+	str_contains( $default_error, 'local_search' ),
 	'Default arg renders the duplicated tool name into the error.'
 );
 datamachine_dup_msg_assert(
@@ -55,18 +54,18 @@ datamachine_dup_msg_assert(
 	'Duplicate-correction payload reports success=false.'
 );
 
-// --- Explicit chat mode matches default. -------------------------------------
+// --- Explicit system mode matches default. -----------------------------------
 
-$chat_envelope = ConversationManager::generateDuplicateToolCallMessage( 'foo', 0, 'chat' );
-$chat_error    = $extract_error( $chat_envelope );
+$system_envelope = ConversationManager::generateDuplicateToolCallMessage( 'foo', 0, 'system' );
+$system_error    = $extract_error( $system_envelope );
 
 datamachine_dup_msg_assert(
-	str_contains( $chat_error, 'end the conversation' ),
-	'Explicit chat mode emits the chat-shaped end-the-conversation guidance.'
+	str_contains( $system_error, 'end the conversation' ),
+	'Explicit system mode emits the end-the-conversation guidance.'
 );
 datamachine_dup_msg_assert(
-	! str_contains( $chat_error, 'publish handler' ),
-	'Explicit chat mode does NOT mention the publish handler.'
+	! str_contains( $system_error, 'publish handler' ),
+	'Explicit system mode does NOT mention the publish handler.'
 );
 
 // --- Pipeline mode tells the AI to continue the pipeline. --------------------
@@ -105,14 +104,14 @@ datamachine_dup_msg_assert(
 	'Bridge mode does NOT tell the AI to end the conversation.'
 );
 
-// --- Unknown modes fall through to chat semantics. ---------------------------
+// --- Unknown modes fall through to system semantics. -------------------------
 
 $unknown_envelope = ConversationManager::generateDuplicateToolCallMessage( 'foo', 0, 'totally-not-a-mode' );
 $unknown_error    = $extract_error( $unknown_envelope );
 
 datamachine_dup_msg_assert(
 	str_contains( $unknown_error, 'end the conversation' ),
-	'Unknown mode falls back to chat-mode "end the conversation" wording.'
+	'Unknown mode falls back to system-mode "end the conversation" wording.'
 );
 
 // --- Turn count propagates through to the envelope payload. ------------------

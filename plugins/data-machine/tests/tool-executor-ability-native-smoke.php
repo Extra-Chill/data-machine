@@ -142,7 +142,7 @@ namespace {
 
 namespace DataMachine\Engine\AI\Actions {
 	class ActionPolicyResolver {
-		public const MODE_CHAT = 'chat';
+		public const MODE_SYSTEM = 'system';
 
 		public function resolveForTool( array $args ): string {
 			return $args['tool_def']['action_policy'] ?? 'direct';
@@ -284,7 +284,7 @@ namespace DataMachine\Tests\ToolExecutorAbilityNativeSmoke {
 				),
 				$payload
 			),
-			ActionPolicyResolver::MODE_CHAT
+			ActionPolicyResolver::MODE_SYSTEM
 		);
 	}
 

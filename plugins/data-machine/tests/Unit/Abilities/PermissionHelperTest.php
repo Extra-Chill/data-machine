@@ -230,7 +230,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 		PermissionHelper::set_agent_context(
 			123,
 			$user_id,
-			array( 'datamachine_chat' ),
+			array( 'datamachine_use_tools' ),
 			456
 		);
 
@@ -238,7 +238,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 
 		$this->assertInstanceOf( \AgentsAPI\AI\WP_Agent_Execution_Principal::class, $principal );
 		$this->assertSame( \AgentsAPI\AI\WP_Agent_Execution_Principal::AUTH_SOURCE_AGENT_TOKEN, $principal->auth_source );
-		$this->assertTrue( PermissionHelper::can( 'chat' ) );
+		$this->assertTrue( PermissionHelper::can( 'use_tools' ) );
 		$this->assertFalse( PermissionHelper::can( 'manage_agents' ) );
 	}
 
@@ -254,15 +254,15 @@ class PermissionHelperTest extends WP_UnitTestCase {
 				'ability_categories' => array( 'datamachine-content' ),
 				'ability_allow'      => array( 'datamachine/wiki' ),
 				'ability_deny'       => array( 'datamachine/delete-post' ),
-				'capabilities'       => array( 'datamachine_chat' ),
+				'capabilities'       => array( 'datamachine_view_logs' ),
 			),
 			456
 		);
 
 		$principal = PermissionHelper::get_execution_principal();
 
-		$this->assertSame( array( 'datamachine_chat' ), $principal->capability_ceiling->allowed_capabilities );
-		$this->assertTrue( PermissionHelper::can( 'chat' ) );
+		$this->assertSame( array( 'datamachine_view_logs' ), $principal->capability_ceiling->allowed_capabilities );
+		$this->assertTrue( PermissionHelper::can( 'view_logs' ) );
 		$this->assertFalse( PermissionHelper::can( 'use_tools' ) );
 	}
 
@@ -278,7 +278,7 @@ class PermissionHelperTest extends WP_UnitTestCase {
 				'ability_categories' => array( 'datamachine-content' ),
 				'ability_allow'      => array( 'datamachine/wiki' ),
 				'ability_deny'       => array( 'datamachine/delete-post' ),
-				'capabilities'       => array( 'datamachine_chat' ),
+				'capabilities'       => array( 'datamachine_view_logs' ),
 			),
 			456
 		);

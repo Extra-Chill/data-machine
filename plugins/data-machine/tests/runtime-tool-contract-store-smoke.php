@@ -107,7 +107,6 @@ namespace {
 	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_pending_result;
 	use function DataMachine\Engine\AI\datamachine_prepare_runtime_tool_request;
 	use function DataMachine\Engine\AI\datamachine_runtime_tool_request_store;
-	use function DataMachine\Engine\AI\datamachine_resume_runtime_tool_request;
 	use function DataMachine\Engine\AI\datamachine_session_has_pending_runtime_tools;
 	use function DataMachine\Engine\AI\datamachine_submit_runtime_tool_result;
 	use function DataMachine\Engine\AI\datamachine_timeout_runtime_tool_request;
@@ -170,21 +169,18 @@ namespace {
 		return 0;
 	}
 
-	// Host chat runtimes continue deferred conversations from this action.
-	$GLOBALS['datamachine_runtime_tool_continue_calls'] = array();
+	// Session transports observe projected runtime-tool results from this action.
+	$GLOBALS['datamachine_runtime_tool_submitted_calls'] = array();
 
 	if ( ! function_exists( 'do_action' ) ) {
 		function do_action( string $hook, ...$args ): void {
-			if ( 'datamachine_runtime_tool_continue' !== $hook ) {
+			if ( 'datamachine_runtime_tool_result_submitted' !== $hook ) {
 				return;
 			}
 
-			$calling_user_id = $args[2] ?? null;
-			$GLOBALS['datamachine_runtime_tool_continue_calls'][] = array(
-				'session_id'      => $args[0] ?? '',
-				'user_id'         => $args[1] ?? 0,
-				'calling_user_id' => $calling_user_id,
-				'tools'           => null !== $calling_user_id && $calling_user_id > 0 ? array( 'owner_tool' ) : array(),
+			$GLOBALS['datamachine_runtime_tool_submitted_calls'][] = array(
+				'request_id' => (string) ( $args[0]['request_id'] ?? '' ),
+				'success'    => ! empty( $args[1]['success'] ),
 			);
 		}
 	}
@@ -324,9 +320,9 @@ namespace {
 
 	echo "runtime-tool-contract-store-smoke\n\n";
 
-	$chat_db                              = $GLOBALS['datamachine_runtime_tool_smoke_store'];
-	$chat_db->sessions['session-1']       = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
-	$chat_db->sessions['session-timeout'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store                              = $GLOBALS['datamachine_runtime_tool_smoke_store'];
+	$transcript_store->sessions['session-1']       = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store->sessions['session-timeout'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 
 	$pending = prepare_and_persist_runtime_tool_request(
 		array(
@@ -335,8 +331,8 @@ namespace {
 			'parameters' => array( 'label' => 'Hero' ),
 			'turn_count' => 3,
 			'session_id' => 'session-1',
-			'mode'       => 'chat',
-			'modes'      => array( 'chat' ),
+			'mode'       => 'system',
+			'modes'      => array( 'system' ),
 		),
 		array(
 			'user_id'         => 7,
@@ -353,7 +349,7 @@ namespace {
 	$assert( 'pending' === ( $request['metadata']['datamachine']['persistence_status'] ?? '' ), 'deferred request keeps Data Machine persistence status namespaced' );
 	$assert( 52 === ( $request['metadata']['datamachine']['calling_user_id'] ?? null ), 'deferred request persists the delegated acting caller separately from runtime ownership' );
 	$assert( isset( Jobs::$engine_data[1]['runtime_tool_request'] ), 'store adapter persists request in job engine data' );
-	$assert( isset( $chat_db->sessions['session-1']['metadata']['runtime_tool_requests'][ $request_id ] ), 'store adapter mirrors request into session metadata' );
+	$assert( isset( $transcript_store->sessions['session-1']['metadata']['runtime_tool_requests'][ $request_id ] ), 'store adapter mirrors request into session metadata' );
 	$assert( 'datamachine_runtime_tool_timeout' === ( $GLOBALS['datamachine_runtime_tool_scheduled'][0]['hook'] ?? '' ), 'deferred request schedules timeout action' );
 	$assert( null !== datamachine_runtime_tool_request_store()->get( $request_id ), 'store adapter reads the pending request back' );
 
@@ -363,24 +359,20 @@ namespace {
 	$assert( WP_Agent_Runtime_Tool_Result::STATUS_SUBMITTED === ( $stored['metadata']['datamachine']['result']['status'] ?? '' ), 'submitted result is stored in canonical result shape' );
 	$assert( 'fulfilled' === ( $stored['metadata']['datamachine']['persistence_status'] ?? '' ), 'submitted result completes namespaced Data Machine status' );
 	$assert( 'completed' === ( Jobs::$jobs[1]['status'] ?? '' ), 'successful result completes the Data Machine job' );
-	$assert( 1 === count( $chat_db->sessions['session-1']['messages'] ), 'submitted result appends a transcript tool message' );
-	$assert( false === ( $chat_db->sessions['session-1']['metadata']['has_pending_tools'] ?? true ), 'submitted result clears pending session state' );
-	$assert( 'datamachine_runtime_tool_resume' === ( $GLOBALS['datamachine_runtime_tool_enqueued'][0]['hook'] ?? '' ), 'submitted result enqueues resume action' );
-	$before_recovery_messages = count( $chat_db->sessions['session-1']['messages'] );
+	$assert( 1 === count( $transcript_store->sessions['session-1']['messages'] ), 'submitted result appends a transcript tool message' );
+	$assert( false === ( $transcript_store->sessions['session-1']['metadata']['has_pending_tools'] ?? true ), 'submitted result clears pending session state' );
+	$assert( array() === $GLOBALS['datamachine_runtime_tool_enqueued'], 'submitted result does not enqueue a conversation resume action' );
+	$assert( 1 === count( $GLOBALS['datamachine_runtime_tool_submitted_calls'] ) && $request_id === ( $GLOBALS['datamachine_runtime_tool_submitted_calls'][0]['request_id'] ?? '' ), 'submitted result fires the projection action once' );
+	$before_recovery_messages = count( $transcript_store->sessions['session-1']['messages'] );
 	$before_recovery_actions  = count( $GLOBALS['datamachine_runtime_tool_enqueued'] );
 	$duplicate_submission = datamachine_submit_runtime_tool_result( $request_id, array( 'selected_id' => 'block-1' ) );
 	$assert( is_array( $duplicate_submission ) && true === ( $duplicate_submission['success'] ?? false ), 'duplicate result submission enters idempotent continuation recovery' . ( $duplicate_submission instanceof WP_Error ? ': ' . $duplicate_submission->get_error_message() : '' ) );
-	$assert( $before_recovery_messages === count( $chat_db->sessions['session-1']['messages'] ), 'duplicate result submission does not duplicate transcript projection' );
-	$assert( $before_recovery_actions === count( $GLOBALS['datamachine_runtime_tool_enqueued'] ), 'duplicate result submission adopts existing resume action' );
+	$assert( $before_recovery_messages === count( $transcript_store->sessions['session-1']['messages'] ), 'duplicate result submission does not duplicate transcript projection' );
+	$assert( $before_recovery_actions === count( $GLOBALS['datamachine_runtime_tool_enqueued'] ), 'duplicate result submission enqueues no actions' );
 	datamachine_timeout_runtime_tool_request( $request_id );
-	$assert( $before_recovery_messages === count( $chat_db->sessions['session-1']['messages'] ), 'fulfilled timeout recovery does not duplicate transcript projection' );
-	$assert( $before_recovery_actions === count( $GLOBALS['datamachine_runtime_tool_enqueued'] ), 'fulfilled timeout recovery adopts existing resume action idempotently' );
-	datamachine_resume_runtime_tool_request( $request_id );
-	$delegated_resume = $GLOBALS['datamachine_runtime_tool_continue_calls'][0] ?? array();
-	$assert( 7 === ( $delegated_resume['user_id'] ?? null ), 'async delegated resume retains runtime/session ownership' );
-	$assert( 52 === ( $delegated_resume['calling_user_id'] ?? null ), 'async delegated resume restores the original acting caller' );
-	$assert( array( 'owner_tool' ) === ( $delegated_resume['tools'] ?? null ), 'delegated caller-scoped tools remain visible after async resume' );
-	$assert( 52 === ( Jobs::$engine_data[1]['runtime_tool_run_state']['resume_payload']['calling_user_id'] ?? null ), 'runtime run-state records the delegated caller in its resume payload' );
+	$assert( $before_recovery_messages === count( $transcript_store->sessions['session-1']['messages'] ), 'fulfilled timeout recovery does not duplicate transcript projection' );
+	$assert( $before_recovery_actions === count( $GLOBALS['datamachine_runtime_tool_enqueued'] ), 'fulfilled timeout recovery enqueues no actions' );
+	$assert( 1 === count( $GLOBALS['datamachine_runtime_tool_submitted_calls'] ), 'duplicate submission and timeout recovery do not re-fire the projection action' );
 
 	$timeout_pending = prepare_and_persist_runtime_tool_request(
 		array(
@@ -398,7 +390,7 @@ namespace {
 	$assert( 'runtime_tool_timeout' === ( $timeout_stored['metadata']['datamachine']['result']['metadata']['datamachine']['code'] ?? '' ), 'timeout stores canonical error result metadata' );
 	$assert( 'failed' === ( Jobs::$jobs[2]['status'] ?? '' ), 'timeout fails the Data Machine job' );
 
-	$chat_db->sessions['session-system'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store->sessions['session-system'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$system_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/select_block',
@@ -406,8 +398,8 @@ namespace {
 			'parameters' => array(),
 			'turn_count' => 2,
 			'session_id' => 'session-system',
-			'mode'       => 'chat',
-			'modes'      => array( 'chat' ),
+			'mode'       => 'system',
+			'modes'      => array( 'system' ),
 		),
 		array(
 			'user_id'         => 7,
@@ -418,15 +410,11 @@ namespace {
 	$system_request    = $system_pending['runtime_tool_request'] ?? array();
 	$system_request_id = (string) ( $system_request['request_id'] ?? '' );
 	$assert( 0 === ( $system_request['metadata']['datamachine']['calling_user_id'] ?? null ), 'deferred request preserves an explicit no-human caller' );
-	datamachine_submit_runtime_tool_result( $system_request_id, array( 'selected_id' => 'block-2' ) );
-	datamachine_resume_runtime_tool_request( $system_request_id );
-	$system_resume = $GLOBALS['datamachine_runtime_tool_continue_calls'][1] ?? array();
-	$assert( 7 === ( $system_resume['user_id'] ?? null ), 'async no-human resume retains runtime/session ownership' );
-	$assert( 0 === ( $system_resume['calling_user_id'] ?? null ), 'async no-human resume restores explicit zero without owner fallback' );
-	$assert( array() === ( $system_resume['tools'] ?? null ), 'owner-scoped tools do not appear after async no-human resume' );
-	$assert( 0 === ( Jobs::$engine_data[3]['runtime_tool_run_state']['resume_payload']['calling_user_id'] ?? null ), 'runtime run-state records explicit zero in its resume payload' );
+	$system_submission = datamachine_submit_runtime_tool_result( $system_request_id, array( 'selected_id' => 'block-2' ) );
+	$assert( true === ( $system_submission['projected'] ?? false ), 'no-human result submission projects into the owning session' );
+	$assert( ! isset( Jobs::$engine_data[3]['runtime_tool_run_state']['resume_payload'] ), 'runtime run-state no longer records a resume payload' );
 
-	$chat_db->sessions['session-packet'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store->sessions['session-packet'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$packet_token = 'packet-reservation-token';
 	$packet_id    = hash( 'sha256', 'packet-runtime-identity' );
 	$packet_request = datamachine_prepare_runtime_tool_request(
@@ -476,28 +464,25 @@ namespace {
 	Jobs::$fail_next_complete = true;
 	$first_packet_submission = datamachine_submit_runtime_tool_result( (string) $packet_request['request_id'], array( 'published' => true ) );
 	$packet_phases = Jobs::$engine_data[ $packet_job_id ]['runtime_tool_request']['metadata']['datamachine']['completion_phases'] ?? array();
-	$assert( true === ( $first_packet_submission['success'] ?? false ) && false === ( $first_packet_submission['scheduled'] ?? true ), 'request terminal transition survives a crash before job terminalization' );
+	$assert( true === ( $first_packet_submission['success'] ?? false ) && false === ( $first_packet_submission['projected'] ?? true ), 'request terminal transition survives a crash before job terminalization' );
 	$assert( ! empty( $packet_phases['request_terminal_at'] ) && ! empty( $packet_phases['reservation_finalized_at'] ) && empty( $packet_phases['job_terminalized_at'] ), 'crash snapshot records exactly the completed runtime phases' );
 	$assert( 'succeeded' === ( Jobs::$engine_data[ $packet_job_id ]['packet_tool_executions']['client/packet_handler'][ $packet_id ]['state'] ?? null ), 'reservation finalizes before terminal cleanup' );
 
-	$before_packet_messages = count( $chat_db->sessions['session-packet']['messages'] );
+	$before_packet_messages = count( $transcript_store->sessions['session-packet']['messages'] );
 	$duplicate_packet_submission = datamachine_submit_runtime_tool_result( (string) $packet_request['request_id'], array( 'published' => true ) );
 	$packet_phases = Jobs::$engine_data[ $packet_job_id ]['runtime_tool_request']['metadata']['datamachine']['completion_phases'] ?? array();
-	$assert( true === ( $duplicate_packet_submission['success'] ?? false ) && true === ( $duplicate_packet_submission['scheduled'] ?? false ), 'duplicate callback completes every missing phase after terminalization failure' );
+	$assert( true === ( $duplicate_packet_submission['success'] ?? false ) && true === ( $duplicate_packet_submission['projected'] ?? false ), 'duplicate callback completes every missing phase after terminalization failure' );
 	$assert( 'completed' === ( Jobs::$jobs[ $packet_job_id ]['status'] ?? '' ), 'duplicate callback retries and completes job terminalization' );
 	$assert( ! isset( Jobs::$engine_data[ $packet_job_id ]['packet_tool_executions'] ), 'terminal cleanup runs only after reservation finalization is durable' );
-	$assert( ! empty( $packet_phases['job_terminalized_at'] ) && ! empty( $packet_phases['session_projected_at'] ) && ! empty( $packet_phases['resume_scheduled_at'] ), 'duplicate callback persists terminal, projection, and resume phases' );
-	$assert( $before_packet_messages + 1 === count( $chat_db->sessions['session-packet']['messages'] ), 'recovery projects the packet result exactly once' );
-	$before_packet_resumes = count( $GLOBALS['datamachine_runtime_tool_continue_calls'] );
-	datamachine_resume_runtime_tool_request( (string) $packet_request['request_id'] );
-	datamachine_resume_runtime_tool_request( (string) $packet_request['request_id'] );
-	$assert( $before_packet_resumes + 1 === count( $GLOBALS['datamachine_runtime_tool_continue_calls'] ), 'duplicate resume action delivery continues the conversation exactly once' );
-	$GLOBALS['datamachine_runtime_tool_enqueued'] = array_values( array_filter( $GLOBALS['datamachine_runtime_tool_enqueued'], static fn( array $action ): bool => 'datamachine_runtime_tool_resume' !== $action['hook'] || array( $packet_request['request_id'] ) !== $action['args'] ) );
+	$assert( ! empty( $packet_phases['job_terminalized_at'] ) && ! empty( $packet_phases['session_projected_at'] ) && empty( $packet_phases['resume_scheduled_at'] ), 'duplicate callback persists terminal and projection phases' );
+	$assert( $before_packet_messages + 1 === count( $transcript_store->sessions['session-packet']['messages'] ), 'recovery projects the packet result exactly once' );
+	$before_packet_submitted = count( $GLOBALS['datamachine_runtime_tool_submitted_calls'] );
 	datamachine_submit_runtime_tool_result( (string) $packet_request['request_id'], array( 'published' => true ) );
-	$assert( 0 === count( array_filter( $GLOBALS['datamachine_runtime_tool_enqueued'], static fn( array $action ): bool => 'datamachine_runtime_tool_resume' === $action['hook'] && array( $packet_request['request_id'] ) === $action['args'] ) ), 'completed duplicate callback does not enqueue another resume after the first action ran' );
+	$assert( $before_packet_submitted === count( $GLOBALS['datamachine_runtime_tool_submitted_calls'] ), 'completed duplicate callback does not re-fire the projection action' );
+	$assert( 0 === count( array_filter( $GLOBALS['datamachine_runtime_tool_enqueued'], static fn( array $action ): bool => 'datamachine_runtime_tool_resume' === $action['hook'] ) ), 'runtime tool completion never enqueues a resume action' );
 	$assert( array() === datamachine_runtime_tool_request_store()->recent_pending(), 'store adapter implements the Agents API recent-pending contract' );
 
-	$chat_db->sessions['session-client-output'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store->sessions['session-client-output'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$client_pending = prepare_and_persist_runtime_tool_request(
 		array(
 			'tool_name'  => 'client/packet_handler',
@@ -522,7 +507,7 @@ namespace {
 	$assert( ! str_contains( (string) json_encode( $client_pending ), 'reservation_token' ) && ! str_contains( (string) json_encode( $client_pending ), 'must-never-leave-engine-state' ), 'actual client-visible deferred request output contains no reservation token' );
 	$assert( 808 === ( $client_execution['job_id'] ?? null ) && 'client/packet_handler' === ( $client_execution['tool_name'] ?? null ) && $packet_id === ( $client_execution['disposition_id'] ?? null ), 'client-visible deferred request retains only safe packet execution identity' );
 
-	$chat_db->sessions['session-integrated'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
+	$transcript_store->sessions['session-integrated'] = array( 'messages' => array(), 'metadata' => array(), 'provider' => 'openai', 'model' => 'gpt' );
 	$integrated_tool = array(
 		'name'              => 'client/deferred_action',
 		'description'       => 'A deferred client action.',
@@ -561,8 +546,8 @@ namespace {
 			'pre_tool_mediator' => datamachine_build_pre_tool_mediator(
 				$integrated_tools,
 				$integrated_payload,
-				'chat',
-				array( 'chat' ),
+				'system',
+				array( 'system' ),
 				new DataMachineToolRuntimeRules(),
 				new class() implements LoopEventSinkInterface {
 					public function emit( string $event, array $payload = array() ): void {
@@ -580,7 +565,7 @@ namespace {
 	$assert( str_starts_with( $integrated_request_id, 'runtime_tool_' ) && $integrated_job_id > 0, 'integrated async mediation preserves the preallocated Data Machine request id' );
 	$assert( 'call-integrated' === ( $integrated_request['tool_call_id'] ?? '' ), 'integrated async mediation preserves the provider tool call id' );
 	$assert( $integrated_request_id === ( Jobs::$engine_data[ $integrated_job_id ]['runtime_tool_request']['request_id'] ?? '' ), 'Agents API persists the canonical mediated request in the Data Machine store' );
-	$assert( isset( $chat_db->sessions['session-integrated']['metadata']['runtime_tool_requests'][ $integrated_request_id ] ), 'integrated async mediation mirrors the canonical request into session state' );
+	$assert( isset( $transcript_store->sessions['session-integrated']['metadata']['runtime_tool_requests'][ $integrated_request_id ] ), 'integrated async mediation mirrors the canonical request into session state' );
 	$assert( 0 === $integrated_executor->calls, 'integrated async mediation bypasses the PHP executor' );
 	if ( $failures ) {
 		echo "\nFAILED: " . count( $failures ) . " runtime tool contract store assertions failed.\n";

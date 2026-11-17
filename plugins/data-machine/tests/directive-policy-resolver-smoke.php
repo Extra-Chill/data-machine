@@ -158,7 +158,7 @@ namespace {
 	$result = $resolver->resolve(
 		$directives,
 		array(
-			'modes'    => array( 'chat' ),
+			'modes'    => array( 'system' ),
 			'agent_id' => 4,
 		)
 	);

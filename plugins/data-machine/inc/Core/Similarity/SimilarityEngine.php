@@ -6,10 +6,10 @@
  * and tokenization from three prior implementations:
  *
  * - DuplicateDetection (Core/WordPress) — publish-level fuzzy title match
- * - QueueValidator (Engine/AI/Tools) — Jaccard word-set similarity
+ * - QueueTopicValidator (Core/Similarity) — Jaccard word-set similarity
  * - Domain-specific identifier generators for structured record matching
  *
- * All similarity math lives here. Consumers (QueueValidator, publish handlers,
+ * All similarity math lives here. Consumers (QueueTopicValidator, publish handlers,
  * DuplicateCheckAbility, extension strategies) call these pure functions.
  *
  * @package DataMachine\Core\Similarity

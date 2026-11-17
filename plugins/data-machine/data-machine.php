@@ -131,7 +131,6 @@ require_once __DIR__ . '/inc/bootstrap.php';
  * AbilityServiceProvider: InspectRequestAbility.php,
  * new \DataMachine\Abilities\AI\InspectRequestAbility(),
  * new \DataMachine\Engine\AI\Actions\ResolvePendingActionAbility(),
- * new \DataMachine\Engine\AI\Actions\ResolvePendingAction(),
  * PendingActionObservers::register, WordPressActionDispatchObserver,
  * new \DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility().
  * RuntimeServiceProvider: AuthRefHandlerConfig::register().
@@ -208,7 +207,7 @@ if ( did_action( 'plugins_loaded' ) ) {
  * ability classes at `plugins_loaded:20` regardless of request shape, and
  * those abilities register against Data Machine categories. If the categories
  * are missing when the lazy `wp_abilities_api_init` fire happens (e.g. when
- * a frontend page calls `wp_get_ability()` via Frontend Agent Chat or an
+ * a frontend page calls `wp_get_ability()` via a frontend agent or an
  * OG-card task), every extension ability registration triggers a
  * `_doing_it_wrong` notice and the ability is silently dropped from the
  * registry. See: Extra-Chill/data-machine#2287.
@@ -264,7 +263,7 @@ function datamachine_resolve_or_create_agent_id( int $user_id ): int {
 
 	$agent_slug  = sanitize_title( (string) $user->user_login );
 	$agent_name  = (string) $user->display_name;
-	$agent_model = \DataMachine\Core\PluginSettings::getModelForMode( 'chat' );
+	$agent_model = \DataMachine\Core\PluginSettings::getModelForMode( 'agent' );
 
 	return $agents_repo->create_if_missing(
 		$agent_slug,
@@ -369,12 +368,12 @@ function datamachine_resolve_explicit_system_agent(): ?array {
  *
  * @since 0.72.0
  * @since 0.160.0 Always resolves to the install default agent; never auto-provisions
- *               a per-human agent row for system tasks. Host chat runtimes remain
+ *               a per-human agent row for system tasks. Host agent runtimes remain
  *               the legitimate callers of datamachine_resolve_or_create_agent_id().
  * @since 0.173.0 Fails closed when no explicit or unambiguous existing agent resolves.
  * @since next     Checks the explicit `system_agent_slug` setting first. That setting
  *                names a fixed agent identity rather than depending on a human's
- *                active-agent chat preference; an unset or invalid setting falls
+ *                active-agent preference; an unset or invalid setting falls
  *                back to the existing owner/active-agent/single-agent chain unchanged.
  *
  * @return array{user_id:int,agent_id:int,triggering_user_id:int} Acting user id

@@ -23,7 +23,7 @@ final class DataMachineModeActionPolicyProvider implements \WP_Agent_Action_Poli
 	 * @return string|null Action policy value, or null for no opinion.
 	 */
 	public function get_action_policy( array $context ): ?string {
-		$mode     = (string) ( $context['mode'] ?? ActionPolicyResolver::MODE_CHAT );
+		$mode     = (string) ( $context['mode'] ?? ActionPolicyResolver::MODE_SYSTEM );
 		$tool_def = is_array( $context['tool_def'] ?? null ) ? $context['tool_def'] : array();
 		$key      = 'action_policy_' . $mode;
 

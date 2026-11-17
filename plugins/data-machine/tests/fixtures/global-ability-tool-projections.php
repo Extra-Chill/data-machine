@@ -32,7 +32,7 @@ return array(
 			'required'   => array( 'prompt' ),
 		),
 		'ability'         => 'datamachine/generate-image',
-		'modes'           => array( 'chat', 'pipeline' ),
+		'modes'           => array( 'pipeline' ),
 	),
 	'internal_link_audit' => array(
 		'description'                => 'Audit links on this WordPress site. Four actions: "audit" scans post content to build a link graph (cached 24hr), "orphans" lists posts with zero inbound links, "backlinks" gets all posts linking to a given post_id, "broken" performs HTTP HEAD checks for broken URLs (expensive, supports internal/external/all scope). Always run "audit" first, then use other actions for specific checks.',
@@ -84,7 +84,7 @@ return array(
 			'backlinks' => 'datamachine/get-backlinks',
 			'broken'    => 'datamachine/check-broken-links',
 		),
-		'modes'                      => array( 'chat', 'pipeline' ),
+		'modes'                      => array( 'pipeline' ),
 		'strip_action_parameter'     => true,
 		'strip_internal_result_keys' => true,
 	),
@@ -111,7 +111,7 @@ return array(
 			'required'   => array( 'query' ),
 		),
 		'ability'         => 'datamachine/local-search',
-		'modes'           => array( 'chat', 'pipeline' ),
+		'modes'           => array( 'pipeline' ),
 	),
 	'wordpress_post_reader' => array(
 		'name'            => 'WordPress Post Reader',
@@ -132,6 +132,6 @@ return array(
 			'required'   => array( 'source_url' ),
 		),
 		'ability'         => 'datamachine/get-wordpress-post',
-		'modes'           => array( 'chat', 'pipeline' ),
+		'modes'           => array( 'pipeline' ),
 	),
 );

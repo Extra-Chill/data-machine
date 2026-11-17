@@ -6,8 +6,8 @@
  *
  * Static/global tools that declare `pipeline` are auto-injected into every
  * pipeline AI step. This smoke pins the audit boundary: source/search/content
- * helpers can remain pipeline-visible, while chat affordances and duplicate
- * validation tools stay chat-only.
+ * helpers can remain pipeline-visible, while interactive affordances and
+ * duplicate validation tools are not pipeline tools.
  *
  * @package DataMachine\Tests
  */
@@ -90,38 +90,21 @@ function resolve_tools_for_pipeline_modes( string $mode, array $allow_only = arr
 echo "Global tool pipeline-mode smoke (#1442)\n";
 echo "---------------------------------------\n";
 
-$chat_only = array(
-	'queue_validator' => array( 'inc/Engine/AI/Tools/Global/QueueValidator.php', 'DataMachine\Engine\AI\Tools\Global\QueueValidator' ),
+assert_true_for_pipeline_modes(
+	! file_exists( dirname( __DIR__ ) . '/inc/Engine/AI/Tools/Global/QueueValidator.php' ),
+	'queue_validator tool is removed',
+	$failures,
+	$passes
 );
-
-foreach ( $chat_only as $tool => [ $path, $class_name ] ) {
-	load_global_tool_for_pipeline_modes( $path, $class_name );
-
-	$chat_tools     = resolve_tools_for_pipeline_modes( 'chat' );
-	$pipeline_tools = resolve_tools_for_pipeline_modes( 'pipeline' );
-
-	assert_true_for_pipeline_modes(
-		isset( $chat_tools[ $tool ] ),
-		"{$tool} resolves in chat mode",
-		$failures,
-		$passes
-	);
-	assert_true_for_pipeline_modes(
-		! isset( $pipeline_tools[ $tool ] ),
-		"{$tool} does not resolve in pipeline mode",
-		$failures,
-		$passes
-	);
-}
 
 load_global_tool_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentDailyMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentDailyMemory' );
 load_global_tool_for_pipeline_modes( 'inc/Engine/AI/Tools/Global/AgentMemory.php', 'DataMachine\Engine\AI\Tools\Global\AgentMemory' );
 
-$chat_tools     = resolve_tools_for_pipeline_modes( 'chat', array( 'agent_daily_memory', 'agent_memory' ) );
+$opt_in_tools   = resolve_tools_for_pipeline_modes( 'pipeline', array( 'agent_daily_memory', 'agent_memory' ) );
 $pipeline_tools = resolve_tools_for_pipeline_modes( 'pipeline' );
 assert_true_for_pipeline_modes(
-	isset( $chat_tools['agent_daily_memory'] ),
-	'agent_daily_memory resolves in chat mode',
+	isset( $opt_in_tools['agent_daily_memory'] ),
+	'agent_daily_memory resolves in pipeline mode when opted in',
 	$failures,
 	$passes
 );
@@ -138,8 +121,8 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	isset( $chat_tools['agent_memory'] ),
-	'agent_memory resolves in chat mode',
+	isset( $opt_in_tools['agent_memory'] ),
+	'agent_memory resolves in pipeline mode when opted in',
 	$failures,
 	$passes
 );
@@ -179,7 +162,7 @@ $projections              = apply_filters( 'datamachine_ability_tool_projections
 
 foreach ( $projected_pipeline_tools as $tool ) {
 	assert_true_for_pipeline_modes(
-		array( 'chat', 'pipeline' ) === ( $projections[ $tool ]['modes'] ?? array() ),
+		array( 'pipeline' ) === ( $projections[ $tool ]['modes'] ?? array() ),
 		"{$tool} remains pipeline-visible through ability projection",
 		$failures,
 		$passes
@@ -199,7 +182,7 @@ assert_true_for_pipeline_modes(
 	$passes
 );
 assert_true_for_pipeline_modes(
-	file_contains_for_pipeline_modes( 'inc/Engine/AI/Directives/AgentDailyMemoryDirective.php', "'modes'    => array( 'chat', 'pipeline' )" ),
+	file_contains_for_pipeline_modes( 'inc/Engine/AI/Directives/AgentDailyMemoryDirective.php', "'modes'    => array( 'pipeline' )" ),
 	'daily memory directive remains opt-in pipeline context injection',
 	$failures,
 	$passes

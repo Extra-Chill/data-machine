@@ -872,7 +872,7 @@ class QueueCommand extends BaseCommand {
 			}
 		}
 
-		$validator = new \DataMachine\Engine\AI\Tools\Global\QueueValidator();
+		$validator = new \DataMachine\Core\Similarity\QueueTopicValidator();
 		$params    = array(
 			'topic'     => $topic,
 			'post_type' => $post_type,

@@ -92,7 +92,7 @@ $assert( substr_count( $main, 'register_activation_hook(' ) === 0, 'entrypoint n
 $tool_provider_order = array(
 	'new \\DataMachine\\Engine\\AI\\Configuration\\ImageGenerationSettings();',
 	'\\datamachine_register_global_ability_tools();',
-	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\QueueValidator();',
+	'new \\DataMachine\\Engine\\AI\\Tools\\Global\\WebFetch();',
 );
 $offset              = -1;
 foreach ( $tool_provider_order as $needle ) {

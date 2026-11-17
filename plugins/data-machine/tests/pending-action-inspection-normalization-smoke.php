@@ -54,7 +54,7 @@ $rows = \DataMachine\Engine\AI\Actions\PendingActionInspectionAbility::normalize
 						),
 					),
 					'context'       => array( 'session_id' => 'sess-1' ),
-					'resolve_with'  => 'resolve_pending_action',
+					'resolve_with'  => 'agents/resolve-pending-action',
 				),
 			),
 		),
@@ -71,7 +71,7 @@ datamachine_pending_inspection_assert( 'site-1' === $row['workspace_id'], 'works
 datamachine_pending_inspection_assert( 'sess-1' === $row['context']['session_id'], 'Data Machine context is surfaced' );
 datamachine_pending_inspection_assert( 'agent_token' === $row['principal_context']['principal_class'], 'safe principal context is surfaced' );
 datamachine_pending_inspection_assert( '[redacted]' === $row['audit_context']['parameters_redacted']['token'], 'redacted audit parameters are preserved' );
-datamachine_pending_inspection_assert( 'resolve_pending_action' === $row['resolve_with'], 'frontend resolver hint is present' );
+datamachine_pending_inspection_assert( 'agents/resolve-pending-action' === $row['resolve_with'], 'frontend resolver hint is present' );
 datamachine_pending_inspection_assert( 'act_bundle_upgrade' === $row['resolve_params']['action_id'], 'frontend resolve params include action id' );
 
 echo "OK ({$assertions} assertions)\n";

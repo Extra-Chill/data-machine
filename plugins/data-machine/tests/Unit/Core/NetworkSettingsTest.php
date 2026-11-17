@@ -107,7 +107,7 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 
 	public function test_mode_models_stored_at_network_level(): void {
 		$mode_models = array(
-			'chat'     => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
+			'agent'    => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			'pipeline' => array( 'provider' => 'openai', 'model' => 'gpt-4o-mini' ),
 		);
 
@@ -166,18 +166,18 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 	public function test_get_agent_model_site_override_wins(): void {
 		update_option( 'datamachine_settings', array(
 			'mode_models' => array(
-				'chat' => array( 'provider' => 'openai', 'model' => 'gpt-4o' ),
+				'agent' => array( 'provider' => 'openai', 'model' => 'gpt-4o' ),
 			),
 		) );
 		PluginSettings::clearCache();
 
 		NetworkSettings::update( array(
 			'mode_models' => array(
-				'chat' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
+				'agent' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			),
 		) );
 
-		$result = PluginSettings::getModelForMode( 'chat' );
+		$result = PluginSettings::getModelForMode( 'agent' );
 
 		$this->assertSame( 'openai', $result['provider'] );
 		$this->assertSame( 'gpt-4o', $result['model'] );
@@ -218,29 +218,29 @@ class NetworkSettingsTest extends WP_UnitTestCase {
 		update_option( 'datamachine_settings', array() );
 		PluginSettings::clearCache();
 
-		$result = PluginSettings::getModelForMode( 'chat' );
+		$result = PluginSettings::getModelForMode( 'agent' );
 
 		$this->assertSame( '', $result['provider'] );
 		$this->assertSame( '', $result['model'] );
 	}
 
 	public function test_get_agent_model_mixed_cascade(): void {
-		// Site has provider override for chat, but no model.
-		// Network has model for chat.
+		// Site has provider override for agent, but no model.
+		// Network has model for agent.
 		update_option( 'datamachine_settings', array(
 			'mode_models' => array(
-				'chat' => array( 'provider' => 'openai', 'model' => '' ),
+				'agent' => array( 'provider' => 'openai', 'model' => '' ),
 			),
 		) );
 		PluginSettings::clearCache();
 
 		NetworkSettings::update( array(
 			'mode_models' => array(
-				'chat' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
+				'agent' => array( 'provider' => 'anthropic', 'model' => 'claude-sonnet-4-20250514' ),
 			),
 		) );
 
-		$result = PluginSettings::getModelForMode( 'chat' );
+		$result = PluginSettings::getModelForMode( 'agent' );
 
 		// Provider from site, model from network.
 		$this->assertSame( 'openai', $result['provider'] );

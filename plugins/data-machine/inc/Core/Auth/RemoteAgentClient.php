@@ -15,8 +15,8 @@
  *       'remote.example',
  *       'content-agent',
  *       'POST',
- *       '/wp-json/datamachine/v1/chat',
- *       array( 'body' => array( 'message' => 'hello' ) )
+ *       '/wp-json/datamachine/v1/trigger/42',
+ *       array( 'body' => array( 'source' => 'local-agent' ) )
  *   );
  *
  *   if ( $result['success'] ) {

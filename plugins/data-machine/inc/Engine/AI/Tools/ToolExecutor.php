@@ -2,7 +2,7 @@
 /**
  * Universal AI tool execution infrastructure.
  *
- * Shared tool execution logic used by both Chat and Pipeline agents.
+ * Shared tool execution logic used by pipeline and system agents.
  * Handles tool discovery, validation, execution, and parameter building.
  *
  * @package DataMachine\Engine\AI\Tools
@@ -43,14 +43,14 @@ class ToolExecutor {
 	 * 0.72.0 so the resolver has enough context to apply per-agent and
 	 * per-mode policy. Callers that pre-date the feature (pipeline code that
 	 * goes through `getAvailableTools()`) continue to work — mode defaults
-	 * to MODE_CHAT which matches the historical assumption, and missing
-	 * agent_id simply skips per-agent policy.
+	 * to MODE_SYSTEM (no user present, direct execution unless a tool
+	 * declares otherwise), and missing agent_id simply skips per-agent policy.
 	 *
 	 * @param  string $tool_name       Tool name to execute.
 	 * @param  array  $tool_parameters Parameters from AI.
 	 * @param  array  $available_tools Available tools array.
 	 * @param  array  $payload         Step payload (job_id, flow_step_id, data, flow_step_config).
-	 * @param  string $mode            Agent mode (chat/pipeline/system). Default: chat.
+	 * @param  string $mode            Agent mode (pipeline/system). Default: system.
 	 * @param  int    $agent_id        Acting agent ID (0 = no per-agent policy).
 	 * @param  array  $client_context  Optional client-supplied context.
 	 * @return array Tool execution result.
@@ -60,7 +60,7 @@ class ToolExecutor {
 		array $tool_parameters,
 		array $available_tools,
 		array $payload,
-		string $mode = ActionPolicyResolver::MODE_CHAT,
+		string $mode = ActionPolicyResolver::MODE_SYSTEM,
 		int $agent_id = 0,
 		array $client_context = array()
 	): array {

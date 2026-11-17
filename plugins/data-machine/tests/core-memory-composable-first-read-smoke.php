@@ -186,7 +186,7 @@ namespace {
 
 	$custom_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
 	core_memory_composable_assert( in_array( 'analysis', $custom_context['modes'] ?? array(), true ), 'custom mode is preserved for memory resolution' );
-	core_memory_composable_assert( ! in_array( 'chat', $custom_context['modes'] ?? array(), true ), 'custom mode does not masquerade as chat' );
+	core_memory_composable_assert( ! in_array( 'pipeline', $custom_context['modes'] ?? array(), true ), 'custom mode does not masquerade as pipeline' );
 
 	\DataMachine\Engine\AI\Directives\CoreMemoryFilesDirective::get_outputs(
 		'openai',
@@ -201,7 +201,7 @@ namespace {
 	);
 
 	$system_context = end( $GLOBALS['__core_memory_composable_resolver_contexts'] );
-	core_memory_composable_assert( ! in_array( 'chat', $system_context['modes'] ?? array(), true ), 'system mode does not inherit chat memory files' );
+	core_memory_composable_assert( ! in_array( 'pipeline', $system_context['modes'] ?? array(), true ), 'system mode does not inherit pipeline memory files' );
 
 	echo "\n{$assertions} assertions, {$failures} failures\n";
 	if ( $failures > 0 ) {

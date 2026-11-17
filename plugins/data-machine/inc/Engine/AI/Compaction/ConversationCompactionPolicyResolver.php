@@ -2,7 +2,7 @@
 /**
  * Conversation Compaction Policy Resolver.
  *
- * Resolves the per-turn conversation compaction policy for a live chat/system
+ * Resolves the per-turn conversation compaction policy for a live system
  * conversation from the acting agent's persisted `agent_config`. Sibling to
  * ToolPolicyResolver (IF a tool is visible), MemoryPolicyResolver (WHICH memory
  * files inject), ActionPolicyResolver (HOW a tool executes), and

@@ -108,7 +108,7 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 					'class'                    => 'NonExistentClass',
 					'method'                   => 'handle_tool_call',
 					'parameters'               => array(),
-					'modes'                    => array( 'pipeline', 'chat' ),
+					'modes'                    => array( 'pipeline', 'system' ),
 					'requires_pipeline_opt_in' => true,
 				);
 				$tools['test_read_tool'] = array(
@@ -395,19 +395,19 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 	}
 
 	// ============================================
-	// NON-REGRESSION: chat/system modes unaffected
+	// NON-REGRESSION: system mode unaffected
 	// ============================================
 
-	public function test_chat_mode_not_gated(): void {
+	public function test_system_mode_not_gated(): void {
 		$this->registerToolsFilter(
 			function ( array $tools ): array {
 				$tools['test_gated_publish'] = array(
 					'label'                    => 'Test Gated Publish',
-					'description'              => 'Available in chat.',
+					'description'              => 'Available in system mode.',
 					'class'                    => 'NonExistentClass',
 					'method'                   => 'handle_tool_call',
 					'parameters'               => array(),
-					'modes'                    => array( 'chat' ),
+					'modes'                    => array( 'system' ),
 					'requires_pipeline_opt_in' => true,
 				);
 				return $tools;
@@ -416,10 +416,10 @@ class PipelinePublishOptInTest extends WP_UnitTestCase {
 
 		$tools = $this->resolver->resolve(
 			array(
-				'mode' => ToolPolicyResolver::MODE_CHAT,
+				'mode' => ToolPolicyResolver::MODE_SYSTEM,
 			)
 		);
 
-		$this->assertArrayHasKey( 'test_gated_publish', $tools, 'Pipeline opt-in flag does not affect chat mode.' );
+		$this->assertArrayHasKey( 'test_gated_publish', $tools, 'Pipeline opt-in flag does not affect system mode.' );
 	}
 }

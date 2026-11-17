@@ -94,7 +94,7 @@ class MemoryFileRegistry {
 	 *                                        by users with that WordPress capability. Default true.
 	 *                                        Forced to false when composable is true.
 	 *     @type string[]    $modes           Execution modes where this file is available for prompt injection.
-	 *                                        Array of mode slugs (e.g. 'chat', 'editor', 'pipeline',
+	 *                                        Array of mode slugs (e.g. 'editor', 'pipeline',
 	 *                                        'system') or array( 'all' ) to make available everywhere.
 	 *                                        Default empty array: registered but never injected.
 	 *     @type string[]    $injection_contexts Semantic prompt-injection contexts where this file applies
@@ -412,7 +412,7 @@ class MemoryFileRegistry {
 	 * @since 0.60.0
 	 * @since 0.68.0 Internal key renamed from contexts to modes.
 	 *
-	 * @param array $modes Agent mode slugs (e.g. 'chat', 'pipeline', 'system', 'editor').
+	 * @param array $modes Agent mode slugs (e.g. 'pipeline', 'system', 'editor').
 	 * @return array<string, array> Filtered and sorted file metadata.
 	 */
 	public static function get_for_modes( array $modes, array $injection_contexts = array() ): array {
