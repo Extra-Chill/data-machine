@@ -293,7 +293,7 @@ abstract class BaseOAuth2Provider extends BaseAuthProvider {
 	 * @return string Cron hook name.
 	 */
 	public function get_cron_hook_name(): string {
-		return 'datamachine_refresh_token_' . $this->provider_slug;
+		return ProactiveRefreshCron::HOOK_PREFIX . $this->provider_slug;
 	}
 
 	/**
