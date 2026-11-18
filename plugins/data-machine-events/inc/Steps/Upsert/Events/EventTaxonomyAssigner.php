@@ -1108,4 +1108,79 @@ class EventTaxonomyAssigner {
 
 		return new EngineData( $engine_context, $job_id );
 	}
+
+	/**
+	 * Artist term IDs in stored billing order.
+	 *
+	 * When `artist` is registered with core `'sort' => true`, non-append
+	 * wp_set_object_terms() persists term_relationships.term_order. Ordered
+	 * terms lead; terms without an order (0: appended or legacy) follow.
+	 *
+	 * @param int $post_id Event post ID.
+	 * @return array{ids: int[], ordered: bool} Term IDs, and whether any stored order exists.
+	 */
+	public function orderedArtistIds( int $post_id ): array {
+		global $wpdb;
+
+		if ( ! taxonomy_exists( 'artist' ) ) {
+			return array(
+				'ids'     => array(),
+				'ordered' => false,
+			);
+		}
+
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- term_order is not exposed by the term APIs and must be read fresh during the upsert.
+			$wpdb->prepare(
+				"SELECT tt.term_id, tr.term_order FROM {$wpdb->term_relationships} tr INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = 'artist' ORDER BY ( tr.term_order = 0 ), tr.term_order ASC, tr.term_taxonomy_id ASC",
+				$post_id
+			)
+		);
+
+		$ids     = array();
+		$ordered = false;
+		foreach ( (array) $rows as $row ) {
+			$ids[]   = (int) $row->term_id;
+			$ordered = $ordered || (int) $row->term_order > 0;
+		}
+
+		return array(
+			'ids'     => $ids,
+			'ordered' => $ordered,
+		);
+	}
+
+	/**
+	 * Persist artist billing order with one non-append set.
+	 *
+	 * Groups are concatenated in priority order and de-duplicated; any artist
+	 * still attached but not listed is kept at the end, so no artist is ever
+	 * removed. A no-op unless `artist` is sort-enabled.
+	 *
+	 * @param int   $post_id Event post ID.
+	 * @param int[] ...$groups Term ID lists in priority order.
+	 * @return \WP_Error|null Error from core, or null.
+	 */
+	public function persistArtistOrder( int $post_id, array ...$groups ): ?\WP_Error {
+		$taxonomy = get_taxonomy( 'artist' );
+		if ( ! $taxonomy || empty( $taxonomy->sort ) ) {
+			return null;
+		}
+
+		$groups[] = $this->orderedArtistIds( $post_id )['ids'];
+		$ordered  = array();
+		foreach ( $groups as $group ) {
+			foreach ( $group as $term_id ) {
+				$term_id = (int) $term_id;
+				if ( $term_id > 0 && ! in_array( $term_id, $ordered, true ) ) {
+					$ordered[] = $term_id;
+				}
+			}
+		}
+		if ( empty( $ordered ) ) {
+			return null;
+		}
+
+		$result = wp_set_object_terms( $post_id, $ordered, 'artist', false );
+		return is_wp_error( $result ) ? $result : null;
+	}
 }
