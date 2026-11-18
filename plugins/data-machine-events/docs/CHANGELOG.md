@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.1] - 2026-11-18
+
+### Fixed
+- explicit event.festival on upsert-event; keep separators inside venue names
+
 ## [0.88.0] - 2026-11-17
 
 ### Added
