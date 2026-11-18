@@ -123,7 +123,7 @@ class ChatPersonResolver {
 					'name'     => self::CURRENT_USER_SECTION,
 					'layer'    => 'runtime',
 					'priority' => 0,
-					'content'  => sprintf( 'The current speaker is WordPress user ID %d.', $user_id ),
+					'content'  => self::current_speaker_line( $user_id ),
 				)
 			);
 		}
@@ -271,6 +271,50 @@ class ChatPersonResolver {
 		}
 
 		return $sections;
+	}
+
+	/**
+	 * Build the current-speaker line, including the speaker's live role
+	 * display names on the current site.
+	 *
+	 * Resolved at turn time so it always reflects role changes; scaffolded
+	 * USER.md files deliberately carry no role snapshot.
+	 *
+	 * @param int $user_id Speaker user ID.
+	 * @return string
+	 */
+	private static function current_speaker_line( int $user_id ): string {
+		$roles = self::current_role_names( $user_id );
+		if ( empty( $roles ) ) {
+			return sprintf( 'The current speaker is WordPress user ID %d.', $user_id );
+		}
+
+		return sprintf( 'The current speaker is WordPress user ID %d (roles on this site: %s).', $user_id, implode( ', ', $roles ) );
+	}
+
+	/**
+	 * Resolve a user's role display names on the current blog.
+	 *
+	 * @param int $user_id WordPress user ID.
+	 * @return string[] Translated role display names; unknown role slugs fall back to the slug.
+	 */
+	private static function current_role_names( int $user_id ): array {
+		$user = get_userdata( $user_id );
+		if ( ! $user instanceof \WP_User || empty( $user->roles ) ) {
+			return array();
+		}
+
+		$role_names = wp_roles()->role_names;
+		$names      = array();
+		foreach ( $user->roles as $slug ) {
+			$slug = (string) $slug;
+			if ( '' === $slug ) {
+				continue;
+			}
+			$names[] = isset( $role_names[ $slug ] ) ? translate_user_role( $role_names[ $slug ] ) : $slug;
+		}
+
+		return array_values( array_unique( $names ) );
 	}
 
 	/**

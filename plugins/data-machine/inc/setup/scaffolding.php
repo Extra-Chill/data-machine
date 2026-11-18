@@ -154,8 +154,9 @@ function datamachine_get_scaffold_defaults( string $agent_name = '' ): array {
 	if ( $admin_email ) {
 		$user_lines[] = sprintf( '- **Email:** %s', $admin_email );
 	}
-	$user_lines[] = '- **Role:** Site Administrator';
-	$user_about   = implode( "\n", $user_lines );
+	// No Role line: roles change after scaffolding, so a written snapshot goes
+	// stale. The live roles are supplied per turn by ChatPersonResolver.
+	$user_about = implode( "\n", $user_lines );
 
 	$user = implode(
 		"\n",
@@ -375,11 +376,9 @@ function datamachine_scaffold_user_content( string $content, string $filename, a
 	$about_lines[] = sprintf( '- **Name:** %s', $user->display_name );
 	$about_lines[] = sprintf( '- **Username:** %s', $user->user_login );
 
-	$roles = $user->roles;
-	if ( ! empty( $roles ) ) {
-		$role_name     = ucfirst( reset( $roles ) );
-		$about_lines[] = sprintf( '- **Role:** %s', $role_name );
-	}
+	// Roles are intentionally not written here: a scaffold-time snapshot goes
+	// stale when the user's roles change. ChatPersonResolver injects the live
+	// roles on the current site into each turn instead.
 
 	if ( ! empty( $user->user_registered ) ) {
 		$registered    = wp_date( 'F Y', strtotime( $user->user_registered ) );
