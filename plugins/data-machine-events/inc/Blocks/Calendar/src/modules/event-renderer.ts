@@ -171,9 +171,12 @@ function renderBadges( event: CalendarEventItem ): HTMLElement | null {
 	// entirely server-side from escaped values (esc_html / esc_url /
 	// esc_attr), so parsing it here introduces no new injection surface.
 	// See #381.
-	const serverBadges = renderServerBadges( event.badges_html );
-	if ( serverBadges ) {
-		return serverBadges;
+	// When the envelope ships `badges_html` at all, it is authoritative:
+	// an empty string means "no badges" (e.g. every assigned taxonomy is
+	// badge-excluded). `taxonomies` is unfiltered event data (#3999), so
+	// rebuilding from it is only a fallback for envelopes predating #381.
+	if ( typeof event.badges_html === 'string' ) {
+		return renderServerBadges( event.badges_html );
 	}
 
 	const taxonomies = event.taxonomies || {};
