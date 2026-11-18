@@ -42,7 +42,7 @@ class PermissionHelper {
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
 		'create_own_agent' => 'datamachine_create_own_agent',
-		'web_fetch'        => 'publish_posts',
+		'web_fetch'        => 'edit_posts',
 	);
 
 	/**
@@ -179,8 +179,9 @@ class PermissionHelper {
 	 * - daily_memory: reading and appending the acting agent's daily memory.
 	 *   Scope comes from the execution principal; overwrite and delete stay
 	 *   behind can_manage() inside DailyMemoryAbilities.
-	 * - web_fetch: reading a public web page as text maps to publish_posts,
-	 *   the same author level the web_fetch tool already requires.
+	 * - web_fetch: reading a public http(s) page as text (SSRF-protected,
+	 *   nothing persisted) maps to core's edit_posts, so anyone who can draft
+	 *   content (contributors, submit-for-review roles) can research it.
 	 *
 	 * @since 0.37.0
 	 * @var string[]
@@ -736,7 +737,7 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	private static function agent_can( string $action ): bool {
-		$capability = self::CAPABILITY_MAP[ $action ] ?? null;
+		$capability = self::resolve_action_capability( $action );
 		if ( empty( $capability ) || self::$agent_owner_id <= 0 ) {
 			return false;
 		}
@@ -1050,13 +1051,56 @@ class PermissionHelper {
 	 * @return bool
 	 */
 	private static function user_can( int $user_id, string $action ): bool {
-		$mapped_capability = self::CAPABILITY_MAP[ $action ] ?? null;
+		$mapped_capability = self::resolve_action_capability( $action );
 
-		if ( empty( $mapped_capability ) ) {
+		if ( null === $mapped_capability ) {
 			return false;
 		}
 
 		return self::user_has_capability( $user_id, $mapped_capability );
+	}
+
+	/**
+	 * Resolve the WordPress capability required for a Data Machine action.
+	 *
+	 * Single read point for CAPABILITY_MAP, used by both user_can() and
+	 * agent_can() so user sessions, pre-authenticated contexts and agent
+	 * tokens all enforce the same (possibly filtered) capability.
+	 *
+	 * @param string $action Action key.
+	 * @return string|null Capability, or null when the action is unknown or unmapped.
+	 */
+	private static function resolve_action_capability( string $action ): ?string {
+		$mapped = self::CAPABILITY_MAP[ $action ] ?? null;
+
+		/**
+		 * Filter the WordPress capability required for a Data Machine action.
+		 *
+		 * Lets a platform retune which capability gates an action (for
+		 * example require publish_posts for web_fetch again, or grant
+		 * view_logs to a custom capability) without patching Data Machine.
+		 * Applies to user sessions, pre-authenticated contexts and agent
+		 * tokens alike; agent tokens remain bounded by their capability
+		 * ceiling. Return an empty value to deny the action outright.
+		 *
+		 * Management holders (manage_flows / manage_settings / manage_agents)
+		 * still pass actions listed in IMPLIED_BY_MANAGEMENT before this
+		 * filter is consulted, and manage_options still satisfies any mapped
+		 * capability for user principals.
+		 *
+		 * @since next
+		 *
+		 * @param string|null $mapped Capability from the built-in map, or null if the action is unmapped.
+		 * @param string      $action Data Machine action key (e.g. 'web_fetch', 'manage_flows').
+		 */
+		$capability = apply_filters( 'datamachine_action_capability', $mapped, $action );
+
+		if ( ! is_string( $capability ) ) {
+			return null;
+		}
+
+		$capability = trim( $capability );
+		return '' === $capability ? null : $capability;
 	}
 
 	/**
