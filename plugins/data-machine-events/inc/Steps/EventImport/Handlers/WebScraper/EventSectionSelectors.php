@@ -34,6 +34,12 @@ final class EventSectionSelectors {
 				'extract_base64_event'         => true,
 			),
 
+			// Canva Sites decoded by CanvaSiteResolver (one element per page section).
+			array(
+				'xpath'                        => '//section[@' . CanvaSiteResolver::SECTION_ATTRIBUTE . ']',
+				'enable_table_row_date_filter' => false,
+			),
+
 			// SeeTickets widget patterns (used by Resound Presents, etc.)
 			array(
 				'xpath'                        => '//*[contains(@class, "seetickets-list-event-container")]',
