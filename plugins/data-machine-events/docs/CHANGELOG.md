@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.4] - 2026-11-18
+
+### Fixed
+- persist lineup billing order via core term_order
+
 ## [0.88.3] - 2026-11-18
 
 ### Fixed
