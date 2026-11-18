@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.2] - 2026-11-18
+
+### Fixed
+- gate read-only diagnostics with AbilityPermissions::canRead()
+
 ## [0.88.1] - 2026-11-18
 
 ### Fixed
