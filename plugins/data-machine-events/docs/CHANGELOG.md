@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.5] - 2026-11-18
+
+### Fixed
+- serialize event taxonomies as data, not badge policy
+
 ## [0.88.4] - 2026-11-18
 
 ### Fixed
