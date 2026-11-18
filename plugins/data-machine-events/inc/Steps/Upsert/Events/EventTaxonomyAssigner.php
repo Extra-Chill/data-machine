@@ -1131,16 +1131,34 @@ class EventTaxonomyAssigner {
 
 		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- term_order is not exposed by the term APIs and must be read fresh during the upsert.
 			$wpdb->prepare(
-				"SELECT tt.term_id, tr.term_order FROM {$wpdb->term_relationships} tr INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = 'artist' ORDER BY ( tr.term_order = 0 ), tr.term_order ASC, tr.term_taxonomy_id ASC",
-				$post_id
+				"SELECT tt.term_id, tr.term_order FROM {$wpdb->term_relationships} tr INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE tr.object_id = %d AND tt.taxonomy = %s",
+				$post_id,
+				'artist'
 			)
 		);
 
-		$ids     = array();
+		// Sort in PHP: ordered terms (term_order > 0) ascending, then unordered
+		// ones by term ID, so the result is deterministic on every DB engine.
+		$rows = array_map(
+			static fn( $row ) => array(
+				'id'    => (int) $row->term_id,
+				'order' => (int) $row->term_order,
+			),
+			(array) $rows
+		);
+		usort(
+			$rows,
+			static function ( array $a, array $b ): int {
+				$order_a = $a['order'] > 0 ? $a['order'] : PHP_INT_MAX;
+				$order_b = $b['order'] > 0 ? $b['order'] : PHP_INT_MAX;
+				return array( $order_a, $a['id'] ) <=> array( $order_b, $b['id'] );
+			}
+		);
+
+		$ids     = array_column( $rows, 'id' );
 		$ordered = false;
-		foreach ( (array) $rows as $row ) {
-			$ids[]   = (int) $row->term_id;
-			$ordered = $ordered || (int) $row->term_order > 0;
+		foreach ( $rows as $row ) {
+			$ordered = $ordered || $row['order'] > 0;
 		}
 
 		return array(
