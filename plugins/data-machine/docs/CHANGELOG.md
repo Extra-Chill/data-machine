@@ -2,6 +2,12 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.1] - 2026-11-18
+
+### Fixed
+- carry live speaker roles per turn; stop scaffolding stale USER.md role
+- gate web_fetch on edit_posts and make action capabilities filterable
+
 ## [0.205.0] - 2026-11-17
 
 ### Changed
