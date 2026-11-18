@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.3] - 2026-11-18
+
+### Fixed
+- decode Canva Sites for the universal web scraper
+
 ## [0.88.2] - 2026-11-18
 
 ### Fixed
