@@ -127,6 +127,14 @@ class EventUpsertAbilities {
 			$config['allow_past_create'] = true;
 		}
 
+		// An explicit festival is caller intent; it is assigned even when no
+		// pipeline festival taxonomy selection exists (#3982).
+		$festival = trim( sanitize_text_field( (string) ( $event['festival'] ?? '' ) ) );
+		unset( $event['festival'] );
+		if ( '' !== $festival ) {
+			$config['explicit_festival'] = $festival;
+		}
+
 		// Explicit organizer is caller intent, not an AI guess (#849).
 		if ( '' !== trim( (string) ( $event['organizer'] ?? '' ) ) ) {
 			$config['promoter_explicit_organizer'] = true;
@@ -301,6 +309,10 @@ class EventUpsertAbilities {
 							'type'        => 'string',
 							'format'      => 'uri',
 							'description' => 'Organizer URL, stored as promoter term meta when organizer is supplied.',
+						),
+						'festival'          => array(
+							'type'        => 'string',
+							'description' => 'Festival name. Assigned as a festival term (appended on updates) and takes precedence over a festival parsed from the venue string.',
 						),
 						'eventStatus'       => $string,
 						'previousStartDate' => $string,
