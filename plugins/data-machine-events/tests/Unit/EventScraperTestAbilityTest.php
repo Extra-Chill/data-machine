@@ -77,7 +77,7 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 		$this->assertArrayNotHasKey( 'eligible_event_count', $output['properties']['extraction_info']['properties'] );
 	}
 
-	public function test_ability_permission_requires_manage_options(): void {
+	public function test_ability_permission_uses_shared_read_gate_by_default(): void {
 		$ability = wp_get_ability( 'data-machine-events/test-event-scraper' );
 		$this->assertNotNull( $ability );
 
@@ -88,9 +88,53 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 		$this->assertInstanceOf( \WP_Error::class, $denied );
 		$this->assertSame( 'ability_invalid_permissions', $denied->get_error_code() );
 
+		// Default read capability is edit_posts: contributors pass, no manage_options needed.
+		$contributor_id = self::factory()->user->create( array( 'role' => 'contributor' ) );
+		wp_set_current_user( $contributor_id );
+		$this->assertTrue( $ability->check_permissions( array( 'target_url' => 'https://example.com/events' ) ) );
+
 		$admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $admin_id );
 		$this->assertTrue( $ability->check_permissions( array( 'target_url' => 'https://example.com/events' ) ) );
+	}
+
+	/**
+	 * Regression for #3992: platform consumers that filter
+	 * `datamachine_events_read_capability` to a custom capability can grant
+	 * the scraper diagnostic to a role holding only that capability.
+	 */
+	public function test_filtered_read_capability_grants_execution_to_custom_cap_holder(): void {
+		$capability = 'dme_test_custom_events_read';
+		$filter     = static fn(): string => $capability;
+		add_filter( 'datamachine_events_read_capability', $filter );
+
+		try {
+			$ability = wp_get_ability( 'data-machine-events/test-event-scraper' );
+			$this->assertNotNull( $ability );
+
+			$holder = $this->createUserWithOnlyCapability( $capability );
+			$this->assertFalse( user_can( $holder, 'manage_options' ) );
+			$this->assertFalse( user_can( $holder, 'edit_posts' ) );
+
+			$this->mockHttpResponse( $this->buildJsonLdHtml( 2, 'Custom Cap Event' ) );
+			wp_set_current_user( $holder );
+			$this->assertTrue( $ability->check_permissions( array( 'target_url' => 'https://example.com/custom-cap' ) ) );
+			$result = $ability->execute( array( 'target_url' => 'https://example.com/custom-cap' ) );
+			$this->assertIsArray( $result, (string) wp_json_encode( $result ) );
+			$this->assertTrue( $result['success'] ?? false, (string) wp_json_encode( $result ) );
+			$this->assertSame( 2, $result['event_data']['event_count'] );
+
+			// A user without the filtered capability is denied, even with the
+			// default edit_posts capability the filter replaced.
+			$contributor_id = self::factory()->user->create( array( 'role' => 'contributor' ) );
+			wp_set_current_user( $contributor_id );
+			$this->assertFalse( $ability->check_permissions( array( 'target_url' => 'https://example.com/custom-cap' ) ) );
+			$denied = $ability->execute( array( 'target_url' => 'https://example.com/custom-cap' ) );
+			$this->assertInstanceOf( \WP_Error::class, $denied );
+			$this->assertSame( 'ability_invalid_permissions', $denied->get_error_code() );
+		} finally {
+			remove_filter( 'datamachine_events_read_capability', $filter );
+		}
 	}
 
 	public function test_ability_rejects_missing_target_url_from_schema(): void {
@@ -761,6 +805,15 @@ class EventScraperTestAbilityTest extends WP_UnitTestCase {
 				'source_type' => 'universal_web_scraper',
 			),
 		);
+	}
+
+	private function createUserWithOnlyCapability( string $capability ): int {
+		$user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		$user    = new \WP_User( $user_id );
+		$user->set_role( '' );
+		$user->add_cap( $capability );
+
+		return $user_id;
 	}
 
 	private function loginAsAdministrator(): void {

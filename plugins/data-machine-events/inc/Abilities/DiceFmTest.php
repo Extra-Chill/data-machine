@@ -60,9 +60,7 @@ class DiceFmTest {
 							),
 						),
 						'execute_callback'    => array( $this, 'executeAbility' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
+						'permission_callback' => AbilityPermissions::canRead(),
 						'meta'                => array( 'show_in_rest' => true ),
 					)
 				);

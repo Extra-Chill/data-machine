@@ -66,10 +66,7 @@ class VenueStatsAbilities {
 						),
 					),
 					'execute_callback'    => array( $this, 'executeVenueStats' ),
-					'permission_callback' => function () {
-						return current_user_can( 'manage_options' )
-							|| ( defined( 'WP_CLI' ) && ! empty( $_SERVER['argv'] ) );
-					},
+					'permission_callback' => AbilityPermissions::canRead(),
 					'meta'                => array(
 						'show_in_rest' => true,
 						'annotations'  => array(
