@@ -372,6 +372,23 @@ class UniversalWebScraper extends EventImportHandler {
 				break;
 			}
 
+			// Canva Sites render client-side; decode their document JSON into
+			// plain HTML for the extractor chain and HTML-section/AI fallback.
+			// The original page URL is kept for processing and provenance.
+			$canva_html = ( new CanvaSiteResolver() )->resolve( $html_content, $current_url );
+			$is_canva   = null !== $canva_html;
+			if ( $is_canva ) {
+				$context->log(
+					'info',
+					'Universal Web Scraper: Decoded Canva Site document',
+					array(
+						'source_url'     => $current_url,
+						'decoded_length' => strlen( $canva_html ),
+					)
+				);
+				$html_content = $canva_html;
+			}
+
 			// Try structured data extraction first
 			$structured_result = $this->tryStructuredDataExtraction(
 				$html_content,
@@ -382,7 +399,10 @@ class UniversalWebScraper extends EventImportHandler {
 
 			// Structured extractors containing only past/filtered events return null.
 			// Before AI fallbacks, look for Event JSON-LD on linked detail pages.
-			if ( null === $structured_result ) {
+			// Decoded Canva Sites skip this: their links are mostly off-site ticket
+			// or shop pages, and a single JSON-LD hit would short-circuit the
+			// per-section AI fallback that reads every other event on the page.
+			if ( null === $structured_result && ! $is_canva ) {
 				$linked_events = $this->linked_event_pages->extract( $html_content, $current_url );
 				if ( ! empty( $linked_events ) ) {
 					$structured_result = $this->processor->process(
