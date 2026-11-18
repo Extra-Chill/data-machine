@@ -101,7 +101,7 @@ class TumblrPublishAbility extends AbstractSocialAbility {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'tumblr' );
 
-		if ( ! $provider || ! $provider->is_authenticated() ) {
+		if ( ! $provider ) {
 			return new \WP_Error( 'missing_auth', 'Tumblr not authenticated', array( 'status' => 401 ) );
 		}
 

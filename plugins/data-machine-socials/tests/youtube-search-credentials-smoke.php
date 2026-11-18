@@ -113,6 +113,13 @@ namespace {
 	$check( ! is_wp_error( $creds ) && 'FILTERKEY' === $creds['value'], 'api key filter is honored' );
 	unset( $GLOBALS['yts_filter'] );
 
+	// Hard-expired OAuth token that the provider can refresh: is_authenticated()
+	// reports false, but resolution must still use the refreshed token instead
+	// of silently falling back to the API key.
+	$GLOBALS['yts_provider'] = new YTS_Provider( false, 'REFRESHED', array( 'api_key' => 'KEY123' ) );
+	$creds                   = Y::resolve_credentials();
+	$check( ! is_wp_error( $creds ) && 'oauth' === $creds['type'] && 'REFRESHED' === $creds['value'], 'expired oauth token is refreshed, not bypassed' );
+
 	// OAuth wins when connected.
 	$GLOBALS['yts_provider'] = new YTS_Provider( true, 'TOKEN', array( 'api_key' => 'KEY123' ) );
 	$creds                   = Y::resolve_credentials();

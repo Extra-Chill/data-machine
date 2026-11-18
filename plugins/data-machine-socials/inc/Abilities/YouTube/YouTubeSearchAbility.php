@@ -213,7 +213,9 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'youtube' );
 
-		if ( $provider && $provider->is_authenticated() ) {
+		if ( $provider ) {
+			// get_valid_access_token() refreshes an expired token, or returns null
+			// when no channel is connected, so the API-key fallback still applies.
 			$access_token = $provider->get_valid_access_token();
 			if ( ! empty( $access_token ) ) {
 				return array(
