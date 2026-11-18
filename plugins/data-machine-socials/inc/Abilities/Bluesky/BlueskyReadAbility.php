@@ -82,9 +82,9 @@ class BlueskyReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'bluesky', 'Bluesky', false, BlueskyAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$session = $auth->get_session();
@@ -230,16 +230,5 @@ class BlueskyReadAbility extends AbstractSocialAbility {
 			'success' => true,
 			'data'    => $data,
 		);
-	}
-
-	private function getAuthProvider(): ?BlueskyAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'bluesky' );
-
-		if ( $provider instanceof BlueskyAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

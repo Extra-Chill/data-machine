@@ -105,9 +105,9 @@ class MastodonReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$provider = $this->getAuthProvider();
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', 'Mastodon auth provider not available', array( 'status' => 401 ) );
+		$provider = $this->resolveProvider( 'mastodon', 'Mastodon', false, MastodonAuth::class );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$instance = $provider->get_instance();
@@ -167,8 +167,8 @@ class MastodonReadAbility extends AbstractSocialAbility {
 
 		if ( empty( $account_id ) ) {
 			// Default to the authenticated account.
-			$provider   = $this->getAuthProvider();
-			$account_id = $provider ? $provider->get_account_id() : '';
+			$provider   = $this->resolveProvider( 'mastodon', 'Mastodon', false, MastodonAuth::class );
+			$account_id = is_wp_error( $provider ) ? '' : $provider->get_account_id();
 		}
 
 		if ( empty( $account_id ) ) {
@@ -389,16 +389,5 @@ class MastodonReadAbility extends AbstractSocialAbility {
 		}
 
 		return is_array( $data ) ? $data : array( $data );
-	}
-
-	private function getAuthProvider(): ?MastodonAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'mastodon' );
-
-		if ( $provider instanceof MastodonAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

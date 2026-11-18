@@ -18,8 +18,10 @@ namespace DataMachineSocials\Abilities\Facebook;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Facebook\FacebookGraphClient;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -90,8 +92,8 @@ class FacebookAdsUpdateAbility extends AbstractSocialAbility {
 
 	/** @return array|\WP_Error */
 	public function execute( array $input ) {
-		$auth = FacebookGraphClient::auth();
-		$act  = $auth ? $auth->get_ad_account_id() : '';
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		$act  = is_wp_error( $auth ) ? '' : $auth->get_ad_account_id();
 		if ( '' === $act ) {
 			return new \WP_Error( 'ads_not_configured', 'No ad account selected.' );
 		}

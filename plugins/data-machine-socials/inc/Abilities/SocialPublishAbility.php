@@ -7,10 +7,10 @@
 
 namespace DataMachineSocials\Abilities;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Operations\DelegatedCrossPostAction;
 use DataMachineSocials\PublishComposerContract;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -174,9 +174,8 @@ class SocialPublishAbility extends AbstractSocialAbility {
 			return 'publish_ability_missing';
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProviderForHandler( $channel );
-		if ( ! $provider ) {
+		$provider = CredentialResolver::providerForHandler( $channel, $channel, false );
+		if ( is_wp_error( $provider ) ) {
 			return 'provider_missing';
 		}
 		if ( method_exists( $provider, 'is_configured' ) && ! $provider->is_configured() ) {

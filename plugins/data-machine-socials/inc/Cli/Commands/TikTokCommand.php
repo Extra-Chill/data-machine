@@ -9,8 +9,8 @@
 
 namespace DataMachineSocials\Cli\Commands;
 
-use DataMachine\Abilities\AuthAbilities;
 use WP_CLI;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -106,14 +106,14 @@ class TikTokCommand {
 			WP_CLI::error( 'Publish ID is required.' );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'tiktok' );
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			WP_CLI::error( 'TikTok not authenticated.' );
+		$credentials = CredentialResolver::token( 'tiktok', 'TikTok' );
+		if ( is_wp_error( $credentials ) ) {
+			WP_CLI::error( $credentials->get_error_message() );
+			return;
 		}
 
 		$result = \DataMachineSocials\Abilities\TikTok\TikTokPublishAbility::fetch_post_status(
-			$provider->get_valid_access_token(),
+			$credentials['token'],
 			$publish_id
 		);
 
@@ -186,12 +186,11 @@ class TikTokCommand {
 	public function auth_status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'tiktok' );
+		$provider = CredentialResolver::provider( 'tiktok', 'TikTok', false );
 
 		WP_CLI::log( 'TikTok Integration Status' );
 		WP_CLI::log( '---' );
-		if ( ! $provider ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}

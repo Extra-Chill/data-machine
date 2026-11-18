@@ -10,7 +10,7 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Abilities\AuthAbilities;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -36,13 +36,12 @@ class YouTubeCommand {
 	public function status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'youtube' );
+		$provider = CredentialResolver::provider( 'youtube', 'YouTube', false );
 
 		WP_CLI::log( 'YouTube Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}

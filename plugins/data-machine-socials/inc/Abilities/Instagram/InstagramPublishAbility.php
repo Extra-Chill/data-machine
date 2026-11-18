@@ -14,11 +14,12 @@
 
 namespace DataMachineSocials\Abilities\Instagram;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
+use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -322,19 +323,17 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		}
 
 		// Auth check.
-		$auth = new AuthAbilities();
-		/** @var \DataMachineSocials\Handlers\Instagram\InstagramAuth|null $provider */
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'instagram', 'Instagram', true, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
+		$provider     = $credentials['provider'];
 		$user_id      = $provider->get_user_id();
-		$access_token = $provider->get_valid_access_token();
+		$access_token = $credentials['token'];
 
-		if ( empty( $user_id ) || empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Instagram credentials not available', array( 'status' => 401 ) );
+		if ( empty( $user_id ) ) {
+			return new \WP_Error( 'missing_auth', 'Instagram account ID unavailable. Re-authorize in WP Admin > Data Machine > Settings.', array( 'status' => 401 ) );
 		}
 
 		// Build caption with source URL if provided.
@@ -885,12 +884,9 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found -- ability callback signature.
 		unset( $input );
-		$auth = new AuthAbilities();
-		/** @var \DataMachineSocials\Handlers\Instagram\InstagramAuth|null $provider */
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'instagram', 'Instagram', true, InstagramAuth::class );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		return array(

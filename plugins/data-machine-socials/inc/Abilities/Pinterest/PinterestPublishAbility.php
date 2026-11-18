@@ -10,10 +10,10 @@
 
 namespace DataMachineSocials\Abilities\Pinterest;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -101,19 +101,13 @@ class PinterestPublishAbility extends AbstractSocialAbility {
 	 * @return array Response with pin details or error.
 	 */
 	public static function execute_publish( array $input ): array|\WP_Error {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'pinterest' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::credentials( 'pinterest', 'Pinterest' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$config = $provider->get_config();
-		$token  = $provider->get_valid_access_token();
-
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$config = $credentials['config'];
+		$token  = $credentials['token'];
 
 		$title       = sanitize_text_field( $input['title'] ?? '' );
 		$description = sanitize_textarea_field( $input['description'] ?? '' );

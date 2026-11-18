@@ -85,9 +85,9 @@ class TwitterReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'twitter', 'Twitter', false, TwitterAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$connection = $auth->get_connection();
@@ -254,16 +254,5 @@ class TwitterReadAbility extends AbstractSocialAbility {
 		}
 
 		return $fallback;
-	}
-
-	private function getAuthProvider(): ?TwitterAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'twitter' );
-
-		if ( $provider instanceof TwitterAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

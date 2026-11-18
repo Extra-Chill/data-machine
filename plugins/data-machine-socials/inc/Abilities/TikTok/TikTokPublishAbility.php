@@ -29,11 +29,11 @@
 
 namespace DataMachineSocials\Abilities\TikTok;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\TikTok\TikTokAuth;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -196,15 +196,12 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Invalid video URL: ' . $video_url, array( 'status' => 400 ) );
 		}
 
-		$provider = self::resolve_provider();
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
+		$credentials = CredentialResolver::token( 'tiktok', 'TikTok' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'TikTok access token unavailable', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		$privacy_level = $input['privacy_level'] ?? 'PUBLIC_TO_EVERYONE';
 
@@ -451,15 +448,13 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$provider = self::resolve_provider();
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
+		$credentials = CredentialResolver::token( 'tiktok', 'TikTok' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'TikTok access token unavailable', array( 'status' => 401 ) );
-		}
+		$provider     = $credentials['provider'];
+		$access_token = $credentials['token'];
 
 		// Fetch display name via the Display API user info endpoint.
 		$display_name = '';
@@ -492,21 +487,5 @@ class TikTokPublishAbility extends AbstractSocialAbility {
 			'display_name'  => $display_name,
 			'creator_info'  => $creator_info,
 		);
-	}
-
-	/**
-	 * Resolve and authenticate the TikTok auth provider.
-	 *
-	 * @return object|\WP_Error Provider or error.
-	 */
-	private static function resolve_provider() {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'tiktok' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'TikTok not authenticated', array( 'status' => 401 ) );
-		}
-
-		return $provider;
 	}
 }

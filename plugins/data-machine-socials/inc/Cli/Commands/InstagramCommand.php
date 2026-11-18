@@ -13,8 +13,8 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Handlers\Instagram\InstagramAuth;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -398,13 +398,12 @@ class InstagramCommand {
 	public function status( $args, $assoc_args ) {
 		unset( $args );
 		unset( $assoc_args );
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'instagram' );
+		$provider = CredentialResolver::provider( 'instagram', 'Instagram', false, InstagramAuth::class );
 
 		WP_CLI::log( 'Instagram Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider instanceof InstagramAuth ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}

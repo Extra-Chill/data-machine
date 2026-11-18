@@ -10,7 +10,7 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Abilities\AuthAbilities;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -221,13 +221,12 @@ class TwitterCommand {
 	public function status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'twitter' );
+		$provider = CredentialResolver::provider( 'twitter', 'Twitter', false );
 
 		WP_CLI::log( 'Twitter / X Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}

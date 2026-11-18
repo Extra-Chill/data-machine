@@ -17,11 +17,11 @@
 
 namespace DataMachineSocials\Abilities\TikTok;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\TikTok\TikTokAuth;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -111,17 +111,12 @@ class TikTokReadAbility extends AbstractSocialAbility {
 	public static function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'tiktok' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'TikTok not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'tiktok', 'TikTok' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'TikTok access token unavailable', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		if ( 'profile' === $action ) {
 			return self::get_profile( $access_token );

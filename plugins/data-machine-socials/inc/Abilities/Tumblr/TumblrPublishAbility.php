@@ -11,10 +11,10 @@
 
 namespace DataMachineSocials\Abilities\Tumblr;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -98,17 +98,12 @@ class TumblrPublishAbility extends AbstractSocialAbility {
 	 * @return array Response with post details or error.
 	 */
 	public static function execute_publish( array $input ): array|\WP_Error {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'tumblr' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'tumblr', 'Tumblr' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$token = $provider->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$token = $credentials['token'];
 
 		$body            = trim( (string) ( $input['body'] ?? '' ) );
 		$title           = trim( (string) ( $input['title'] ?? '' ) );

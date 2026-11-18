@@ -8,8 +8,8 @@
 
 namespace DataMachineSocials;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Engine\Tasks\TaskScheduler;
+use DataMachineSocials\Auth\CredentialResolver;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -996,8 +996,7 @@ class RestApi {
 	 * returns auth status alongside platform config in one response.
 	 */
 	public static function get_auth_status() {
-		$auth_abilities = new AuthAbilities();
-		$providers      = $auth_abilities->getAllProviders();
+		$providers = CredentialResolver::all();
 
 		$statuses = array();
 
@@ -1064,8 +1063,7 @@ class RestApi {
 	 */
 	public static function get_platforms() {
 		$handler_abilities = new \DataMachine\Abilities\HandlerAbilities();
-		$auth_abilities    = new AuthAbilities();
-		$providers         = $auth_abilities->getAllProviders();
+		$providers         = CredentialResolver::all();
 
 		// Get all handlers that registered via HandlerRegistrationTrait.
 		$all_handlers = $handler_abilities->getAllHandlers();

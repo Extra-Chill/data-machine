@@ -93,15 +93,12 @@ class TumblrReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'posts';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'tumblr', 'Tumblr', false, TumblrAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$token = $auth->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$token = $credentials['token'];
 
 		switch ( $action ) {
 			case 'posts':
@@ -251,16 +248,5 @@ class TumblrReadAbility extends AbstractSocialAbility {
 				'total' => $response['total_posts'] ?? count( $items ),
 			),
 		);
-	}
-
-	private function getAuthProvider(): ?TumblrAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'tumblr' );
-
-		if ( $provider instanceof TumblrAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

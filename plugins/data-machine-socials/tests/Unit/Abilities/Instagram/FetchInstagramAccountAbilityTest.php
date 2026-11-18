@@ -259,6 +259,7 @@ class FetchInstagramAccountAbilityTest extends WP_UnitTestCase {
 		} );
 		$result = ( new FetchInstagramAccountAbility() )->execute( array( 'username' => 'venue' ) );
 		$this->assertWPError( $result );
-		$this->assertSame( 'instagram_auth', $result->get_error_code() );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
 	}
 }

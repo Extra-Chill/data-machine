@@ -13,7 +13,6 @@
 
 namespace DataMachineSocials\Handlers\Facebook;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -25,11 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Facebook extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	/**
-	* @var FacebookAuth Authentication handler instance
-	*/
-	private $auth;
 
 	public function __construct() {
 		parent::__construct( 'facebook' );
@@ -94,31 +88,6 @@ class Facebook extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	* Lazy-load auth provider when needed.
-	*
-	* @return FacebookAuth|null Auth provider instance or null if unavailable
-	*/
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'facebook' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Facebook Handler: Authentication service not available',
-					array(
-						'handler'             => 'facebook',
-						'missing_service'     => 'facebook',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {

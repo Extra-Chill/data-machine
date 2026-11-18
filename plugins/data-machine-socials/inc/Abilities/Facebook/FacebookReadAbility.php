@@ -86,9 +86,9 @@ class FacebookReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		// Facebook uses page_access_token for page operations.
@@ -230,16 +230,5 @@ class FacebookReadAbility extends AbstractSocialAbility {
 				'has_next' => ! empty( $paging['next'] ),
 			),
 		);
-	}
-
-	private function getAuthProvider(): ?FacebookAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'facebook' );
-
-		if ( $provider instanceof FacebookAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

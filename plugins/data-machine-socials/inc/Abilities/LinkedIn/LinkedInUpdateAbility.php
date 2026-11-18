@@ -12,7 +12,6 @@
 
 namespace DataMachineSocials\Abilities\LinkedIn;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
@@ -81,13 +80,9 @@ class LinkedInUpdateAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'commentary is required', array( 'status' => 400 ) );
 		}
 
-		$provider = $this->getAuthProvider();
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn auth provider not available', array( 'status' => 401 ) );
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
+		$provider = $this->resolveProvider( 'linkedin', 'LinkedIn', true, LinkedInAuth::class );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$encoded_id = rawurlencode( $post_id );
@@ -120,16 +115,5 @@ class LinkedInUpdateAbility extends AbstractSocialAbility {
 		}
 
 		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to update LinkedIn post', array( 'status' => 500 ) );
-	}
-
-	private function getAuthProvider(): ?LinkedInAuth {
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'linkedin' );
-
-		if ( $provider instanceof LinkedInAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

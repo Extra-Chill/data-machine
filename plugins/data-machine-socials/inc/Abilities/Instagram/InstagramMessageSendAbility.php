@@ -93,9 +93,9 @@ class InstagramMessageSendAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$page = $auth->get_page_context();
@@ -124,21 +124,6 @@ class InstagramMessageSendAbility extends AbstractSocialAbility {
 		}
 
 		return $this->sendMessage( $page['id'], $page['access_token'], $recipient_id, $message, $messaging_type );
-	}
-
-	private function getAuthProvider(): ?InstagramAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider instanceof InstagramAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 

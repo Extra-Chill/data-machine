@@ -2,13 +2,14 @@
 /** Business Discovery fetch primitive. @package DataMachineSocials */
 namespace DataMachineSocials\Abilities\Instagram;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Instagram\InstagramAccountSettings;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
+use DataMachineSocials\Handlers\Instagram\InstagramAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -84,11 +85,14 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 		if ( ! $username || $limit < 1 || $limit > 500 ) {
 			return new \WP_Error( 'invalid_param', 'A valid Instagram username and max_items between 1 and 500 are required.' );
 		}
-		$auth    = ( new AuthAbilities() )->getProvider( 'instagram' );
-		$token   = $auth ? $auth->get_valid_access_token() : '';
-		$user_id = $auth ? $auth->get_user_id() : '';
-		if ( ! $token || ! $user_id ) {
-			return new \WP_Error( 'instagram_auth', 'Instagram authentication is missing or expired. Reconnect Instagram.' );
+		$credentials = CredentialResolver::token( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
+		}
+		$token   = $credentials['token'];
+		$user_id = $credentials['provider']->get_user_id();
+		if ( ! $user_id ) {
+			return new \WP_Error( 'missing_auth', 'Instagram account ID unavailable. Re-authorize in WP Admin > Data Machine > Settings.', array( 'status' => 401 ) );
 		}
 
 		$recent_context = max( 0, min( 12, (int) ( $input['recent_context'] ?? 0 ) ) );

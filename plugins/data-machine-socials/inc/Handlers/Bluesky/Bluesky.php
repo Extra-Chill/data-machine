@@ -5,7 +5,6 @@
 
 namespace DataMachineSocials\Handlers\Bluesky;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -19,8 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Bluesky extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	private $auth;
 
 	public function __construct() {
 		parent::__construct( 'bluesky' );
@@ -81,31 +78,6 @@ class Bluesky extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	* Lazy-load auth provider when needed.
-	*
-	* @return BlueskyAuth|null Auth provider instance or null if unavailable
-	*/
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'bluesky' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Bluesky Handler: Authentication service not available',
-					array(
-						'handler'             => 'bluesky',
-						'missing_service'     => 'bluesky',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {

@@ -11,10 +11,10 @@
 
 namespace DataMachineSocials\Abilities\Pinterest;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -167,17 +167,12 @@ class PinterestBoardsAbility extends AbstractSocialAbility {
 	 * @return array Result with success, count, and boards.
 	 */
 	public static function sync_boards(): array|\WP_Error {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'pinterest' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'pinterest', 'Pinterest' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$token = $provider->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$token = $credentials['token'];
 
 		$all_boards = array();
 		$bookmark   = null;
@@ -295,8 +290,6 @@ class PinterestBoardsAbility extends AbstractSocialAbility {
 	 * @return bool
 	 */
 	public static function is_configured(): bool {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'pinterest' );
-		return $provider && $provider->is_authenticated();
+		return ! is_wp_error( CredentialResolver::provider( 'pinterest', 'Pinterest' ) );
 	}
 }

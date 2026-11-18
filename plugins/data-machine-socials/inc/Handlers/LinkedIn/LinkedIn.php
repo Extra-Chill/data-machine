@@ -14,7 +14,6 @@
 
 namespace DataMachineSocials\Handlers\LinkedIn;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -30,9 +29,6 @@ defined( 'ABSPATH' ) || exit;
 class LinkedIn extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	/** @var LinkedInAuth OAuth authentication handler */
-	private $auth;
 
 	public function __construct() {
 		parent::__construct( 'linkedin' );
@@ -94,31 +90,6 @@ class LinkedIn extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	 * Lazy-load auth provider when needed.
-	 *
-	 * @return LinkedInAuth|null Auth provider instance or null if unavailable.
-	 */
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'linkedin' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'LinkedIn Handler: Authentication service not available',
-					array(
-						'handler'             => 'linkedin',
-						'missing_service'     => 'linkedin',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	/**

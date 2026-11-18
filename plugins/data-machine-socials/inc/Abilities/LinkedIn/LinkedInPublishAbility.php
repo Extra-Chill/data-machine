@@ -11,10 +11,10 @@
 
 namespace DataMachineSocials\Abilities\LinkedIn;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -141,13 +141,12 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'linkedin' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'linkedin', 'LinkedIn', true, LinkedInAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
+		$provider   = $credentials['provider'];
 		$person_urn = $provider->get_person_urn();
 		if ( empty( $person_urn ) ) {
 			return new \WP_Error( 'missing_auth', 'LinkedIn person URN not available. Try re-authenticating.', array( 'status' => 401 ) );
@@ -170,7 +169,7 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 		try {
 			// Handle image upload if provided.
 			if ( ! empty( $image_path ) && file_exists( $image_path ) ) {
-				$image_urn = self::upload_image( $provider, $person_urn, $image_path );
+				$image_urn = self::upload_image( $provider, $credentials['token'], $person_urn, $image_path );
 				if ( ! $image_urn ) {
 					return new \WP_Error( 'api_error', 'Failed to upload image to LinkedIn', array( 'status' => 500 ) );
 				}
@@ -226,11 +225,9 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'linkedin' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'linkedin', 'LinkedIn' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$account = $provider->get_account_details();
@@ -250,12 +247,13 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 	 * 1. Initialize upload to get an upload URL and image URN.
 	 * 2. Upload the binary image data to the provided URL.
 	 *
-	 * @param LinkedInAuth $provider Auth provider with API access.
-	 * @param string       $owner_urn Owner URN (person or organization).
-	 * @param string       $image_path Local path to the image file.
+	 * @param LinkedInAuth $provider     Auth provider with API access.
+	 * @param string       $access_token Access token resolved by CredentialResolver.
+	 * @param string       $owner_urn    Owner URN (person or organization).
+	 * @param string       $image_path   Local path to the image file.
 	 * @return string|null Image URN on success, null on failure.
 	 */
-	private static function upload_image( LinkedInAuth $provider, string $owner_urn, string $image_path ): ?string {
+	private static function upload_image( LinkedInAuth $provider, string $access_token, string $owner_urn, string $image_path ): ?string {
 		if ( ! file_exists( $image_path ) ) {
 			return null;
 		}
@@ -303,11 +301,6 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 		// Step 2: Upload the binary image.
 		$file_contents = file_get_contents( $image_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- LinkedIn requires raw local image bytes.
 		if ( false === $file_contents ) {
-			return null;
-		}
-
-		$access_token = $provider->get_valid_access_token();
-		if ( null === $access_token ) {
 			return null;
 		}
 

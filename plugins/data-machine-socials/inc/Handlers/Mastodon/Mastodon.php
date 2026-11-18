@@ -9,7 +9,6 @@
 
 namespace DataMachineSocials\Handlers\Mastodon;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -22,8 +21,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Mastodon extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	private $auth;
 
 	public function __construct() {
 		parent::__construct( 'mastodon' );
@@ -85,31 +82,6 @@ class Mastodon extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	 * Lazy-load auth provider when needed.
-	 *
-	 * @return MastodonAuth|null Auth provider instance or null if unavailable.
-	 */
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'mastodon' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Mastodon Handler: Authentication service not available',
-					array(
-						'handler'             => 'mastodon',
-						'missing_service'     => 'mastodon',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {

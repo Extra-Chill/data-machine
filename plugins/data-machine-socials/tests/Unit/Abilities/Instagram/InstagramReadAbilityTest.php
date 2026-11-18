@@ -511,7 +511,9 @@ class InstagramReadAbilityTest extends WP_UnitTestCase {
 		$result = $this->ability->execute( array( 'action' => 'list' ) );
 
 		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'auth provider', strtolower( $result->get_error_message() ) );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
+		$this->assertSame( 'Instagram not authenticated', $result->get_error_message() );
+		$this->assertSame( 401, $result->get_error_data()['status'] );
 	}
 
 	/*

@@ -12,7 +12,6 @@
 
 namespace DataMachineSocials\Abilities\LinkedIn;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Handlers\LinkedIn\LinkedInAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
@@ -83,13 +82,9 @@ class LinkedInReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$provider = $this->getAuthProvider();
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn auth provider not available', array( 'status' => 401 ) );
-		}
-
-		if ( ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
+		$provider = $this->resolveProvider( 'linkedin', 'LinkedIn', true, LinkedInAuth::class );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		switch ( $action ) {
@@ -205,16 +200,5 @@ class LinkedInReadAbility extends AbstractSocialAbility {
 				'content'        => $data['content'] ?? null,
 			),
 		);
-	}
-
-	private function getAuthProvider(): ?LinkedInAuth {
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'linkedin' );
-
-		if ( $provider instanceof LinkedInAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

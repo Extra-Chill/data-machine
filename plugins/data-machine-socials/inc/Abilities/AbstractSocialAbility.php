@@ -19,7 +19,11 @@
  * - registerAbility()        Register one or more abilities once, guarded.
  * - resolveProvider()        Resolve + authenticate the platform provider.
  * - resolveAccessToken()     Resolve a valid OAuth access token server-side.
+ * - resolveCredentials()     Resolve the provider and its access token together.
  * - apiError()               Build the standard api_error WP_Error.
+ *
+ * The three resolve* helpers delegate to CredentialResolver, which is also
+ * what static ability callbacks, handlers, and CLI commands call directly.
  *
  * @package    DataMachineSocials
  * @subpackage Abilities
@@ -28,7 +32,7 @@
 
 namespace DataMachineSocials\Abilities;
 
-use DataMachine\Abilities\AuthAbilities;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -79,25 +83,18 @@ abstract class AbstractSocialAbility {
 	/**
 	 * Resolve and authenticate the platform auth provider.
 	 *
-	 * @param string $platform              Provider key (e.g. 'threads').
-	 * @param string $label                 Human-readable platform label for errors.
-	 * @param bool   $require_authenticated When true, enforce is_authenticated().
-	 * @return object|\WP_Error The provider on success, WP_Error otherwise.
+	 * Delegates to CredentialResolver, the single credential implementation.
+	 *
+	 * @template T of object
+	 *
+	 * @param string               $platform              Provider key (e.g. 'threads').
+	 * @param string               $label                 Human-readable platform label for errors.
+	 * @param bool                 $require_authenticated When true, enforce is_authenticated().
+	 * @param class-string<T>|null $expected_class        Expected provider class, if any.
+	 * @return ($expected_class is null ? object : T|\WP_Error) The provider on success, WP_Error otherwise.
 	 */
-	protected function resolveProvider( string $platform, string $label, bool $require_authenticated = true ) {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( $platform );
-
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', $label . ' not authenticated', array( 'status' => 401 ) );
-		}
-
-		$is_authenticated = array( $provider, 'is_authenticated' );
-		if ( $require_authenticated && ! ( is_callable( $is_authenticated ) && call_user_func( $is_authenticated ) ) ) {
-			return new \WP_Error( 'missing_auth', $label . ' not authenticated', array( 'status' => 401 ) );
-		}
-
-		return $provider;
+	protected function resolveProvider( string $platform, string $label, bool $require_authenticated = true, ?string $expected_class = null ): object {
+		return CredentialResolver::provider( $platform, $label, $require_authenticated, $expected_class );
 	}
 
 	/**
@@ -112,17 +109,25 @@ abstract class AbstractSocialAbility {
 	 * @return string|\WP_Error Access token, or a missing_auth WP_Error.
 	 */
 	protected function resolveAccessToken( string $platform, string $label ): string|\WP_Error {
-		$provider = $this->resolveProvider( $platform, $label );
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
-		}
+		$resolved = CredentialResolver::token( $platform, $label );
 
-		$token = method_exists( $provider, 'get_valid_access_token' ) ? $provider->get_valid_access_token() : null;
-		if ( ! is_string( $token ) || '' === trim( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Could not obtain a valid ' . $label . ' access token.', array( 'status' => 401 ) );
-		}
+		return is_wp_error( $resolved ) ? $resolved : $resolved['token'];
+	}
 
-		return trim( $token );
+	/**
+	 * Resolve a platform's provider plus a valid access token.
+	 *
+	 * @template T of object
+	 *
+	 * @param string               $platform              Provider key.
+	 * @param string               $label                 Human-readable platform label for errors.
+	 * @param bool                 $require_authenticated When true, enforce is_authenticated(). Pass
+	 *                                                    false so an expired token can still refresh.
+	 * @param class-string<T>|null $expected_class        Expected provider class, if any.
+	 * @return ($expected_class is null ? array{provider: object, token: string}|\WP_Error : array{provider: T, token: string}|\WP_Error)
+	 */
+	protected function resolveCredentials( string $platform, string $label, bool $require_authenticated = true, ?string $expected_class = null ): array|\WP_Error {
+		return CredentialResolver::token( $platform, $label, $require_authenticated, $expected_class );
 	}
 
 	/**

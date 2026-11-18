@@ -38,11 +38,21 @@ class InstagramInsightsAbility extends AbstractSocialAbility {
 					'input_schema'        => array(
 						'type'       => 'object',
 						'properties' => array(
-							'media_id' => array( 'type' => 'string', 'description' => __( 'Instagram media ID.', 'data-machine-socials' ) ),
+							'media_id' => array(
+								'type'        => 'string',
+								'description' => __( 'Instagram media ID.', 'data-machine-socials' ),
+							),
 						),
 						'required'   => array( 'media_id' ),
 					),
-					'output_schema'       => array( 'type' => 'object', 'properties' => array( 'success' => array( 'type' => 'boolean' ), 'data' => array( 'type' => 'object' ), 'error' => array( 'type' => 'string' ) ) ),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'success' => array( 'type' => 'boolean' ),
+							'data'    => array( 'type' => 'object' ),
+							'error'   => array( 'type' => 'string' ),
+						),
+					),
 					'execute_callback'    => array( $this, 'execute' ),
 					'permission_callback' => array( $this, 'checkPermission' ),
 					'meta'                => array( 'show_in_rest' => true ),
@@ -60,17 +70,18 @@ class InstagramInsightsAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'media_id is required', array( 'status' => 400 ) );
 		}
 
-		$provider = $this->getAuthProvider();
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
-		}
-		$token = $provider->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable. Re-authenticate the Instagram account.', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
+		$token = $credentials['token'];
+
 		$media_id = rawurlencode( (string) $input['media_id'] );
-		$media    = $this->graphGet( self::GRAPH_API_URL . '/' . $media_id . '?' . http_build_query( array( 'fields' => 'media_type,media_product_type', 'access_token' => $token ) ), $token );
+		$media    = $this->graphGet( self::GRAPH_API_URL . '/' . $media_id . '?' . http_build_query( array(
+			'fields'       => 'media_type,media_product_type',
+			'access_token' => $token,
+		) ), $token );
 		if ( is_wp_error( $media ) ) {
 			return $media;
 		}
@@ -78,17 +89,22 @@ class InstagramInsightsAbility extends AbstractSocialAbility {
 		$media_type = strtoupper( (string) ( $media['media_type'] ?? '' ) );
 		$is_reel    = 'REELS' === strtoupper( (string) ( $media['media_product_type'] ?? '' ) ) || 'VIDEO' === $media_type;
 		$metrics    = $is_reel ? self::REEL_METRICS : self::FEED_METRICS;
-		$insights   = $this->graphGet( self::GRAPH_API_URL . '/' . $media_id . '/insights?' . http_build_query( array( 'metric' => implode( ',', $metrics ), 'access_token' => $token ) ), $token );
+		$insights   = $this->graphGet( self::GRAPH_API_URL . '/' . $media_id . '/insights?' . http_build_query( array(
+			'metric'       => implode( ',', $metrics ),
+			'access_token' => $token,
+		) ), $token );
 		if ( is_wp_error( $insights ) ) {
 			return $insights;
 		}
 
-		return array( 'success' => true, 'data' => array( 'media_id' => (string) $input['media_id'], 'media_type' => $media_type, 'metrics' => $insights['data'] ?? array() ) );
-	}
-
-	private function getAuthProvider(): ?InstagramAuth {
-		$provider = ( new \DataMachine\Abilities\AuthAbilities() )->getProvider( 'instagram' );
-		return $provider instanceof InstagramAuth ? $provider : null;
+		return array(
+			'success' => true,
+			'data'    => array(
+				'media_id'   => (string) $input['media_id'],
+				'media_type' => $media_type,
+				'metrics'    => $insights['data'] ?? array(),
+			),
+		);
 	}
 
 	private function graphGet( string $url, string $token ): array|\WP_Error {

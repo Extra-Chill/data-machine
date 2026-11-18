@@ -114,15 +114,12 @@ class PinterestAnalyticsAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'user';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'pinterest', 'Pinterest', false, PinterestAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$token = $auth->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$token = $credentials['token'];
 
 		// Parse date range
 		$start_date = $input['start_date'] ?? gmdate( 'Y-m-d', strtotime( '-30 days' ) );
@@ -350,16 +347,5 @@ class PinterestAnalyticsAbility extends AbstractSocialAbility {
 		}
 
 		return $summary;
-	}
-
-	private function getAuthProvider(): ?PinterestAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'pinterest' );
-
-		if ( $provider instanceof PinterestAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

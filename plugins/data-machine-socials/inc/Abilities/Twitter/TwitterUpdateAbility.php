@@ -84,13 +84,13 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 		$action = $input['action'] ?? '';
 
 		// Get auth provider.
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'twitter', 'Twitter', false, TwitterAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$connection = $auth->get_connection();
-		if ( ! $connection ) {
+		if ( is_wp_error( $connection ) ) {
 			return new \WP_Error( 'missing_auth', 'Twitter connection not available', array( 'status' => 401 ) );
 		}
 
@@ -105,40 +105,20 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 				return $this->deleteTweet( $connection, $tweet_id );
 
 			case 'retweet':
-				return $this->retweet( $connection, $tweet_id );
+				return $this->retweet( $auth, $connection, $tweet_id );
 
 			case 'unretweet':
-				return $this->unretweet( $connection, $tweet_id );
+				return $this->unretweet( $auth, $connection, $tweet_id );
 
 			case 'like':
-				return $this->likeTweet( $connection, $tweet_id );
+				return $this->likeTweet( $auth, $connection, $tweet_id );
 
 			case 'unlike':
-				return $this->unlikeTweet( $connection, $tweet_id );
+				return $this->unlikeTweet( $auth, $connection, $tweet_id );
 
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, retweet, unretweet, like, or unlike.", array( 'status' => 500 ) );
 		}
-	}
-
-	/**
-	 * Get auth provider.
-	 *
-	 * @return TwitterAuth|null
-	 */
-	private function getAuthProvider(): ?TwitterAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'twitter' );
-
-		if ( ! $provider instanceof TwitterAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**
@@ -173,13 +153,13 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 	/**
 	 * Retweet a tweet.
 	 *
-	 * @param object $connection TwitterOAuth connection.
-	 * @param string $tweet_id   Tweet ID to retweet.
+	 * @param TwitterAuth $auth       Resolved Twitter auth provider.
+	 * @param object      $connection TwitterOAuth connection.
+	 * @param string      $tweet_id   Tweet ID to retweet.
 	 * @return array Result.
 	 */
-	private function retweet( $connection, string $tweet_id ): array|\WP_Error {
+	private function retweet( TwitterAuth $auth, $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for retweeting.
-		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -213,13 +193,13 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 	/**
 	 * Unretweet a tweet.
 	 *
-	 * @param object $connection TwitterOAuth connection.
-	 * @param string $tweet_id   Tweet ID to unretweet.
+	 * @param TwitterAuth $auth       Resolved Twitter auth provider.
+	 * @param object      $connection TwitterOAuth connection.
+	 * @param string      $tweet_id   Tweet ID to unretweet.
 	 * @return array Result.
 	 */
-	private function unretweet( $connection, string $tweet_id ): array|\WP_Error {
+	private function unretweet( TwitterAuth $auth, $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for unretweeting.
-		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -251,13 +231,13 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 	/**
 	 * Like a tweet.
 	 *
-	 * @param object $connection TwitterOAuth connection.
-	 * @param string $tweet_id   Tweet ID to like.
+	 * @param TwitterAuth $auth       Resolved Twitter auth provider.
+	 * @param object      $connection TwitterOAuth connection.
+	 * @param string      $tweet_id   Tweet ID to like.
 	 * @return array Result.
 	 */
-	private function likeTweet( $connection, string $tweet_id ): array|\WP_Error {
+	private function likeTweet( TwitterAuth $auth, $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for liking.
-		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 
@@ -290,13 +270,13 @@ class TwitterUpdateAbility extends AbstractSocialAbility {
 	/**
 	 * Unlike a tweet.
 	 *
-	 * @param object $connection TwitterOAuth connection.
-	 * @param string $tweet_id   Tweet ID to unlike.
+	 * @param TwitterAuth $auth       Resolved Twitter auth provider.
+	 * @param object      $connection TwitterOAuth connection.
+	 * @param string      $tweet_id   Tweet ID to unlike.
 	 * @return array Result.
 	 */
-	private function unlikeTweet( $connection, string $tweet_id ): array|\WP_Error {
+	private function unlikeTweet( TwitterAuth $auth, $connection, string $tweet_id ): array|\WP_Error {
 		// Need user ID for unliking.
-		$auth    = $this->getAuthProvider();
 		$account = $auth->get_account_details();
 		$user_id = $account['user_id'] ?? null;
 

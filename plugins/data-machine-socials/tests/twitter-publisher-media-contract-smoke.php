@@ -174,6 +174,7 @@ namespace {
 	$connection = new TwitterMediaConnection();
 	$GLOBALS['twitter_media_provider'] = new TwitterMediaProvider( $connection );
 
+	require_once dirname( __DIR__ ) . '/inc/Auth/CredentialResolver.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Twitter/TwitterPublishAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Publisher.php';
 	$GLOBALS['twitter_publish_ability'] = new TwitterPublisherAbility();

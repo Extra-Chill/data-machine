@@ -10,7 +10,7 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Abilities\AuthAbilities;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -275,13 +275,12 @@ class FacebookCommand {
 	public function status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'facebook' );
+		$provider = CredentialResolver::provider( 'facebook', 'Facebook', false );
 
 		WP_CLI::log( 'Facebook Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			return;
 		}
@@ -552,9 +551,10 @@ class FacebookCommand {
 	 * @subcommand ads-connect
 	 */
 	public function ads_connect( $args, $assoc_args ) {
-		$auth = ( new AuthAbilities() )->getProvider( 'facebook' );
-		if ( ! $auth instanceof \DataMachineSocials\Handlers\Facebook\FacebookAuth ) {
-			WP_CLI::error( 'Facebook auth provider not available.' );
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, \DataMachineSocials\Handlers\Facebook\FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			WP_CLI::error( $auth->get_error_message() );
+			return;
 		}
 		WP_CLI::log( 'Approve ads access (expires in 15 minutes):' );
 		WP_CLI::log( $auth->get_ads_authorization_url() );
@@ -577,9 +577,10 @@ class FacebookCommand {
 	 * @subcommand ads-config
 	 */
 	public function ads_config( $args, $assoc_args ) {
-		$auth = \DataMachineSocials\Handlers\Facebook\FacebookGraphClient::auth();
-		if ( ! $auth ) {
-			WP_CLI::error( 'Facebook auth provider not available.' );
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, \DataMachineSocials\Handlers\Facebook\FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			WP_CLI::error( $auth->get_error_message() );
+			return;
 		}
 
 		if ( isset( $assoc_args['account'] ) && ! $auth->set_ad_account_id( (string) $assoc_args['account'] ) ) {

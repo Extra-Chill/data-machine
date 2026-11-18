@@ -29,10 +29,10 @@
 
 namespace DataMachineSocials\Abilities\YouTube;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -154,15 +154,12 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', sprintf( 'Title exceeds %d characters', self::MAX_TITLE_LENGTH ), array( 'status' => 400 ) );
 		}
 
-		$provider = self::resolve_auth_provider();
-		if ( is_wp_error( $provider ) ) {
-			return $provider;
+		$credentials = CredentialResolver::token( 'youtube', 'YouTube' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $provider->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'YouTube access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		/*
 		 * Resolve a local video file. YouTube requires raw bytes (it does not
@@ -414,21 +411,5 @@ class YouTubeUploadAbility extends AbstractSocialAbility {
 			}
 		}
 		return 'video/mp4';
-	}
-
-	/**
-	 * Resolve and authenticate the YouTube provider.
-	 *
-	 * @return object|\WP_Error
-	 */
-	private static function resolve_auth_provider() {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'youtube' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'YouTube not authenticated', array( 'status' => 401 ) );
-		}
-
-		return $provider;
 	}
 }

@@ -11,7 +11,6 @@
 
 namespace DataMachineSocials\Handlers\Threads;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
@@ -25,11 +24,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Threads extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	/**
-	* @var ThreadsAuth Authentication handler instance
-	*/
-	private $auth;
 
 	public function __construct() {
 		parent::__construct( 'threads' );
@@ -90,31 +84,6 @@ class Threads extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	* Lazy-load auth provider when needed.
-	*
-	* @return ThreadsAuth|null Auth provider instance or null if unavailable
-	*/
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'threads' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Threads Handler: Authentication service not available',
-					array(
-						'handler'             => 'threads',
-						'missing_service'     => 'threads',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {

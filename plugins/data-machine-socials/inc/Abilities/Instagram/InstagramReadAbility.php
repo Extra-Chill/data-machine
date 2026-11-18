@@ -166,15 +166,13 @@ class InstagramReadAbility extends AbstractSocialAbility {
 		$action = $input['action'] ?? 'list';
 
 		// Get auth provider.
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
-		}
+		$auth         = $credentials['provider'];
+		$access_token = $credentials['token'];
 
 		switch ( $action ) {
 			case 'list':
@@ -983,21 +981,5 @@ class InstagramReadAbility extends AbstractSocialAbility {
 			'created_time'    => (string) ( $message['created_time'] ?? '' ),
 			'raw'             => $message,
 		);
-	}
-
-	/**
-	 * Get the Instagram auth provider.
-	 *
-	 * @return InstagramAuth|null
-	 */
-	private function getAuthProvider(): ?InstagramAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'instagram' );
-
-		if ( $provider instanceof InstagramAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

@@ -16,8 +16,10 @@ namespace DataMachineSocials\Abilities\Facebook;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Facebook\FacebookGraphClient;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -109,11 +111,11 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 		if ( is_wp_error( $res ) ) {
 			return $res;
 		}
-		$auth = FacebookGraphClient::auth();
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, FacebookAuth::class );
 		return array(
 			'success'  => true,
 			'accounts' => $res['data'] ?? array(),
-			'selected' => $auth ? $auth->get_ad_account_id() : '',
+			'selected' => is_wp_error( $auth ) ? '' : $auth->get_ad_account_id(),
 		);
 	}
 
@@ -340,8 +342,8 @@ class FacebookAdsReadAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$auth    = FacebookGraphClient::auth();
-		$account = $auth ? $auth->get_ad_account_id() : '';
+		$auth    = CredentialResolver::provider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		$account = is_wp_error( $auth ) ? '' : $auth->get_ad_account_id();
 		if ( '' === $account ) {
 			return new \WP_Error( 'ads_not_configured', 'No ad account selected.' );
 		}

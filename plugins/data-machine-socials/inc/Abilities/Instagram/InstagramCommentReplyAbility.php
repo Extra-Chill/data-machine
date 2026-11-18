@@ -75,15 +75,12 @@ class InstagramCommentReplyAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		$comment_id = sanitize_text_field( $input['comment_id'] ?? '' );
 		$message    = trim( sanitize_textarea_field( $input['message'] ?? '' ) );
@@ -101,21 +98,6 @@ class InstagramCommentReplyAbility extends AbstractSocialAbility {
 		}
 
 		return $this->replyToComment( $access_token, $comment_id, $message );
-	}
-
-	private function getAuthProvider(): ?InstagramAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider instanceof InstagramAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	private function replyToComment( string $access_token, string $comment_id, string $message ): array|\WP_Error {

@@ -76,6 +76,7 @@ namespace {
 		}
 	}
 
+	require_once dirname( __DIR__ ) . '/inc/Auth/CredentialResolver.php';
 	require dirname( __DIR__ ) . '/inc/Abilities/YouTube/YouTubeSearchAbility.php';
 
 	use DataMachineSocials\Abilities\YouTube\YouTubeSearchAbility as Y;

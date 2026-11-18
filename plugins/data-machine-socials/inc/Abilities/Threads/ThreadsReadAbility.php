@@ -88,15 +88,13 @@ class ThreadsReadAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? 'list';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'threads', 'Threads', false, ThreadsAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Threads access token unavailable (expired or refresh failed)', array( 'status' => 401 ) );
-		}
+		$auth         = $credentials['provider'];
+		$access_token = $credentials['token'];
 
 		switch ( $action ) {
 			case 'list':
@@ -231,16 +229,5 @@ class ThreadsReadAbility extends AbstractSocialAbility {
 				'has_next' => ! empty( $paging['next'] ),
 			),
 		);
-	}
-
-	private function getAuthProvider(): ?ThreadsAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'threads' );
-
-		if ( $provider instanceof ThreadsAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

@@ -28,11 +28,6 @@ class YouTube extends PublishHandler {
 
 	use HandlerRegistrationTrait;
 
-	/**
-	 * @var YouTubeAuth Authentication handler instance.
-	 */
-	private $auth;
-
 	public function __construct() {
 		parent::__construct( 'youtube' );
 
@@ -92,31 +87,6 @@ class YouTube extends PublishHandler {
 				),
 			)
 		);
-	}
-
-	/**
-	 * Lazy-load auth provider when needed.
-	 *
-	 * @return YouTubeAuth|null Auth provider instance or null if unavailable.
-	 */
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'youtube' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'YouTube Handler: Authentication service not available',
-					array(
-						'handler'             => 'youtube',
-						'missing_service'     => 'youtube',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
 	}
 
 	protected function executePublish( array $parameters, array $handler_config ): array {

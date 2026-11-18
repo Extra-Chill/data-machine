@@ -69,9 +69,9 @@ class MastodonDeleteAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'status_id is required', array( 'status' => 400 ) );
 		}
 
-		$provider = $this->getAuthProvider();
-		if ( ! $provider ) {
-			return new \WP_Error( 'missing_auth', 'Mastodon auth provider not available', array( 'status' => 401 ) );
+		$provider = $this->resolveProvider( 'mastodon', 'Mastodon', false, MastodonAuth::class );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$instance = $provider->get_instance();
@@ -115,20 +115,5 @@ class MastodonDeleteAbility extends AbstractSocialAbility {
 		}
 
 		return new \WP_Error( 'api_error', $error_msg, array( 'status' => 500 ) );
-	}
-
-	private function getAuthProvider(): ?MastodonAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'mastodon' );
-
-		if ( ! $provider instanceof MastodonAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 }

@@ -15,6 +15,7 @@
 namespace DataMachineSocials\Handlers\Facebook;
 
 use DataMachine\Core\HttpClient;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -44,9 +45,9 @@ final class FacebookGraphClient {
 	 * @return self|\WP_Error
 	 */
 	public static function for_ads() {
-		$auth = self::auth();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 		$token = (string) $auth->get_valid_user_access_token();
 		if ( '' === $token ) {
@@ -56,17 +57,6 @@ final class FacebookGraphClient {
 			return new \WP_Error( 'ads_permission_missing', 'The Facebook connection has no ads permission. Run `wp datamachine-socials facebook ads-connect` and approve ads access.', array( 'status' => 403 ) );
 		}
 		return new self( $token, 'Facebook Ads' );
-	}
-
-	/**
-	 * The registered Facebook auth provider, if any.
-	 */
-	public static function auth(): ?FacebookAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-		$provider = ( new \DataMachine\Abilities\AuthAbilities() )->getProvider( 'facebook' );
-		return $provider instanceof FacebookAuth ? $provider : null;
 	}
 
 	/** @return array|\WP_Error */
