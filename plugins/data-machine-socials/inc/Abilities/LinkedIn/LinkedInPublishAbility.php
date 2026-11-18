@@ -144,7 +144,7 @@ class LinkedInPublishAbility extends AbstractSocialAbility {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'linkedin' );
 
-		if ( ! $provider || ! $provider->is_authenticated() ) {
+		if ( ! $provider ) {
 			return new \WP_Error( 'missing_auth', 'LinkedIn not authenticated', array( 'status' => 401 ) );
 		}
 

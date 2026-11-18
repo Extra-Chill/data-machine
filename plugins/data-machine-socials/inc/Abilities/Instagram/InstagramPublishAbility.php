@@ -326,7 +326,7 @@ class InstagramPublishAbility extends AbstractSocialAbility {
 		/** @var \DataMachineSocials\Handlers\Instagram\InstagramAuth|null $provider */
 		$provider = $auth->getProvider( 'instagram' );
 
-		if ( ! $provider || ! $provider->is_authenticated() ) {
+		if ( ! $provider ) {
 			return new \WP_Error( 'missing_auth', 'Instagram not authenticated', array( 'status' => 401 ) );
 		}
 

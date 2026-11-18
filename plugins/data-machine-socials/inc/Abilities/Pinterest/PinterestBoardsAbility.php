@@ -170,7 +170,7 @@ class PinterestBoardsAbility extends AbstractSocialAbility {
 		$auth     = new AuthAbilities();
 		$provider = $auth->getProvider( 'pinterest' );
 
-		if ( ! $provider || ! $provider->is_authenticated() ) {
+		if ( ! $provider ) {
 			return new \WP_Error( 'missing_auth', 'Pinterest not authenticated', array( 'status' => 401 ) );
 		}
 
