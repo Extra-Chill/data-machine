@@ -14,10 +14,10 @@
 
 namespace DataMachineSocials\Handlers\Tumblr;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineSocials\Auth\CredentialResolver;
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -28,9 +28,6 @@ defined( 'ABSPATH' ) || exit;
 class Tumblr extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	/** @var TumblrAuth|null Authentication handler */
-	private $auth;
 
 	/**
 	* Constructor.
@@ -113,30 +110,6 @@ class Tumblr extends PublishHandler {
 	}
 
 	/**
-	* Lazy-load auth provider.
-	*
-	* @return TumblrAuth|null Auth provider instance or null if unavailable.
-	*/
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'tumblr' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Tumblr Handler: Authentication service not available',
-					array(
-						'handler'             => 'tumblr',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
-	}
-
-	/**
 	* Execute Tumblr publishing.
 	*
 	* @param array $parameters Tool parameters including title, body, tags, state, blog_identifier.
@@ -169,15 +142,12 @@ class Tumblr extends PublishHandler {
 			);
 		}
 
-		$auth = $this->get_auth();
-		if ( ! $auth ) {
-			return $this->errorResponse( 'Tumblr authentication not configured', array(), 'critical' );
+		$credentials = CredentialResolver::token( 'tumblr', 'Tumblr', false );
+		if ( is_wp_error( $credentials ) ) {
+			return $this->errorResponse( $credentials->get_error_message(), array(), 'critical' );
 		}
 
-		$token = $auth->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return $this->errorResponse( 'Tumblr access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array(), 'critical' );
-		}
+		$token = $credentials['token'];
 
 		$content_blocks = array();
 		$title          = trim( (string) ( $parameters['title'] ?? '' ) );

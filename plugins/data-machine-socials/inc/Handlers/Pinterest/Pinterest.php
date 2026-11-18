@@ -14,11 +14,11 @@
 
 namespace DataMachineSocials\Handlers\Pinterest;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Abilities\Pinterest\PinterestBoardsAbility;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineSocials\Auth\CredentialResolver;
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -30,9 +30,6 @@ defined( 'ABSPATH' ) || exit;
 class Pinterest extends PublishHandler {
 
 	use HandlerRegistrationTrait;
-
-	/** @var PinterestAuth Authentication handler */
-	private $auth;
 
 	/**
 	* Constructor.
@@ -120,30 +117,6 @@ class Pinterest extends PublishHandler {
 	}
 
 	/**
-	* Lazy-load auth provider.
-	*
-	* @return PinterestAuth|null Auth provider instance or null if unavailable.
-	*/
-	private function get_auth() {
-		if ( null === $this->auth ) {
-			$auth_abilities = new AuthAbilities();
-			$this->auth     = $auth_abilities->getProvider( 'pinterest' );
-
-			if ( null === $this->auth ) {
-				$this->log(
-					'error',
-					'Pinterest Handler: Authentication service not available',
-					array(
-						'handler'             => 'pinterest',
-						'available_providers' => array_keys( $auth_abilities->getAllProviders() ),
-					)
-				);
-			}
-		}
-		return $this->auth;
-	}
-
-	/**
 	* Execute Pinterest publishing.
 	*
 	* @param array $parameters Tool parameters including title, description, board_id.
@@ -176,16 +149,12 @@ class Pinterest extends PublishHandler {
 			);
 		}
 
-		$auth = $this->get_auth();
-		if ( ! $auth ) {
-			return $this->errorResponse( 'Pinterest authentication not configured', array(), 'critical' );
+		$credentials = CredentialResolver::token( 'pinterest', 'Pinterest', false );
+		if ( is_wp_error( $credentials ) ) {
+			return $this->errorResponse( $credentials->get_error_message(), array(), 'critical' );
 		}
 
-		$token = $auth->get_valid_access_token();
-
-		if ( empty( $token ) ) {
-			return $this->errorResponse( 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array(), 'critical' );
-		}
+		$token = $credentials['token'];
 
 		$board_id = $this->resolve_board_id( $parameters, $handler_config, $engine );
 

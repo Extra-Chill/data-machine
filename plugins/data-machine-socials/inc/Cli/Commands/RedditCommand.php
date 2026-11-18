@@ -14,9 +14,9 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Reddit\RedditAuth;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -1036,13 +1036,12 @@ class RedditCommand {
 	 */
 	public function status( $args, $assoc_args ) {
 		unset( $args, $assoc_args );
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'reddit' );
+		$provider = CredentialResolver::provider( 'reddit', 'Reddit', false, RedditAuth::class );
 
 		WP_CLI::log( 'Reddit Integration Status' );
 		WP_CLI::log( '---' );
 
-		if ( ! $provider instanceof RedditAuth ) {
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Provider:      Not found' );
 			WP_CLI::log( 'Authenticated: No' );
 			return;
@@ -1327,36 +1326,6 @@ class RedditCommand {
 	}
 
 	/**
-	 * Get a valid Reddit access token or exit with error.
-	 *
-	 * @return string Access token.
-	 */
-	private function get_access_token(): string {
-		$auth_abilities = new AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'reddit' );
-
-		$access_token = '';
-		$error        = '';
-
-		if ( ! $provider instanceof RedditAuth ) {
-			$error = 'Reddit auth provider not found. Is data-machine-socials active?';
-		} elseif ( ! $provider->is_authenticated() ) {
-			$error = 'Reddit is not authenticated. Connect via Settings > Data Machine > Auth.';
-		} else {
-			$access_token = (string) $provider->get_valid_access_token();
-			if ( '' === $access_token ) {
-				$error = 'Failed to obtain a valid Reddit access token (expired and refresh failed).';
-			}
-		}
-
-		if ( '' !== $error ) {
-			WP_CLI::error( $error );
-		}
-
-		return $access_token;
-	}
-
-	/**
 	 * Make an authenticated GET request to the Reddit OAuth API.
 	 *
 	 * @param string $endpoint API endpoint path (e.g. "/r/bonnaroo/about").
@@ -1364,7 +1333,13 @@ class RedditCommand {
 	 * @return array Decoded JSON response data.
 	 */
 	private function reddit_api_get( string $endpoint, array $params = array() ): array {
-		$access_token = $this->get_access_token();
+		$credentials = CredentialResolver::token( 'reddit', 'Reddit', true, RedditAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			WP_CLI::error( $credentials->get_error_message() );
+			return array();
+		}
+
+		$access_token = $credentials['token'];
 
 		$url = self::API_BASE . $endpoint . '.json';
 		if ( ! empty( $params ) ) {

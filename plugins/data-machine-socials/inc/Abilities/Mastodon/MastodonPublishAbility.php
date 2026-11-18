@@ -11,11 +11,11 @@
 
 namespace DataMachineSocials\Abilities\Mastodon;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\Handlers\Mastodon\MastodonAuth;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -134,11 +134,9 @@ class MastodonPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Content or image is required', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'mastodon' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Mastodon not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'mastodon', 'Mastodon' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$instance = $provider->get_instance();
@@ -239,11 +237,9 @@ class MastodonPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'mastodon' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Mastodon not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'mastodon', 'Mastodon' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$details = $provider->get_account_details();

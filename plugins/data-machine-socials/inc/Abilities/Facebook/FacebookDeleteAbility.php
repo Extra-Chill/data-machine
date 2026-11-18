@@ -67,9 +67,9 @@ class FacebookDeleteAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$access_token = $auth->get_page_access_token();
@@ -108,20 +108,5 @@ class FacebookDeleteAbility extends AbstractSocialAbility {
 		}
 
 		return $this->apiError( $result['error'] ?? 'Failed to delete post' );
-	}
-
-	private function getAuthProvider(): ?FacebookAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'facebook' );
-
-		if ( ! $provider instanceof FacebookAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 }

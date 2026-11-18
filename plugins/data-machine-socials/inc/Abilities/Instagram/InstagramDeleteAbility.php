@@ -74,36 +74,18 @@ class InstagramDeleteAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Instagram access token unavailable', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		if ( empty( $input['media_id'] ) ) {
 			return new \WP_Error( 'missing_param', 'media_id is required', array( 'status' => 400 ) );
 		}
 
 		return $this->deleteMedia( $access_token, $input['media_id'] );
-	}
-
-	private function getAuthProvider(): ?InstagramAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'instagram' );
-
-		if ( ! $provider instanceof InstagramAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**

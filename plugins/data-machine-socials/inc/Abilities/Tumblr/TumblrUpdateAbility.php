@@ -84,15 +84,12 @@ class TumblrUpdateAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'tumblr', 'Tumblr', false, TumblrAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$token = $auth->get_valid_access_token();
-		if ( empty( $token ) ) {
-			return new \WP_Error( 'missing_auth', 'Tumblr access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$token = $credentials['token'];
 
 		$blog_identifier = sanitize_text_field( (string) ( $input['blog_identifier'] ?? '' ) );
 		$post_id         = sanitize_text_field( (string) ( $input['post_id'] ?? '' ) );
@@ -139,16 +136,5 @@ class TumblrUpdateAbility extends AbstractSocialAbility {
 				'updated' => true,
 			),
 		);
-	}
-
-	private function getAuthProvider(): ?TumblrAuth {
-		$auth_abilities = new \DataMachine\Abilities\AuthAbilities();
-		$provider       = $auth_abilities->getProvider( 'tumblr' );
-
-		if ( $provider instanceof TumblrAuth ) {
-			return $provider;
-		}
-
-		return null;
 	}
 }

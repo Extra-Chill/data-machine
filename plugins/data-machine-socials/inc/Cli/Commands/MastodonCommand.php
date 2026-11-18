@@ -9,10 +9,10 @@
 
 namespace DataMachineSocials\Cli\Commands;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Abilities\Mastodon\MastodonPublishAbility;
 use DataMachineSocials\Handlers\Mastodon\MastodonAuth;
 use WP_CLI;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -222,8 +222,8 @@ class MastodonCommand {
 	public function status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$provider = ( new AuthAbilities() )->getProvider( 'mastodon' );
-		if ( ! $provider ) {
+		$provider = CredentialResolver::provider( 'mastodon', 'Mastodon', false );
+		if ( is_wp_error( $provider ) ) {
 			WP_CLI::log( 'Mastodon provider: not registered' );
 			return;
 		}

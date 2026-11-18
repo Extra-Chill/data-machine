@@ -10,11 +10,11 @@
 
 namespace DataMachineSocials\Abilities\Facebook;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -150,11 +150,9 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'A valid image URL is required for image publishing', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'facebook' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Facebook not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'facebook', 'Facebook' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$page_id           = $provider->get_page_id();
@@ -246,11 +244,9 @@ class FacebookPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_pages( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'facebook' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Facebook not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'facebook', 'Facebook' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		// Get pages from provider or make API call

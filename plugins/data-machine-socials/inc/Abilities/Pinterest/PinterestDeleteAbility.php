@@ -67,16 +67,12 @@ class PinterestDeleteAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'pinterest', 'Pinterest', false, PinterestAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Pinterest access token is missing or expired — re-authorize in WP Admin > Data Machine > Settings', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		if ( empty( $input['pin_id'] ) ) {
 			return new \WP_Error( 'missing_param', 'pin_id is required', array( 'status' => 400 ) );
@@ -106,20 +102,5 @@ class PinterestDeleteAbility extends AbstractSocialAbility {
 		}
 
 		return new \WP_Error( 'api_error', $result['error'] ?? 'Failed to delete pin', array( 'status' => 500 ) );
-	}
-
-	private function getAuthProvider(): ?PinterestAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'pinterest' );
-
-		if ( ! $provider instanceof PinterestAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 }

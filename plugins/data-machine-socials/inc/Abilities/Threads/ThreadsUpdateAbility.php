@@ -75,15 +75,12 @@ class ThreadsUpdateAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Threads auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'threads', 'Threads', false, ThreadsAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
-		$access_token = $auth->get_valid_access_token();
-		if ( empty( $access_token ) ) {
-			return new \WP_Error( 'missing_auth', 'Threads access token unavailable', array( 'status' => 401 ) );
-		}
+		$access_token = $credentials['token'];
 
 		if ( empty( $input['thread_id'] ) ) {
 			return new \WP_Error( 'missing_param', 'thread_id is required', array( 'status' => 400 ) );
@@ -98,21 +95,6 @@ class ThreadsUpdateAbility extends AbstractSocialAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete.", array( 'status' => 500 ) );
 		}
-	}
-
-	private function getAuthProvider(): ?ThreadsAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'threads' );
-
-		if ( ! $provider instanceof ThreadsAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	private function deleteThread( string $access_token, string $thread_id ): array|\WP_Error {

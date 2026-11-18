@@ -10,10 +10,10 @@
 
 namespace DataMachineSocials\Abilities\Bluesky;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -138,11 +138,9 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'A valid image URL is required for image publishing', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'bluesky' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Bluesky not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'bluesky', 'Bluesky' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		// Use the provider's session method which handles auth internally.
@@ -261,11 +259,9 @@ class BlueskyPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'bluesky' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Bluesky not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'bluesky', 'Bluesky' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$details = $provider->get_account_details();

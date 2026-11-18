@@ -115,6 +115,7 @@ namespace {
 		}
 	}
 
+	require_once dirname( __DIR__ ) . '/inc/Auth/CredentialResolver.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Facebook/FacebookPublishAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Bluesky/BlueskyPublishAbility.php';
 	require_once dirname( __DIR__ ) . '/inc/Abilities/Twitter/TwitterPublishAbility.php';

@@ -17,8 +17,10 @@ use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Engine\AI\Actions\PendingActionHelper;
 use DataMachine\Engine\AI\Actions\SignPendingActionResolutionAbility;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use DataMachineSocials\Handlers\Facebook\FacebookGraphClient;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -121,9 +123,9 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 
 	/** @return array|\WP_Error */
 	public function execute( array $input ) {
-		$auth = FacebookGraphClient::auth();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		$auth = CredentialResolver::provider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$promotion = FacebookAdsPolicy::validate( $input, FacebookAdsPolicy::limits(), $auth->get_ad_account_id(), time() );
@@ -368,10 +370,7 @@ class FacebookAdsPromoteAbility extends AbstractSocialAbility {
 	}
 
 	private static function instagramUserId(): string {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return '';
-		}
-		$ig = ( new \DataMachine\Abilities\AuthAbilities() )->getProvider( 'instagram' );
-		return ( $ig && method_exists( $ig, 'get_user_id' ) ) ? (string) $ig->get_user_id() : '';
+		$ig = CredentialResolver::provider( 'instagram', 'Instagram', false );
+		return ( ! is_wp_error( $ig ) && method_exists( $ig, 'get_user_id' ) ) ? (string) $ig->get_user_id() : '';
 	}
 }

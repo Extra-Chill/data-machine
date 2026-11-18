@@ -16,10 +16,10 @@
 
 namespace DataMachineSocials\Abilities\YouTube;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -210,21 +210,16 @@ class YouTubeSearchAbility extends AbstractSocialAbility {
 	 * @return array{type:string,value:string}|\WP_Error
 	 */
 	public static function resolve_credentials(): array|\WP_Error {
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'youtube' );
+		$credentials = CredentialResolver::optional( 'youtube' );
 
-		if ( $provider && $provider->is_authenticated() ) {
-			$access_token = $provider->get_valid_access_token();
-			if ( ! empty( $access_token ) ) {
-				return array(
-					'type'  => 'oauth',
-					'value' => (string) $access_token,
-				);
-			}
+		if ( '' !== $credentials['token'] ) {
+			return array(
+				'type'  => 'oauth',
+				'value' => $credentials['token'],
+			);
 		}
 
-		$config  = $provider ? (array) $provider->get_config() : array();
-		$api_key = (string) ( $config['api_key'] ?? '' );
+		$api_key = (string) ( $credentials['config']['api_key'] ?? '' );
 		if ( '' === $api_key && defined( 'DATAMACHINE_YOUTUBE_API_KEY' ) ) {
 			$api_key = (string) constant( 'DATAMACHINE_YOUTUBE_API_KEY' );
 		}

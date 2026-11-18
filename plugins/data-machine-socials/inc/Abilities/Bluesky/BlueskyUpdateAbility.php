@@ -73,9 +73,9 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 	public function execute( array $input ): array|\WP_Error {
 		$action = $input['action'] ?? '';
 
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Bluesky auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'bluesky', 'Bluesky', false, BlueskyAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$session = $auth->get_session();
@@ -102,21 +102,6 @@ class BlueskyUpdateAbility extends AbstractSocialAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use delete, like, or unlike.", array( 'status' => 500 ) );
 		}
-	}
-
-	private function getAuthProvider(): ?BlueskyAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'bluesky' );
-
-		if ( ! $provider instanceof BlueskyAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	private function deletePost( array $session, string $post_uri ): array|\WP_Error {

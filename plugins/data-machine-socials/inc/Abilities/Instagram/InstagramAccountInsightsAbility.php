@@ -81,15 +81,15 @@ class InstagramAccountInsightsAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'invalid_param', sprintf( 'days must be between 1 and %d.', self::MAX_DAYS ), array( 'status' => 400 ) );
 		}
 
-		$provider = ( new \DataMachine\Abilities\AuthAbilities() )->getProvider( 'instagram' );
-		if ( ! $provider instanceof InstagramAuth ) {
-			return new \WP_Error( 'missing_auth', 'Instagram auth provider not available', array( 'status' => 401 ) );
+		$credentials = $this->resolveCredentials( 'instagram', 'Instagram', false, InstagramAuth::class );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
-		$token   = $provider->get_valid_access_token();
-		$account = (array) $provider->get_account_details();
+		$token   = $credentials['token'];
+		$account = (array) $credentials['provider']->get_account_details();
 		$user_id = (string) ( $account['user_id'] ?? '' );
-		if ( empty( $token ) || '' === $user_id ) {
-			return new \WP_Error( 'missing_auth', 'Instagram access token or account ID unavailable. Re-authenticate the Instagram account.', array( 'status' => 401 ) );
+		if ( '' === $user_id ) {
+			return new \WP_Error( 'missing_auth', 'Instagram account ID unavailable. Re-authenticate the Instagram account.', array( 'status' => 401 ) );
 		}
 
 		$profile = $this->graphGet(

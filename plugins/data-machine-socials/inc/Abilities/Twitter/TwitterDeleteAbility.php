@@ -64,13 +64,13 @@ class TwitterDeleteAbility extends AbstractSocialAbility {
 	}
 
 	public function execute( array $input ): array|\WP_Error {
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Twitter auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'twitter', 'Twitter', false, TwitterAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$connection = $auth->get_connection();
-		if ( ! $connection ) {
+		if ( is_wp_error( $connection ) ) {
 			return new \WP_Error( 'missing_auth', 'Twitter connection not available', array( 'status' => 401 ) );
 		}
 
@@ -93,22 +93,8 @@ class TwitterDeleteAbility extends AbstractSocialAbility {
 			);
 		}
 
-		$error = $result['detail'] ?? $result['title'] ?? 'Failed to delete tweet';
+		$body  = is_array( $result ) ? $result : get_object_vars( $result );
+		$error = $body['detail'] ?? $body['title'] ?? 'Failed to delete tweet';
 		return new \WP_Error( 'api_error', $error, array( 'status' => 500 ) );
-	}
-
-	private function getAuthProvider(): ?TwitterAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'twitter' );
-
-		if ( ! $provider instanceof TwitterAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 }

@@ -10,9 +10,9 @@
 
 namespace DataMachineSocials\Abilities\Threads;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\HttpClient;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
+use DataMachineSocials\Auth\CredentialResolver;
 use DataMachineSocials\PublishAuthorization;
 
 defined( 'ABSPATH' ) || exit;
@@ -131,17 +131,16 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'missing_param', 'Content is required', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'threads' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Threads not authenticated', array( 'status' => 401 ) );
+		$credentials = CredentialResolver::token( 'threads', 'Threads' );
+		if ( is_wp_error( $credentials ) ) {
+			return $credentials;
 		}
 
+		$provider     = $credentials['provider'];
 		$user_id      = $provider->get_user_id();
-		$access_token = $provider->get_valid_access_token();
+		$access_token = $credentials['token'];
 
-		if ( empty( $user_id ) || empty( $access_token ) ) {
+		if ( empty( $user_id ) ) {
 			return new \WP_Error( 'missing_auth', 'Threads credentials not available', array( 'status' => 401 ) );
 		}
 
@@ -232,11 +231,9 @@ class ThreadsPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'threads' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Threads not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'threads', 'Threads' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		return array(

@@ -10,10 +10,10 @@
 
 namespace DataMachineSocials\Abilities\Twitter;
 
-use DataMachine\Abilities\AuthAbilities;
 use DataMachine\Core\EngineData;
 use DataMachineSocials\Abilities\AbstractSocialAbility;
 use DataMachineSocials\PublishAuthorization;
+use DataMachineSocials\Auth\CredentialResolver;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -162,11 +162,9 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 			return new \WP_Error( 'invalid_media_url', 'The required media file is unavailable', array( 'status' => 400 ) );
 		}
 
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'twitter' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'twitter', 'Twitter' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$connection = $provider->get_connection();
@@ -294,11 +292,9 @@ class TwitterPublishAbility extends AbstractSocialAbility {
 	 */
 	public static function get_account( array $input ): array|\WP_Error {
 		$input;
-		$auth     = new AuthAbilities();
-		$provider = $auth->getProvider( 'twitter' );
-
-		if ( ! $provider || ! $provider->is_authenticated() ) {
-			return new \WP_Error( 'missing_auth', 'Twitter not authenticated', array( 'status' => 401 ) );
+		$provider = CredentialResolver::provider( 'twitter', 'Twitter' );
+		if ( is_wp_error( $provider ) ) {
+			return $provider;
 		}
 
 		$account = $provider->get_account_details();

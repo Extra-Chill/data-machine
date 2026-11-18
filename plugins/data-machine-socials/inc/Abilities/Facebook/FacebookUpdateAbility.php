@@ -91,9 +91,9 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 		$action = $input['action'] ?? '';
 
 		// Get auth provider.
-		$auth = $this->getAuthProvider();
-		if ( ! $auth ) {
-			return new \WP_Error( 'missing_auth', 'Facebook auth provider not available', array( 'status' => 401 ) );
+		$auth = $this->resolveProvider( 'facebook', 'Facebook', false, FacebookAuth::class );
+		if ( is_wp_error( $auth ) ) {
+			return $auth;
 		}
 
 		$access_token = $auth->get_page_access_token();
@@ -126,26 +126,6 @@ class FacebookUpdateAbility extends AbstractSocialAbility {
 			default:
 				return new \WP_Error( 'api_error', "Unknown action: {$action}. Use edit, hide, unhide, or delete.", array( 'status' => 500 ) );
 		}
-	}
-
-	/**
-	 * Get auth provider.
-	 *
-	 * @return FacebookAuth|null
-	 */
-	private function getAuthProvider(): ?FacebookAuth {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-
-		$auth     = new \DataMachine\Abilities\AuthAbilities();
-		$provider = $auth->getProvider( 'facebook' );
-
-		if ( ! $provider instanceof FacebookAuth ) {
-			return null;
-		}
-
-		return $provider;
 	}
 
 	/**

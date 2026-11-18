@@ -11,6 +11,8 @@
 namespace DataMachineSocials\Cli\Commands;
 
 use WP_CLI;
+use DataMachineSocials\Auth\CredentialResolver;
+use DataMachineSocials\Handlers\Tumblr\TumblrAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,12 +42,13 @@ class TumblrCommand {
 	public function status( $args, $assoc_args ) {
 		$args;
 		$assoc_args;
-		$provider = $this->get_provider();
+		$provider = CredentialResolver::provider( 'tumblr', 'Tumblr', false, TumblrAuth::class );
+		$found    = ! is_wp_error( $provider );
 
 		WP_CLI::log( 'Tumblr Integration Status' );
 		WP_CLI::log( '---' );
-		WP_CLI::log( 'Configured: ' . ( $provider && $provider->is_configured() ? 'Yes' : 'No' ) );
-		WP_CLI::log( 'Authenticated: ' . ( $provider && $provider->is_authenticated() ? 'Yes' : 'No' ) );
+		WP_CLI::log( 'Configured: ' . ( $found && $provider->is_configured() ? 'Yes' : 'No' ) );
+		WP_CLI::log( 'Authenticated: ' . ( $found && $provider->is_authenticated() ? 'Yes' : 'No' ) );
 	}
 
 	/**
@@ -282,14 +285,6 @@ class TumblrCommand {
 
 		WP_CLI::success( 'Post deleted successfully!' );
 		WP_CLI::log( 'Post ID: ' . $result['data']['post_id'] );
-	}
-
-	private function get_provider() {
-		if ( ! class_exists( '\DataMachine\Abilities\AuthAbilities' ) ) {
-			return null;
-		}
-		$auth = new \DataMachine\Abilities\AuthAbilities();
-		return $auth->getProvider( 'tumblr' );
 	}
 
 	private function get_ability( $slug ) {
