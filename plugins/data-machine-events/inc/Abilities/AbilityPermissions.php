@@ -18,7 +18,8 @@
  *     `edit_others_posts`. Platforms can return their own capability
  *     to widen the trust pool for write operations.
  *   - `datamachine_events_read_capability` — default `edit_posts`.
- *     Same shape for the (currently unused) diagnostic read gate.
+ *     Same shape for read-only diagnostic abilities (scraper/handler
+ *     tests, venue stats).
  *
  * @package DataMachineEvents\Abilities
  * @since 0.39.0
@@ -65,10 +66,11 @@ class AbilityPermissions {
 	 * Permission callback for diagnostic / admin-only read abilities
 	 * that should still be gated but available to elevated roles.
 	 *
-	 * Currently unused by default — read-only abilities were
-	 * intentionally left on their existing gate. Provided here so
-	 * future read abilities have a consistent shape if they want the
-	 * same elevation shape as the write gate.
+	 * Used by read-only diagnostics that persist nothing (e.g.
+	 * test-event-scraper, test-ticketmaster, test-dice-fm,
+	 * venue-stats). Public read abilities stay on `__return_true`;
+	 * abilities that expose Data Machine pipeline metadata or delegate
+	 * to more tightly gated abilities keep their own gate.
 	 *
 	 * @return \Closure
 	 */

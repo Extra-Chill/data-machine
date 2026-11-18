@@ -356,9 +356,7 @@ class EventScraperTest {
 							),
 						),
 						'execute_callback'    => array( $this, 'executeAbility' ),
-						'permission_callback' => function () {
-							return current_user_can( 'manage_options' );
-						},
+						'permission_callback' => AbilityPermissions::canRead(),
 						'meta'                => array( 'show_in_rest' => true ),
 					)
 				);
@@ -687,7 +685,9 @@ class EventScraperTest {
 	 * Execute the scraper once through core's generic test-handler ability.
 	 *
 	 * The caller of test-event-scraper has already passed this ability's own
-	 * manage_options gate (or is trusted server code: CLI, tests).
+	 * AbilityPermissions::canRead() gate (the filterable
+	 * `datamachine_events_read_capability`, default `edit_posts`; WP-CLI is
+	 * always allowed) or is trusted server code (tests).
 	 * The nested call runs through the Abilities API so test-handler input and
 	 * output validation still apply, inside PermissionHelper::run_as_system()
 	 * so its Data Machine permission check does not re-authorize a delegation
