@@ -390,6 +390,8 @@ class EventUpsert extends UpsertHandler {
 			if ( is_numeric( $selection ) ) {
 				$artists[] = (int) $selection;
 			}
+			$prior_artists = $this->taxonomy_assigner->orderedArtistIds( $existing_post_id )['ids'];
+			$set_artists   = array();
 			foreach ( array(
 				'artist'   => $artists,
 				'festival' => array( $festival_match['festival'] ),
@@ -398,6 +400,19 @@ class EventUpsert extends UpsertHandler {
 				if ( is_wp_error( $result ) ) {
 					return $this->lifecycleErrorResponse( $result, $title );
 				}
+				if ( 'artist' === $taxonomy ) {
+					foreach ( $result as $tt_id ) {
+						$term = get_term_by( 'term_taxonomy_id', (int) $tt_id, 'artist' );
+						if ( $term instanceof \WP_Term ) {
+							$set_artists[] = (int) $term->term_id;
+						}
+					}
+				}
+			}
+			// The canonical festival keeps its billing; the set's artists follow.
+			$order_error = $this->taxonomy_assigner->persistArtistOrder( $existing_post_id, $prior_artists, $set_artists );
+			if ( $order_error ) {
+				return $this->lifecycleErrorResponse( $order_error, $title );
 			}
 			do_action( 'datamachine_event_taxonomy_processed', $existing_post_id );
 			return $this->successResponse( array(
@@ -692,6 +707,10 @@ class EventUpsert extends UpsertHandler {
 			// updates and no_change repairs without changing fresh-create semantics.
 			// Fill-only imports are append-only for every taxonomy.
 			$retained_terms = array();
+			$prior_artists  = 'created' !== $action ? $this->taxonomy_assigner->orderedArtistIds( $post_id ) : array(
+				'ids'     => array(),
+				'ordered' => false,
+			);
 			if ( 'created' !== $action ) {
 				foreach ( $fill_only ? get_object_taxonomies( Event_Post_Type::POST_TYPE ) : array( 'artist', 'festival' ) as $taxonomy ) {
 					if ( ! taxonomy_exists( $taxonomy ) ) {
@@ -720,6 +739,9 @@ class EventUpsert extends UpsertHandler {
 			$handler_config_for_tax['taxonomy_artist_selection'] = 'skip';
 			$this->taxonomy_handler->processTaxonomies( $post_id, $parameters, $handler_config_for_tax, $engine_data_array );
 			$artist_result = $this->taxonomy_assigner->assignArtists( $post_id, $parameters['artist'], $artist_selection, $this->taxonomy_handler );
+			// The lineup was just written non-append, so core stored its billing
+			// order; a pre-selected artist appended after it carries order 0.
+			$incoming_artists = $this->taxonomy_assigner->orderedArtistIds( $post_id )['ids'];
 			if ( is_array( $artist_result ) && empty( $artist_result['success'] ) ) {
 				do_action(
 					'datamachine_log',
@@ -749,6 +771,18 @@ class EventUpsert extends UpsertHandler {
 					$lifecycle_result = $term_result;
 					return $this->lifecycleErrorResponse( $term_result, $title );
 				}
+			}
+
+			// Billing order: an existing ordered lineup keeps its order and new
+			// artists follow; a legacy (unordered) lineup is led by the incoming
+			// billing. Appended re-adds above otherwise land with term_order 0.
+			$order_groups = $prior_artists['ordered']
+				? array( $prior_artists['ids'], $incoming_artists )
+				: array( $incoming_artists, $prior_artists['ids'] );
+			$order_error  = $this->taxonomy_assigner->persistArtistOrder( $post_id, ...$order_groups );
+			if ( $order_error ) {
+				$lifecycle_result = $order_error;
+				return $this->lifecycleErrorResponse( $order_error, $title );
 			}
 
 			do_action( 'datamachine_event_taxonomy_processed', $post_id );
