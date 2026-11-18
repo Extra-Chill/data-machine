@@ -73,6 +73,40 @@ class GetEventAbilitiesTest extends \WP_UnitTestCase {
 		$this->assertSame( get_permalink( $id ), $result['permalink'] );
 	}
 
+	public function test_taxonomies_include_badge_excluded_lineup_in_billing_order(): void {
+		global $wp_taxonomies;
+		$previous = $wp_taxonomies['artist'] ?? null;
+		register_taxonomy( 'artist', Event_Post_Type::POST_TYPE, array( 'sort' => true ) );
+		$exclude = static function ( $excluded ) {
+			$excluded[] = 'artist';
+			return $excluded;
+		};
+		add_filter( 'data_machine_events_excluded_taxonomies', $exclude );
+
+		try {
+			$id = $this->seed();
+			wp_set_object_terms( $id, array( 'Zed Headliner', 'Alpha Support', 'Mid Opener' ), 'artist' );
+
+			wp_set_current_user( 0 );
+			$result = ( new GetEventAbilities() )->executeGetEvent( array( 'event_id' => $id ) );
+
+			$this->assertIsArray( $result );
+			$this->assertSame(
+				array( 'Zed Headliner', 'Alpha Support', 'Mid Opener' ),
+				array_column( $result['taxonomies']['artist'] ?? array(), 'name' ),
+				'get-event returns the lineup despite the badge exclusion, in stored order'
+			);
+			$this->assertStringNotContainsString( 'Zed Headliner', \DataMachineEvents\Blocks\Calendar\Taxonomy\Badges::render_taxonomy_badges( $id ), 'badges still honor the exclusion' );
+		} finally {
+			remove_filter( 'data_machine_events_excluded_taxonomies', $exclude );
+			if ( $previous ) {
+				$wp_taxonomies['artist'] = $previous; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+			} else {
+				unregister_taxonomy( 'artist' );
+			}
+		}
+	}
+
 	public function test_draft_missing_and_wrong_post_type_return_404(): void {
 		$ability = new GetEventAbilities();
 		foreach ( array( $this->seed( 'draft' ), $this->seed( 'private' ), $this->seed( 'publish', 'post' ), 99999999, 0 ) as $id ) {

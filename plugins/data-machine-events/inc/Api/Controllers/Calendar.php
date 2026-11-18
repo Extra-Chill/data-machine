@@ -46,6 +46,7 @@ use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
+use DataMachineEvents\Core\Event_Post_Type;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 
 /**
@@ -368,9 +369,10 @@ class Calendar {
 	 *   off it).
 	 * - `badges_html` ships the server-rendered, filter-applied badge markup
 	 *   (via `Badges::render_taxonomy_badges()`) so client-rendered cards can
-	 *   honor the badge-class filters themes hook for styling. The raw
-	 *   `taxonomies` map is still provided for any consumer that wants to
-	 *   render badges itself. See #381.
+	 *   honor the badge-class filters themes hook for styling. `badges_html`
+	 *   is authoritative for badges; the raw `taxonomies` map is unfiltered
+	 *   event data (it includes taxonomies the badge filter hides, e.g. a
+	 *   lineup). See #381, #3999.
 	 * - `button_classes` ships the server-filtered "More Info" button class
 	 *   list (via the `data_machine_events_more_info_button_classes` filter)
 	 *   for the same client-render parity reason. See #381.
@@ -536,20 +538,27 @@ class Calendar {
 	/**
 	 * Serialize taxonomy term assignments for an event.
 	 *
-	 * Honors the `data_machine_events_excluded_taxonomies` filter (context:
-	 * 'badge') so the data envelope matches what the badge HTML would have
-	 * surfaced. Returns a `slug => [{term_id, name, slug, link}, ...]` map.
+	 * This is event data, not presentation: every taxonomy on the event post
+	 * type is included regardless of the `data_machine_events_excluded_taxonomies`
+	 * badge filter (badge markup ships separately in `badges_html`). Terms of
+	 * sort-enabled taxonomies (core `'sort' => true`, e.g. a lineup) keep their
+	 * stored per-object order. Returns a `slug => [{term_id, name, slug, link}, ...]` map.
 	 *
 	 * @param int $post_id Event post ID.
 	 * @return array<string,array<int,array<string,mixed>>>
 	 */
 	private function serialize_taxonomies( int $post_id ): array {
-		$taxonomies = Badges::get_event_taxonomies( $post_id );
-		$out        = array();
+		$out = array();
 
-		foreach ( $taxonomies as $taxonomy_slug => $bundle ) {
-			$terms = $bundle['terms'] ?? array();
-			$list  = array();
+		foreach ( get_object_taxonomies( Event_Post_Type::POST_TYPE, 'objects' ) as $taxonomy_slug => $taxonomy ) {
+			$terms = ! empty( $taxonomy->sort )
+				? wp_get_object_terms( $post_id, $taxonomy_slug, array( 'orderby' => 'term_order' ) )
+				: get_the_terms( $post_id, $taxonomy_slug );
+			if ( ! is_array( $terms ) || empty( $terms ) ) {
+				continue;
+			}
+
+			$list = array();
 			foreach ( $terms as $term ) {
 				$link   = get_term_link( $term, $taxonomy_slug );
 				$list[] = array(
@@ -559,9 +568,7 @@ class Calendar {
 					'link'    => is_wp_error( $link ) ? '' : (string) $link,
 				);
 			}
-			if ( ! empty( $list ) ) {
-				$out[ $taxonomy_slug ] = $list;
-			}
+			$out[ $taxonomy_slug ] = $list;
 		}
 
 		return $out;
