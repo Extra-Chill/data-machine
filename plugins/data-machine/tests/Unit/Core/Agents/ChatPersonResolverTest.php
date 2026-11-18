@@ -252,6 +252,50 @@ class ChatPersonResolverTest extends WP_UnitTestCase {
 		$this->assertStringContainsString( (string) $this->viewer_id, $first['content'] );
 	}
 
+	public function test_current_speaker_section_carries_live_role_display_names(): void {
+		$this->grant( $this->viewer_id, 'viewer' );
+		ChatIdentityLinks::link( $this->viewer_id, self::PLATFORM, 'v' );
+
+		$content = $this->resolve( 'v', 'turn' )['sections'][0]['content'];
+		$this->assertSame(
+			sprintf( 'The current speaker is WordPress user ID %d (roles on this site: Subscriber).', $this->viewer_id ),
+			$content
+		);
+
+		// A role change is reflected on the next turn without any file edit.
+		$user = new \WP_User( $this->viewer_id );
+		$user->set_role( 'editor' );
+		$user->add_role( 'author' );
+
+		$content = $this->resolve( 'v', 'turn' )['sections'][0]['content'];
+		$this->assertSame(
+			sprintf( 'The current speaker is WordPress user ID %d (roles on this site: Editor, Author).', $this->viewer_id ),
+			$content
+		);
+		$this->assertStringNotContainsString( 'Subscriber', $content );
+	}
+
+	public function test_current_speaker_section_omits_roles_when_user_has_none(): void {
+		$this->grant( $this->viewer_id, 'viewer' );
+		ChatIdentityLinks::link( $this->viewer_id, self::PLATFORM, 'v' );
+		( new \WP_User( $this->viewer_id ) )->set_role( '' );
+
+		$this->assertSame(
+			sprintf( 'The current speaker is WordPress user ID %d.', $this->viewer_id ),
+			$this->resolve( 'v', 'turn' )['sections'][0]['content']
+		);
+	}
+
+	public function test_scaffolded_user_md_has_no_role_snapshot(): void {
+		$content = datamachine_scaffold_user_content( '', 'USER.md', array( 'user_id' => $this->viewer_id ) );
+
+		$this->assertStringContainsString( '# User Profile', $content );
+		$this->assertStringNotContainsString( '**Role:**', $content );
+
+		$defaults = datamachine_get_scaffold_defaults();
+		$this->assertStringNotContainsString( '**Role:**', $defaults['USER.md'] );
+	}
+
 	public function test_turn_never_includes_another_users_memory(): void {
 		$this->grant( $this->viewer_id, 'viewer' );
 		$this->grant( $this->other_id, 'viewer' );
