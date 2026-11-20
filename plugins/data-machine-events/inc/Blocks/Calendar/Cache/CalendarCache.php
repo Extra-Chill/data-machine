@@ -414,9 +414,9 @@ class CalendarCache {
 		$ttl = self::TTL_FULL_UPCOMING;
 		if ( '' !== $transition ) {
 			$boundary = new \DateTimeImmutable( $transition, wp_timezone() );
-			$ttl = max( 1, $boundary->getTimestamp() - current_datetime()->getTimestamp() + 1 );
+			$ttl      = max( 1, $boundary->getTimestamp() - current_datetime()->getTimestamp() + 1 );
 		}
-		$entry = array(
+		$entry                     = array(
 			'value'   => $transition,
 			'expires' => current_datetime()->modify( '+' . $ttl . ' seconds' )->format( 'Y-m-d H:i:s' ),
 		);

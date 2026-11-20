@@ -230,7 +230,10 @@ class UpcomingCountAbilities {
 				? self::inventoryCacheKey( $taxonomy, $exclude_roots )
 				: CalendarCache::generate_key(
 					array(
-						'tax_filters' => array( 'taxonomy' => $taxonomy, 'exclude_roots' => $exclude_roots ),
+						'tax_filters' => array(
+'taxonomy'      => $taxonomy,
+'exclude_roots' => $exclude_roots
+),
 						'scope_token' => wp_cache_get_last_changed( 'terms' ) . ':location:' . $filter_term_id,
 					),
 					'upcoming_counts'

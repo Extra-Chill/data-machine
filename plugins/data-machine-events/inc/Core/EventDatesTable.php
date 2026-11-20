@@ -35,7 +35,7 @@ class EventDatesTable {
 	/**
 	 * Object cache group for per-post event date rows.
 	 */
-	public const CACHE_GROUP = 'datamachine_event_dates';
+	public const CACHE_GROUP    = 'datamachine_event_dates';
 	public const SCHEMA_VERSION = 2;
 
 	/** Upgrade active installations as well as fresh activations. */

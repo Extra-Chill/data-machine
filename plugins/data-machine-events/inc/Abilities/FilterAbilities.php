@@ -600,9 +600,9 @@ class FilterAbilities {
 		$cache_key   = ( $is_past ? CalendarCache::PAST_PREFIX : CalendarCache::PREFIX ) . 'filter_inventory_' . md5(
 			(string) wp_json_encode(
 				array(
-					'taxonomies'  => $taxonomy_slugs,
-					'query'       => $query_input,
-					'past_bucket' => $is_past ? CalendarCache::past_time_bucket() : '',
+					'taxonomies'      => $taxonomy_slugs,
+					'query'           => $query_input,
+					'past_bucket'     => $is_past ? CalendarCache::past_time_bucket() : '',
 					'next_transition' => ! $is_past && empty( $query_input['date_start'] ) && empty( $query_input['date_end'] )
 						? CalendarCache::next_upcoming_transition() : '',
 				)

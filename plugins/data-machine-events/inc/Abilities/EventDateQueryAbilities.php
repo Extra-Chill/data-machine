@@ -447,7 +447,7 @@ class EventDateQueryAbilities {
 			&& '' === $date_match && '' !== $date_start && '' !== $date_end
 			&& in_array( $fields, array( 'ids', 'all' ), true )
 			&& ! $this->hasCustomizedMatchingQuery( $input ) ) {
-			return $this->executeWindowQuery( $query_args, $date_start . ' ' . ( $time_start ?: '00:00:00' ), $date_end . ' ' . ( $time_end ?: '23:59:59' ), $fields, $order, $per_page, $page );
+			return $this->executeWindowQuery( $query_args, $date_start . ' ' . ( $time_start ? $time_start : '00:00:00' ), $date_end . ' ' . ( $time_end ? $time_end : '23:59:59' ), $fields, $order, $per_page, $page );
 		}
 
 		// Build the posts_clauses filter for date filtering + ordering.
@@ -590,16 +590,20 @@ class EventDateQueryAbilities {
 			$parent_query = array( 'relation' => 'AND' );
 			$tax_query->get_sql_for_clause( $clause, $parent_query );
 			if ( is_wp_error( $clause ) || empty( $clause['terms'] ) ) {
-				return array( 'posts' => array(), 'total' => 0, 'post_count' => 0 );
+				return array(
+'posts'      => array(),
+'total'      => 0,
+'post_count' => 0
+);
 			}
-			$ids = implode( ',', array_map( 'absint', $clause['terms'] ) );
+			$ids    = implode( ',', array_map( 'absint', $clause['terms'] ) );
 			$where .= " AND EXISTS (SELECT 1 FROM {$wpdb->term_relationships} tr WHERE tr.object_id = ed.post_id AND tr.term_taxonomy_id IN ({$ids}))";
 		}
 		$first = $wpdb->prepare( 'ed.start_datetime BETWEEN %s AND %s', $start, $end );
 		// Retain the upper bound even for reversed windows: long-running events
 		// can still match the canonical overlap predicate in that case.
 		$second = $wpdb->prepare( 'ed.end_datetime >= %s AND ed.start_datetime < %s AND ed.start_datetime <= %s', $start, $start, $end );
-		$sql = "SELECT post_id FROM (
+		$sql    = "SELECT post_id FROM (
 			SELECT ed.post_id, ed.start_datetime FROM {$table} ed FORCE INDEX (status_start)
 			STRAIGHT_JOIN {$wpdb->posts} p ON p.ID = ed.post_id WHERE {$where} AND {$first}
 			UNION ALL
@@ -614,7 +618,11 @@ class EventDateQueryAbilities {
 			_prime_post_caches( $posts, true, true );
 			$posts = array_map( 'get_post', $posts );
 		}
-		return array( 'posts' => $posts, 'total' => count( $posts ), 'post_count' => count( $posts ) );
+		return array(
+'posts'      => $posts,
+'total'      => count( $posts ),
+'post_count' => count( $posts )
+);
 	}
 
 	/**
