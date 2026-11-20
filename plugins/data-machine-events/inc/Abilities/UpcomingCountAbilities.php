@@ -247,7 +247,7 @@ class UpcomingCountAbilities {
 		global $wpdb;
 
 		$now            = current_time( 'mysql' );
-		$upcoming_sql   = UpcomingFilter::upcoming_sql( true, 'tr.object_id' );
+		$upcoming_sql   = UpcomingFilter::upcoming_sql( false, 'tr.object_id' );
 		$upcoming_join  = $upcoming_sql['joins'];
 		$upcoming_where = $upcoming_sql['where'];
 

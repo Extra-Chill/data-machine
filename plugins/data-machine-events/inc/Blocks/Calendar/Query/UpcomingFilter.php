@@ -10,9 +10,9 @@
  *   upcoming = start >= $datetime  OR  end >= $datetime
  *   past     = start <  $datetime  AND (end < $datetime OR end IS NULL)
  *
- * effective_end is the stored COALESCE(end_datetime, start_datetime).
- * Valid event ends are on/after their starts, so this is equivalent to the
- * original OR predicate and permits a status_effective_end range scan.
+ * effective_end is the stored later of start_datetime and end_datetime, so
+ * `effective_end >= X` is exactly the original OR predicate and permits an
+ * effective_end range scan.
  *
  * @package DataMachineEvents\Blocks\Calendar\Query
  * @since   0.25.0
@@ -42,7 +42,7 @@ class UpcomingFilter {
 		global $wpdb;
 
 		return $wpdb->prepare(
-			"(ed.post_status = 'publish' AND ed.effective_end >= %s)",
+			'(ed.effective_end >= %s)',
 			$datetime
 		);
 	}
@@ -58,7 +58,7 @@ class UpcomingFilter {
 		global $wpdb;
 
 		return $wpdb->prepare(
-			"(ed.post_status = 'publish' AND ed.effective_end >= %s AND ed.start_datetime <= %s)",
+			'(ed.effective_end >= %s AND ed.start_datetime <= %s)',
 			$datetime,
 			$end_date
 		);

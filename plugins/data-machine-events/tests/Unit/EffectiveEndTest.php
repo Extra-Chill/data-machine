@@ -14,22 +14,32 @@ class EffectiveEndTest extends \WP_UnitTestCase {
 		CalendarCache::invalidate();
 	}
 
-	public function test_generated_column_backfills_and_tracks_all_writes(): void {
+	public function test_effective_end_is_backfilled_and_maintained_by_upsert(): void {
 		global $wpdb;
 		$table = EventDatesTable::table_name();
-		// A private legacy-shaped table avoids destructive DDL on the shared table.
-		$legacy = $table . '_migration_test';
-		$wpdb->query( "CREATE TEMPORARY TABLE {$legacy} (post_id BIGINT PRIMARY KEY, start_datetime DATETIME, end_datetime DATETIME, post_status VARCHAR(20))" );
-		try {
-			$wpdb->query( "INSERT INTO {$legacy} VALUES (1, '2099-01-01 12:00:00', NULL, 'publish')" );
-			$wpdb->query( "ALTER TABLE {$legacy} ADD effective_end DATETIME GENERATED ALWAYS AS (COALESCE(end_datetime, start_datetime)) STORED, ADD KEY status_effective_end (post_status, effective_end, post_id)" );
-			$this->assertSame( '2099-01-01 12:00:00', $wpdb->get_var( "SELECT effective_end FROM {$legacy}" ) );
-			$wpdb->query( "UPDATE {$legacy} SET end_datetime = '2099-01-02 12:00:00'" );
-			$this->assertSame( '2099-01-02 12:00:00', $wpdb->get_var( "SELECT effective_end FROM {$legacy}" ) );
-		} finally {
-			$wpdb->query( "DROP TEMPORARY TABLE {$legacy}" );
-		}
-		$this->assertCount( 3, $wpdb->get_results( "SHOW INDEX FROM {$table} WHERE Key_name = 'status_effective_end'" ) );
+		$id    = self::factory()->post->create( array( 'post_type' => 'data_machine_events', 'post_status' => 'publish' ) );
+
+		// A row written before the column existed has no effective_end.
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE post_id = %d", $id ) );
+		$wpdb->insert(
+			$table,
+			array(
+				'post_id'        => $id,
+				'start_datetime' => '2099-01-01 12:00:00',
+				'post_status'    => 'publish',
+			)
+		);
+		$this->assertNull( $wpdb->get_var( $wpdb->prepare( "SELECT effective_end FROM {$table} WHERE post_id = %d", $id ) ) );
+
+		EventDatesTable::create_table();
+		$this->assertSame( '2099-01-01 12:00:00', $wpdb->get_var( $wpdb->prepare( "SELECT effective_end FROM {$table} WHERE post_id = %d", $id ) ) );
+
+		$this->assertTrue( EventDatesTable::upsert( $id, '2099-01-01 12:00:00', '2099-01-02 12:00:00' ) );
+		$this->assertSame( '2099-01-02 12:00:00', $wpdb->get_var( $wpdb->prepare( "SELECT effective_end FROM {$table} WHERE post_id = %d", $id ) ) );
+
+		$this->assertTrue( EventDatesTable::upsert( $id, '2099-01-05 12:00:00', null ) );
+		$this->assertSame( '2099-01-05 12:00:00', $wpdb->get_var( $wpdb->prepare( "SELECT effective_end FROM {$table} WHERE post_id = %d", $id ) ) );
+		$this->assertSame( EventDatesTable::SCHEMA_VERSION, (int) get_option( 'datamachine_event_dates_schema_version' ) );
 	}
 
 	public function test_predicate_equivalence_for_null_end_ongoing_multiday_and_boundary(): void {
@@ -43,6 +53,8 @@ class EffectiveEndTest extends \WP_UnitTestCase {
 			array( '2099-01-02 11:00:00', '2099-01-02 13:00:00', true ),
 			array( '2099-01-02 11:00:00', $now, true ),
 			array( '2099-01-01 11:00:00', '2099-01-01 13:00:00', false ),
+			// Preserved end-before-start rows still match on their start.
+			array( '2099-01-03 12:00:00', '2099-01-03 10:00:00', true ),
 		);
 		foreach ( $cases as $case ) {
 			$id = self::factory()->post->create( array( 'post_type' => 'data_machine_events', 'post_status' => 'publish' ) );
