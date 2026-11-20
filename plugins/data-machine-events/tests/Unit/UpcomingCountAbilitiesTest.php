@@ -237,6 +237,40 @@ class UpcomingCountAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $by_id[ $venue_b ] );
 	}
 
+	public function test_location_scoped_counts_hit_cache_and_isolate_locations(): void {
+		$venue = $this->make_venue( 'Scoped Cached Venue' );
+		$event = $this->seed_upcoming_event( $venue );
+		$city = wp_insert_term( 'Cache City', 'location' );
+		$other = wp_insert_term( 'Other Cache City', 'location' );
+		wp_set_object_terms( $event, array( $city['term_id'] ), 'location' );
+		$input = array( 'taxonomy' => 'venue', 'filter_taxonomy' => 'location', 'filter_term_id' => $city['term_id'] );
+		$first = $this->abilities->executeGetUpcomingCounts( $input );
+		$this->assertSame( 1, array_column( $first['terms'], 'count', 'term_id' )[ $venue ] );
+		$aggregates = 0;
+		$record = static function ( $sql ) use ( &$aggregates ) {
+			if ( str_contains( $sql, 'counts.event_count' ) ) {
+				++$aggregates;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $record );
+		try {
+			$this->assertSame( $first, $this->abilities->executeGetUpcomingCounts( $input ) );
+			$this->assertSame( 0, $aggregates );
+			$input['filter_term_id'] = $other['term_id'];
+			$this->assertSame( 0, $this->abilities->executeGetUpcomingCounts( $input )['total'] );
+			$this->assertSame( 1, $aggregates );
+			CalendarCache::invalidate();
+			$this->abilities->executeGetUpcomingCounts( $input );
+			$this->assertSame( 2, $aggregates );
+			wp_cache_set_terms_last_changed();
+			$this->abilities->executeGetUpcomingCounts( $input );
+			$this->assertSame( 3, $aggregates );
+		} finally {
+			remove_filter( 'query', $record );
+		}
+	}
+
 	public function test_unfiltered_counts_use_cache_until_calendar_invalidation(): void {
 		global $wpdb;
 

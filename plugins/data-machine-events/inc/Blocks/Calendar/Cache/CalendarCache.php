@@ -45,6 +45,14 @@ class CalendarCache {
 	const TTL_FULL_UPCOMING      = HOUR_IN_SECONDS;
 	const TTL_FULL_PAST          = 24 * HOUR_IN_SECONDS;
 
+	/** Request-local, site/generation-scoped transition entries. */
+	private static array $transitions = array();
+
+	/** Forget request-local state (also useful to long-running workers). */
+	public static function reset_transitions(): void {
+		self::$transitions = array();
+	}
+
 	/**
 	 * Get a cached value (transient-backed bucket cache).
 	 *
@@ -246,6 +254,7 @@ class CalendarCache {
 	 * @param bool $include_past Whether this mutation can affect past results.
 	 */
 	public static function invalidate( bool $include_past = true ): void {
+		self::reset_transitions();
 		if ( $include_past ) {
 			self::invalidate_past();
 		}
@@ -380,28 +389,40 @@ class CalendarCache {
 		global $wpdb;
 
 		$now   = current_time( 'mysql' );
-		$table = EventDatesTable::table_name();
-		$sql   = $wpdb->prepare(
-			"SELECT MIN(transition_datetime)
-			FROM (
-				SELECT MIN(end_datetime) AS transition_datetime
-				FROM %i
-				WHERE post_status = 'publish' AND end_datetime >= %s
-				UNION ALL
-				SELECT MIN(start_datetime) AS transition_datetime
-				FROM %i
-				WHERE post_status = 'publish' AND end_datetime IS NULL AND start_datetime >= %s
-			) upcoming_transitions",
-			$table,
-			$now,
-			$table,
+		$key   = 'transition_' . get_current_blog_id() . '_' . self::get_generation();
+		$entry = self::$transitions[ $key ] ?? wp_cache_get( $key, self::GROUP );
+		// Inclusive eligibility: a transition is still valid at its exact second.
+		if ( is_array( $entry ) && ( '' === $entry['value'] ? $entry['expires'] >= $now : $entry['value'] >= $now ) ) {
+			self::$transitions[ $key ] = $entry;
+			return $entry['value'];
+		}
+
+		$sql = $wpdb->prepare(
+			"SELECT MIN(effective_end) FROM %i
+			WHERE post_status = 'publish' AND effective_end >= %s",
+			EventDatesTable::table_name(),
 			$now
 		);
-
+		// Covered by (post_status, effective_end, post_id): no table-row reads.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.NotPrepared
 		$transition = $wpdb->get_var( $sql );
+		$transition = is_string( $transition ) ? $transition : '';
+		if ( '' !== $wpdb->last_error ) {
+			return $transition;
+		}
 
-		return is_string( $transition ) ? $transition : '';
+		$ttl = self::TTL_FULL_UPCOMING;
+		if ( '' !== $transition ) {
+			$boundary = new \DateTimeImmutable( $transition, wp_timezone() );
+			$ttl      = max( 1, $boundary->getTimestamp() - current_datetime()->getTimestamp() + 1 );
+		}
+		$entry                     = array(
+			'value'   => $transition,
+			'expires' => current_datetime()->modify( '+' . $ttl . ' seconds' )->format( 'Y-m-d H:i:s' ),
+		);
+		self::$transitions[ $key ] = $entry;
+		wp_cache_set( $key, $entry, self::GROUP, $ttl );
+		return $transition;
 	}
 
 	/**

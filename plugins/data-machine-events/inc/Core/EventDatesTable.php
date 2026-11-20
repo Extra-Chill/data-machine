@@ -35,7 +35,28 @@ class EventDatesTable {
 	/**
 	 * Object cache group for per-post event date rows.
 	 */
-	public const CACHE_GROUP = 'datamachine_event_dates';
+	public const CACHE_GROUP    = 'datamachine_event_dates';
+	public const SCHEMA_VERSION = 2;
+
+	/** Upgrade active installations as well as fresh activations. */
+	public static function maybe_upgrade(): void {
+		if ( self::SCHEMA_VERSION === (int) get_option( 'datamachine_event_dates_schema_version', 0 ) ) {
+			return;
+		}
+		// One request migrates; concurrent requests skip instead of racing the ALTER.
+		if ( ! add_option( 'datamachine_event_dates_upgrading', time(), '', false ) ) {
+			$started = (int) get_option( 'datamachine_event_dates_upgrading', 0 );
+			if ( $started > time() - 10 * MINUTE_IN_SECONDS ) {
+				return;
+			}
+			update_option( 'datamachine_event_dates_upgrading', time(), false );
+		}
+		try {
+			self::create_table();
+		} finally {
+			delete_option( 'datamachine_event_dates_upgrading' );
+		}
+	}
 
 
 	/**
@@ -61,15 +82,36 @@ class EventDatesTable {
 			post_id        BIGINT UNSIGNED NOT NULL,
 			start_datetime DATETIME NOT NULL,
 			end_datetime   DATETIME DEFAULT NULL,
+			effective_end  DATETIME DEFAULT NULL,
 			post_status    VARCHAR(20) NOT NULL DEFAULT 'publish',
 			PRIMARY KEY (post_id),
 			KEY start_datetime (start_datetime),
 			KEY end_datetime (end_datetime),
-			KEY status_start (post_status, start_datetime)
+			KEY status_start (post_status, start_datetime),
+			KEY effective_end (effective_end, post_id),
+			KEY status_effective_end (post_status, effective_end, post_id)
 		) ENGINE=InnoDB {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+
+		// effective_end = the later of start_datetime and end_datetime (start when
+		// end is NULL), maintained by upsert(). Taking the later value keeps
+		// `effective_end >= X` exactly equal to `start >= X OR end >= X`, even
+		// for preserved rows whose end precedes their start. A plain column (not GENERATED) keeps the schema portable to
+		// every database WordPress runs on. Backfill rows written before it existed;
+		// do not mark a failed migration complete so it retries on the next load.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$column = $wpdb->get_row( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table, 'effective_end' ) );
+		if ( $column ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( $wpdb->prepare( 'UPDATE %i SET effective_end = GREATEST(start_datetime, COALESCE(end_datetime, start_datetime)) WHERE effective_end IS NULL', $table ) );
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$index = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'status_effective_end' ) );
+		if ( $column && ! empty( $index ) ) {
+			update_option( 'datamachine_event_dates_schema_version', self::SCHEMA_VERSION, false );
+		}
 	}
 
 	/**
@@ -179,9 +221,10 @@ class EventDatesTable {
 				'post_id'        => $post_id,
 				'start_datetime' => $start_datetime,
 				'end_datetime'   => $end_datetime,
+				'effective_end'  => null !== $end_datetime && $end_datetime > $start_datetime ? $end_datetime : $start_datetime,
 				'post_status'    => $post_status,
 			),
-			array( '%d', '%s', $end_datetime ? '%s' : null, '%s' )
+			array( '%d', '%s', $end_datetime ? '%s' : null, '%s', '%s' )
 		);
 		self::flush_cache( $post_id );
 

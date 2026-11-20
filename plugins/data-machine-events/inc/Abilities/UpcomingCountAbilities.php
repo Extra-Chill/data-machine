@@ -221,13 +221,23 @@ class UpcomingCountAbilities {
 			return $this->executeRollupCounts( $taxonomy, $exclude_roots, $has_filter, $filter_taxonomy, $filter_term_id );
 		}
 
-		// The four unfiltered inventory shapes are shared by badge, directory,
-		// and stats consumers. Reuse Calendar's generation and time-transition
-		// cache so each shape is aggregated once per inventory state, without
+		// Inventory and location-scoped shapes share Calendar's generation and
+		// transition TTL. Other co-occurrence filters stay uncached to avoid
 		// creating per-term entries for the long artist tail.
 		$cache_key = '';
-		if ( ! $has_filter ) {
-			$cache_key = self::inventoryCacheKey( $taxonomy, $exclude_roots );
+		if ( ! $has_filter || 'location' === $filter_taxonomy ) {
+			$cache_key = ! $has_filter
+				? self::inventoryCacheKey( $taxonomy, $exclude_roots )
+				: CalendarCache::generate_key(
+					array(
+						'tax_filters' => array(
+							'taxonomy'      => $taxonomy,
+							'exclude_roots' => $exclude_roots,
+						),
+						'scope_token' => wp_cache_get_last_changed( 'terms' ) . ':location:' . $filter_term_id,
+					),
+					'upcoming_counts'
+				);
 			$cached    = CalendarCache::get( $cache_key, $cache_generation );
 			if ( is_array( $cached ) ) {
 				return $cached;
@@ -242,7 +252,7 @@ class UpcomingCountAbilities {
 		$upcoming_where = $upcoming_sql['where'];
 
 		$parent_clause = $exclude_roots ? 'AND tt.parent != 0' : '';
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Table names and optional clauses are internally constructed; request values remain prepared. The interpolated UpcomingFilter clause carries two %s placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- Table names and optional clauses are internally constructed; request values remain prepared. The interpolated UpcomingFilter clause carries one %s placeholder.
 
 		if ( $has_filter ) {
 			// Co-occurrence join: require each counted post to ALSO be tagged
@@ -273,7 +283,6 @@ class UpcomingCountAbilities {
 					ORDER BY counts.event_count DESC",
 					$taxonomy,
 					$now,
-					$now,
 					Event_Post_Type::POST_TYPE,
 					$filter_taxonomy,
 					$filter_term_id
@@ -302,7 +311,6 @@ class UpcomingCountAbilities {
 					INNER JOIN {$wpdb->terms} t ON t.term_id = counts.term_id
 					ORDER BY counts.event_count DESC",
 					$taxonomy,
-					$now,
 					$now,
 					Event_Post_Type::POST_TYPE
 				)
@@ -368,7 +376,7 @@ class UpcomingCountAbilities {
 
 		// Pull every (term_id, object_id) pair for upcoming published events
 		// in this taxonomy. One pass; deduped per-ancestor in PHP below.
-		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The event dates table name is internally generated; request values remain prepared. The interpolated UpcomingFilter clause carries two %s placeholders.
+		// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- The event dates table name is internally generated; request values remain prepared. The interpolated UpcomingFilter clause carries one %s placeholder.
 		if ( $has_filter ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$pairs = $wpdb->get_results(
@@ -385,7 +393,6 @@ class UpcomingCountAbilities {
 					AND f_tt.term_id = %d",
 					$taxonomy,
 					$now,
-					$now,
 					$filter_taxonomy,
 					$filter_term_id
 				)
@@ -401,7 +408,6 @@ class UpcomingCountAbilities {
 					WHERE tt.taxonomy = %s
 					AND {$upcoming_where}",
 					$taxonomy,
-					$now,
 					$now
 				)
 			);

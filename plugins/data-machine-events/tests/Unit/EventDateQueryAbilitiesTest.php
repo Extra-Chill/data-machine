@@ -293,7 +293,7 @@ class EventDateQueryAbilitiesTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $queries );
 		$this->assertStringContainsString( 'FORCE INDEX (term_taxonomy_id)', $queries[0] );
 		$this->assertStringContainsString( "ed.post_status = 'publish'", $queries[0] );
-		$this->assertStringContainsString( 'ed.end_datetime >=', $queries[0] );
+		$this->assertStringContainsString( 'ed.effective_end >=', $queries[0] );
 		$this->assertStringContainsString( 'GROUP BY ed.post_id, ed.start_datetime', $queries[0] );
 		$this->assertMatchesRegularExpression( '/ORDER BY ed\.start_datetime ASC, ed\.post_id ASC\s+LIMIT 100 OFFSET 0/i', $queries[0] );
 		$this->assertStringNotContainsString( $GLOBALS['wpdb']->posts, $queries[0] );
