@@ -96,16 +96,117 @@ class EventBlockContentBuilder {
 	}
 
 	/**
-	 * Generate paragraph blocks from HTML description
+	 * Block-level HTML tags that must never be nested inside a paragraph.
+	 *
+	 * @var string[]
+	 */
+	private const BLOCK_LEVEL_TAGS = array(
+		'address',
+		'article',
+		'aside',
+		'blockquote',
+		'details',
+		'dl',
+		'div',
+		'figure',
+		'figcaption',
+		'footer',
+		'form',
+		'h1',
+		'h2',
+		'h3',
+		'h4',
+		'h5',
+		'h6',
+		'header',
+		'hr',
+		'iframe',
+		'nav',
+		'ol',
+		'pre',
+		'section',
+		'table',
+		'ul',
+		'video',
+		'audio',
+	);
+
+	/**
+	 * Generate inner blocks from an HTML description.
+	 *
+	 * - Content that already carries block comments passes through unchanged.
+	 * - Content with block-level HTML is converted via html-to-blocks-converter
+	 *   when available, otherwise preserved inside a core/html block.
+	 * - Plain text and inline-only HTML becomes paragraph blocks.
 	 *
 	 * @param string $description HTML description content
-	 * @return string InnerBlocks content with proper paragraph blocks
+	 * @return string InnerBlocks content
 	 */
 	private function generate_description_blocks( string $description ): string {
-		if ( empty( $description ) ) {
+		$description = trim( $description );
+		if ( '' === $description ) {
 			return '';
 		}
 
+		if ( false !== strpos( $description, '<!-- wp:' ) ) {
+			return $description;
+		}
+
+		if ( self::contains_block_level_html( $description ) ) {
+			return $this->convert_block_level_html( $description );
+		}
+
+		return $this->generate_paragraph_blocks( $description );
+	}
+
+	/**
+	 * Whether the HTML contains any block-level tag.
+	 *
+	 * @param string $html HTML content.
+	 * @return bool
+	 */
+	private static function contains_block_level_html( string $html ): bool {
+		$pattern = '/<(?:' . implode( '|', self::BLOCK_LEVEL_TAGS ) . ')(?=[\s>\/])/i';
+		if ( 1 === preg_match( $pattern, $html ) ) {
+			return true;
+		}
+
+		// An <img> inside a paragraph is inline; a standalone one is not.
+		$outside_paragraphs = preg_replace( '/<p(?=[\s>])[^>]*>.*?<\/p>/is', '', $html );
+		return 1 === preg_match( '/<img(?=[\s>\/])/i', (string) $outside_paragraphs );
+	}
+
+	/**
+	 * Convert block-level HTML to serialized blocks.
+	 *
+	 * Uses html_to_blocks_convert() from the html-to-blocks-converter plugin
+	 * when present. Falls back to a core/html block so block-level markup is
+	 * never nested inside a paragraph.
+	 *
+	 * @param string $html HTML content.
+	 * @return string Serialized block markup.
+	 */
+	private function convert_block_level_html( string $html ): string {
+		if ( function_exists( 'html_to_blocks_convert' ) && function_exists( 'serialize_blocks' ) ) {
+			$blocks = html_to_blocks_convert( $html );
+			if ( is_array( $blocks ) && ! empty( $blocks ) ) {
+				$serialized = trim( (string) serialize_blocks( array_values( array_filter( $blocks ) ) ) );
+				if ( '' !== $serialized ) {
+					return $serialized;
+				}
+			}
+		}
+
+		return '<!-- wp:html -->' . "\n" . $html . "\n" . '<!-- /wp:html -->';
+	}
+
+	/**
+	 * Generate paragraph blocks from plain text or inline-only HTML.
+	 *
+	 * @param string $description Description content.
+	 * @return string Paragraph block markup.
+	 */
+	private function generate_paragraph_blocks( string $description ): string {
 		// Split on closing/opening p tags or double line breaks
 		$paragraphs = preg_split( '/<\/p>\s*<p[^>]*>|<\/p>\s*<p>|\n\n+/', $description );
 		if ( false === $paragraphs ) {
