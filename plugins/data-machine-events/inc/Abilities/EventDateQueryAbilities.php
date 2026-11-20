@@ -697,13 +697,13 @@ class EventDateQueryAbilities {
 		$now         = current_time( 'mysql' );
 		$valid_count = 0;
 		do {
-			$params = array_merge( $taxonomy_ids, $exclude, array( $now, $now, self::TAXONOMY_CANDIDATE_BATCH, $candidate_offset ) );
+			$params = array_merge( $taxonomy_ids, $exclude, array( $now, self::TAXONOMY_CANDIDATE_BATCH, $candidate_offset ) );
 			$sql    = "SELECT ed.post_id
 				FROM {$wpdb->term_relationships} tr FORCE INDEX (term_taxonomy_id)
 				INNER JOIN {$table} ed ON ed.post_id = tr.object_id
 				WHERE tr.term_taxonomy_id IN ({$taxonomy_placeholders}){$exclude_sql}
 					AND ed.post_status = 'publish'
-					AND (ed.start_datetime >= %s OR ed.end_datetime >= %s)
+					AND ed.effective_end >= %s
 				GROUP BY ed.post_id, ed.start_datetime
 				ORDER BY ed.start_datetime {$order}, ed.post_id {$order}
 				LIMIT %d OFFSET %d";

@@ -36,6 +36,14 @@ class EventDatesTable {
 	 * Object cache group for per-post event date rows.
 	 */
 	public const CACHE_GROUP = 'datamachine_event_dates';
+	public const SCHEMA_VERSION = 2;
+
+	/** Upgrade active installations as well as fresh activations. */
+	public static function maybe_upgrade(): void {
+		if ( self::SCHEMA_VERSION !== (int) get_option( 'datamachine_event_dates_schema_version', 0 ) ) {
+			self::create_table();
+		}
+	}
 
 
 	/**
@@ -61,15 +69,27 @@ class EventDatesTable {
 			post_id        BIGINT UNSIGNED NOT NULL,
 			start_datetime DATETIME NOT NULL,
 			end_datetime   DATETIME DEFAULT NULL,
+			effective_end  DATETIME GENERATED ALWAYS AS (COALESCE(end_datetime, start_datetime)) STORED,
 			post_status    VARCHAR(20) NOT NULL DEFAULT 'publish',
 			PRIMARY KEY (post_id),
 			KEY start_datetime (start_datetime),
 			KEY end_datetime (end_datetime),
-			KEY status_start (post_status, start_datetime)
+			KEY status_start (post_status, start_datetime),
+			KEY status_effective_end (post_status, effective_end, post_id)
 		) ENGINE=InnoDB {$charset};";
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql );
+
+		// Adding the STORED generated column materializes/backfills existing rows
+		// atomically. Do not mark a failed ALTER complete; retry on the next load.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$column = $wpdb->get_row( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table, 'effective_end' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$index = $wpdb->get_results( $wpdb->prepare( 'SHOW INDEX FROM %i WHERE Key_name = %s', $table, 'status_effective_end' ) );
+		if ( $column && 3 === count( $index ) ) {
+			update_option( 'datamachine_event_dates_schema_version', self::SCHEMA_VERSION, false );
+		}
 	}
 
 	/**

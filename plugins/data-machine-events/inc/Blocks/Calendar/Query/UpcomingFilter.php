@@ -10,16 +10,9 @@
  *   upcoming = start >= $datetime  OR  end >= $datetime
  *   past     = start <  $datetime  AND (end < $datetime OR end IS NULL)
  *
- * Performance notes:
- *   - The OR across columns (start_datetime, end_datetime) prevents MySQL
- *     from using a single B-tree index for a range scan. However, with
- *     ORDER BY + LIMIT (which is the common case for user-facing queries),
- *     MySQL can use the start_datetime index for the sort and early-exit.
- *   - SQL_CALC_FOUND_ROWS forces MySQL to scan all matching rows even with
- *     LIMIT. Callers must set 'no_found_rows' => true and run a dedicated
- *     count query only when a total is required.
- *   - For raw $wpdb queries (COUNT + GROUP BY without LIMIT), the OR pattern
- *     remains simpler than UNION ALL and avoids materializing event IDs.
+ * effective_end is the stored COALESCE(end_datetime, start_datetime).
+ * Valid event ends are on/after their starts, so this is equivalent to the
+ * original OR predicate and permits a status_effective_end range scan.
  *
  * @package DataMachineEvents\Blocks\Calendar\Query
  * @since   0.25.0
@@ -49,8 +42,7 @@ class UpcomingFilter {
 		global $wpdb;
 
 		return $wpdb->prepare(
-			'(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-			$datetime,
+			"(ed.post_status = 'publish' AND ed.effective_end >= %s)",
 			$datetime
 		);
 	}
@@ -66,8 +58,7 @@ class UpcomingFilter {
 		global $wpdb;
 
 		return $wpdb->prepare(
-			'((ed.start_datetime >= %s OR ed.end_datetime >= %s) AND ed.start_datetime <= %s)',
-			$datetime,
+			"(ed.post_status = 'publish' AND ed.effective_end >= %s AND ed.start_datetime <= %s)",
 			$datetime,
 			$end_date
 		);
@@ -86,8 +77,7 @@ class UpcomingFilter {
 		global $wpdb;
 
 		return $wpdb->prepare(
-			'(ed.start_datetime >= %s OR ed.end_datetime >= %s)',
-			$start_dt,
+			'(ed.effective_end >= %s)',
 			$start_dt
 		);
 	}
@@ -125,8 +115,8 @@ class UpcomingFilter {
 
 		return array(
 			'joins'       => "INNER JOIN {$table} ed ON {$join_column} = ed.post_id",
-			'where'       => "(ed.start_datetime >= %s OR ed.end_datetime >= %s){$status_clause}",
-			'param_count' => 2,
+			'where'       => "(ed.effective_end >= %s){$status_clause}",
+			'param_count' => 1,
 		);
 	}
 

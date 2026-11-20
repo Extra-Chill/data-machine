@@ -603,6 +603,8 @@ class FilterAbilities {
 					'taxonomies'  => $taxonomy_slugs,
 					'query'       => $query_input,
 					'past_bucket' => $is_past ? CalendarCache::past_time_bucket() : '',
+					'next_transition' => ! $is_past && empty( $query_input['date_start'] ) && empty( $query_input['date_end'] )
+						? CalendarCache::next_upcoming_transition() : '',
 				)
 			)
 		);

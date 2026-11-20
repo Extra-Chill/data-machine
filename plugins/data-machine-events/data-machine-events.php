@@ -207,6 +207,7 @@ class DATAMACHINE_Events {
 	}
 
 	public function init() {
+		\DataMachineEvents\Core\EventDatesTable::maybe_upgrade();
 		$this->init_hooks();
 		$this->register_post_types();
 		// Record human edits so imports only fill empty fields (#3910).
