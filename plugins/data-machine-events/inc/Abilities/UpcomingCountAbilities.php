@@ -231,9 +231,9 @@ class UpcomingCountAbilities {
 				: CalendarCache::generate_key(
 					array(
 						'tax_filters' => array(
-'taxonomy'      => $taxonomy,
-'exclude_roots' => $exclude_roots
-),
+							'taxonomy'      => $taxonomy,
+							'exclude_roots' => $exclude_roots,
+						),
 						'scope_token' => wp_cache_get_last_changed( 'terms' ) . ':location:' . $filter_term_id,
 					),
 					'upcoming_counts'

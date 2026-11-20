@@ -589,12 +589,12 @@ class EventDateQueryAbilities {
 			}
 			$parent_query = array( 'relation' => 'AND' );
 			$tax_query->get_sql_for_clause( $clause, $parent_query );
-			if ( is_wp_error( $clause ) || empty( $clause['terms'] ) ) {
+			if ( empty( $clause['terms'] ) ) {
 				return array(
-'posts'      => array(),
-'total'      => 0,
-'post_count' => 0
-);
+					'posts'      => array(),
+					'total'      => 0,
+					'post_count' => 0,
+				);
 			}
 			$ids    = implode( ',', array_map( 'absint', $clause['terms'] ) );
 			$where .= " AND EXISTS (SELECT 1 FROM {$wpdb->term_relationships} tr WHERE tr.object_id = ed.post_id AND tr.term_taxonomy_id IN ({$ids}))";
@@ -619,10 +619,10 @@ class EventDateQueryAbilities {
 			$posts = array_map( 'get_post', $posts );
 		}
 		return array(
-'posts'      => $posts,
-'total'      => count( $posts ),
-'post_count' => count( $posts )
-);
+			'posts'      => $posts,
+			'total'      => count( $posts ),
+			'post_count' => count( $posts ),
+		);
 	}
 
 	/**
