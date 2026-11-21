@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.4] - 2026-11-21
+
+### Fixed
+- allow read-scoped access to public content
+
 ## [0.205.3] - 2026-11-21
 
 ### Fixed
