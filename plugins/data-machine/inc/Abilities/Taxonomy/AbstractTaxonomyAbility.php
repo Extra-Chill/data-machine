@@ -52,11 +52,22 @@ abstract class AbstractTaxonomyAbility {
 	}
 
 	/**
+	 * Writes are the default, including resolve-with-create.
+	 *
+	 * @return bool
+	 */
+	protected function isReadOnly(): bool {
+		return false;
+	}
+
+	/**
 	 * Check permission for taxonomy abilities.
 	 *
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return $this->isReadOnly()
+			? PermissionHelper::can( 'read_content' )
+			: PermissionHelper::can_manage();
 	}
 }

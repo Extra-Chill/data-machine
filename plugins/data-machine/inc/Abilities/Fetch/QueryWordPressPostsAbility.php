@@ -121,7 +121,7 @@ class QueryWordPressPostsAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'read_content' );
 	}
 
 	/**
@@ -197,7 +197,8 @@ class QueryWordPressPostsAbility {
 		}
 
 		$wp_query = new \WP_Query( $query_args );
-		$posts    = $wp_query->posts;
+		// Explicit post_status queries bypass WordPress visibility defaults.
+		$posts = array_values( array_filter( $wp_query->posts, array( PermissionHelper::class, 'can_read_post' ) ) );
 
 		if ( empty( $posts ) ) {
 			$logs[] = array(
