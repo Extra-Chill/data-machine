@@ -218,7 +218,7 @@ class FetchWordPressMediaAbility {
 			// Non-operators get what core's /wp/v2/media would show them:
 			// attachments whose parent post they can read (read_post on an
 			// inherit attachment maps to the parent's status and author).
-			if ( ! $is_manager && ! PermissionHelper::can_wp_capability( 'read_post', $post->ID ) ) {
+			if ( ! $is_manager && ! PermissionHelper::can_wp_capability( 'read_post', (int) $post_id ) ) {
 				continue;
 			}
 
