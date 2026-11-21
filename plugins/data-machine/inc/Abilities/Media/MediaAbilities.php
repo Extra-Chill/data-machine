@@ -392,15 +392,17 @@ class MediaAbilities {
 			$media_id = $this->sideloadToMediaLibrary( $file_info['path'], $filename );
 		}
 
-		return array(
-			'success'    => true,
-			'path'       => $file_info['path'],
-			'url'        => $file_info['url'] ?? '',
-			'filename'   => $file_info['filename'],
-			'size'       => $file_info['size'],
-			'mime_type'  => $validation['mime_type'],
-			'media_type' => $media_type,
-			'media_id'   => $media_id,
+		return $this->applyAttachmentResult(
+			array(
+				'success'    => true,
+				'path'       => $file_info['path'],
+				'url'        => $file_info['url'] ?? '',
+				'filename'   => $file_info['filename'],
+				'size'       => $file_info['size'],
+				'mime_type'  => $validation['mime_type'],
+				'media_type' => $media_type,
+				'media_id'   => $media_id,
+			)
 		);
 	}
 
@@ -433,16 +435,61 @@ class MediaAbilities {
 			$media_id = $this->sideloadToMediaLibrary( $file_path, $fn );
 		}
 
-		return array(
-			'success'    => true,
-			'path'       => $file_path,
-			'url'        => $public_url,
-			'filename'   => basename( $file_path ),
-			'size'       => $validation['size'],
-			'mime_type'  => $validation['mime_type'],
-			'media_type' => $media_type,
-			'media_id'   => $media_id,
+		return $this->applyAttachmentResult(
+			array(
+				'success'    => true,
+				'path'       => $file_path,
+				'url'        => $public_url,
+				'filename'   => basename( $file_path ),
+				'size'       => $validation['size'],
+				'mime_type'  => $validation['mime_type'],
+				'media_type' => $media_type,
+				'media_id'   => $media_id,
+			)
 		);
+	}
+
+	/**
+	 * Point an upload result at the Media Library attachment when one was created.
+	 *
+	 * media_handle_sideload() moves the source file into uploads (and may convert
+	 * it, e.g. jpg -> webp), so the repository path/url no longer exist. When a
+	 * media_id is present, describe the attachment instead. Values fall back to
+	 * the original ones only while the original file still exists on disk.
+	 *
+	 * @param array $result Upload result with path, url, filename, mime_type, media_id.
+	 * @return array Result describing the attachment in media-library mode.
+	 */
+	private function applyAttachmentResult( array $result ): array {
+		$media_id = (int) ( $result['media_id'] ?? 0 );
+		if ( $media_id <= 0 ) {
+			return $result;
+		}
+
+		$original_exists = ! empty( $result['path'] ) && file_exists( $result['path'] );
+
+		$url       = wp_get_attachment_url( $media_id );
+		$path      = get_attached_file( $media_id );
+		$mime_type = get_post_mime_type( $media_id );
+
+		if ( $url ) {
+			$result['url'] = $url;
+		} elseif ( ! $original_exists ) {
+			$result['url'] = '';
+		}
+
+		if ( $path ) {
+			$result['path']     = $path;
+			$result['filename'] = basename( $path );
+		} elseif ( ! $original_exists ) {
+			$result['path'] = '';
+		}
+
+		if ( $mime_type ) {
+			$result['mime_type'] = $mime_type;
+		}
+
+		return $result;
 	}
 
 	/**
