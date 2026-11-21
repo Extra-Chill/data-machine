@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.3] - 2026-11-21
+
+### Fixed
+- let upload_files users run fetch-wordpress-media
+
 ## [0.205.2] - 2026-11-21
 
 ### Fixed
