@@ -1,0 +1,56 @@
+/**
+ * Shared Pagination Styles
+ *
+ * Generic pagination component styling used across admin pages.
+ */
+
+.datamachine-pagination {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 15px;
+	padding: 10px 0;
+	flex-wrap: wrap;
+	gap: 15px;
+}
+
+.datamachine-pagination__info {
+	color: #50575e;
+	font-size: 13px;
+}
+
+.datamachine-pagination__controls {
+	display: flex;
+	align-items: center;
+	gap: 15px;
+}
+
+.datamachine-pagination__buttons {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.datamachine-pagination__current {
+	font-size: 13px;
+	color: #50575e;
+	min-width: 50px;
+	text-align: center;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.datamachine-pagination {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.datamachine-pagination__controls {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.datamachine-pagination__buttons {
+		justify-content: center;
+	}
+}

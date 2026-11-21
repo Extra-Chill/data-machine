@@ -1,0 +1,128 @@
+/**
+ * Data Machine - Root CSS Variables
+ * Centralized design tokens for entire admin interface
+ *
+ * IMPORTANT: All variables use datamachine- prefix for explicit clarity (no abbreviations)
+ */
+
+:root {
+    /* Colors - Text */
+    --datamachine-text-primary: #333;
+    --datamachine-text-secondary: #666;
+    --datamachine-text-muted: #757575;
+
+    /* Colors - Borders */
+    --datamachine-border-1: #dcdcde;
+    --datamachine-border-2: #e1e1e1;
+
+    /* Border Styles - Utility classes for consistent dashed/dotted borders */
+    --datamachine-border-dashed: 2px dashed var(--datamachine-border-1);
+    --datamachine-border-dotted: 2px dotted var(--datamachine-border-1);
+
+    /* Colors - Backgrounds */
+    --datamachine-bg-light: #f9f9f9;
+    --datamachine-bg-lighter: #f8f9fa;
+
+    /* Colors - Brand */
+    --datamachine-blue: #0073aa;
+
+    /* Colors - Status */
+    --datamachine-color-success: #00a32a;
+    --datamachine-color-error: #d63638;
+    --datamachine-color-warning: #ffb900;
+    --datamachine-color-neutral: #646970;
+
+    /* Spacing Scale: 8px, 12px, 16px, 24px, 40px */
+    --datamachine-spacing-xs: 8px;
+    --datamachine-spacing-sm: 12px;
+    --datamachine-spacing-md: 16px;
+    --datamachine-spacing-lg: 24px;
+    --datamachine-spacing-xl: 40px;
+
+    /* Border Radius - Single value for entire interface */
+    --datamachine-border-radius: 4px;
+}
+
+/* ===== COMMON UI COMPONENTS ===== */
+/* Shared components used across multiple admin pages */
+
+/* Status Badge - Used for file status, processing status, etc. */
+.datamachine-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: var(--datamachine-border-radius);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+/* Admin Notice - WordPress-style notices for all admin pages */
+.datamachine-admin-notice {
+    background: #fff;
+    border-left: 4px solid #00a32a;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.04);
+    margin: 5px 0 15px;
+    padding: 12px;
+    position: relative;
+    border-radius: var(--datamachine-border-radius);
+}
+
+.datamachine-admin-notice--error,
+.datamachine-admin-notice.error,
+.datamachine-admin-notice.notice-error {
+    border-left-color: #d63638;
+    background-color: #fef5f5;
+}
+
+.datamachine-admin-notice--warning,
+.datamachine-admin-notice.warning {
+    border-left-color: #ffb900;
+    background-color: #fffbf0;
+}
+
+.datamachine-admin-notice--info {
+    border-left-color: #72aee6;
+}
+
+.datamachine-admin-notice--success,
+.datamachine-admin-notice.success,
+.datamachine-admin-notice.notice-success {
+    border-left-color: #00a32a;
+    background: #f0f6fc;
+}
+
+.datamachine-admin-notice p {
+    margin: 0.5em 0;
+    padding: 2px;
+}
+
+/* Hidden utility - used across all pages */
+.datamachine-hidden {
+    display: none;
+}
+
+/* Status Utility Classes - for job status, flow status, etc. */
+.datamachine-status--success {
+    color: var(--datamachine-color-success);
+    font-weight: 500;
+}
+
+.datamachine-status--error {
+    color: var(--datamachine-color-error);
+    font-weight: 500;
+}
+
+.datamachine-status--warning {
+    color: var(--datamachine-color-warning);
+    font-weight: 500;
+}
+
+.datamachine-status--neutral {
+    color: var(--datamachine-color-neutral);
+}
+
+.datamachine-status--running {
+    color: var(--datamachine-color-primary);
+    font-weight: 500;
+}
