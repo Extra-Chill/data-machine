@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.2] - 2026-11-21
+
+### Fixed
+- return attachment url/path/mime from upload-media in media-library mode
+
 ## [0.205.1] - 2026-11-18
 
 ### Fixed
