@@ -143,29 +143,36 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 			}
 		}
 
-		// Build get_terms arguments
+		// Build get_terms arguments. Inputs are schema-validated; casts keep the
+		// get_terms() argument shape explicit.
 		$args = array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => $hide_empty,
-			'orderby'    => $orderby,
-			'order'      => $order,
+			'hide_empty' => (bool) $hide_empty,
+			'orderby'    => (string) $orderby,
+			'order'      => (string) $order,
 			'fields'     => 'all',
 		);
 
+		// Omitting taxonomy queries every taxonomy, as get_terms() does for null.
+		if ( is_array( $taxonomy ) ) {
+			$args['taxonomy'] = array_map( 'strval', $taxonomy );
+		} elseif ( is_string( $taxonomy ) && '' !== $taxonomy ) {
+			$args['taxonomy'] = $taxonomy;
+		}
+
 		if ( ! empty( $search ) ) {
-			$args['search'] = $search;
+			$args['search'] = (string) $search;
 		}
 
 		if ( null !== $parent ) {
-			$args['parent'] = $parent;
+			$args['parent'] = (int) $parent;
 		}
 
 		if ( null !== $number ) {
-			$args['number'] = $number;
+			$args['number'] = (int) $number;
 		}
 
 		if ( null !== $offset ) {
-			$args['offset'] = $offset;
+			$args['offset'] = (int) $offset;
 		}
 
 		$terms = get_terms( $args );
