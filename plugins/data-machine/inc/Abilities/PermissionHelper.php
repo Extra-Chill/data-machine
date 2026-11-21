@@ -185,7 +185,7 @@ class PermissionHelper {
 		}
 
 		if ( in_array( $post->post_status, array( 'draft', 'pending', 'auto-draft', 'future' ), true )
-			&& (int) $post->post_author !== self::acting_user_id() ) {
+			&& self::acting_user_id() !== (int) $post->post_author ) {
 			return false;
 		}
 

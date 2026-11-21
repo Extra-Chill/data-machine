@@ -198,7 +198,12 @@ class QueryWordPressPostsAbility {
 
 		$wp_query = new \WP_Query( $query_args );
 		// Explicit post_status queries bypass WordPress visibility defaults.
-		$posts = array_values( array_filter( $wp_query->posts, array( PermissionHelper::class, 'can_read_post' ) ) );
+		$posts = array();
+		foreach ( $wp_query->posts as $candidate ) {
+			if ( $candidate instanceof \WP_Post && PermissionHelper::can_read_post( $candidate ) ) {
+				$posts[] = $candidate;
+			}
+		}
 
 		if ( empty( $posts ) ) {
 			$logs[] = array(
