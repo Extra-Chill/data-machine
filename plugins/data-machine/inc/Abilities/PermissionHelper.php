@@ -38,6 +38,7 @@ class PermissionHelper {
 		'render_images'    => 'datamachine_render_images',
 		'upload_media'     => 'upload_files',
 		'search_content'   => 'read',
+		'read_content'     => 'read',
 		'daily_memory'     => 'datamachine_daily_memory',
 		'use_tools'        => 'datamachine_use_tools',
 		'view_logs'        => 'datamachine_view_logs',
@@ -161,6 +162,42 @@ class PermissionHelper {
 	}
 
 	/**
+	 * Check object visibility before returning content from read-only abilities.
+	 *
+	 * Draft-like statuses are owner-scoped for non-operators, even editors.
+	 * Password-protected and non-public post types require edit access; other
+	 * non-public statuses use WordPress's per-post read capability mapping.
+	 *
+	 * @param \WP_Post $post Post being returned.
+	 * @return bool
+	 */
+	public static function can_read_post( \WP_Post $post ): bool {
+		if ( self::can_manage() ) {
+			return true;
+		}
+
+		if ( ! self::can( 'read_content' ) ) {
+			return false;
+		}
+
+		if ( is_post_publicly_viewable( $post ) && '' === $post->post_password ) {
+			return true;
+		}
+
+		if ( in_array( $post->post_status, array( 'draft', 'pending', 'auto-draft', 'future' ), true )
+			&& self::acting_user_id() !== (int) $post->post_author ) {
+			return false;
+		}
+
+		$post_type = get_post_type_object( $post->post_type );
+		if ( ! $post_type || ! is_post_type_viewable( $post_type ) || '' !== $post->post_password ) {
+			return self::can_wp_capability( 'edit_post', $post->ID );
+		}
+
+		return self::can_wp_capability( 'read_post', $post->ID );
+	}
+
+	/**
 	 * Actions implied by any management capability.
 	 *
 	 * Holders of manage_flows / manage_settings / manage_agents (and
@@ -176,6 +213,7 @@ class PermissionHelper {
 	 *   Library itself, so editors and authors can bring images in.
 	 * - search_content: read-only search over published posts (local-search).
 	 *   Maps to core's read, since the results are already public.
+	 * - read_content: public post and taxonomy reads, mapped to core read.
 	 * - daily_memory: reading and appending the acting agent's daily memory.
 	 *   Scope comes from the execution principal; overwrite and delete stay
 	 *   behind can_manage() inside DailyMemoryAbilities.
@@ -186,14 +224,14 @@ class PermissionHelper {
 	 * @since 0.37.0
 	 * @var string[]
 	 */
-	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media', 'daily_memory', 'search_content', 'web_fetch' );
+	private const IMPLIED_BY_MANAGEMENT = array( 'view_analytics', 'render_images', 'upload_media', 'daily_memory', 'search_content', 'read_content', 'web_fetch' );
 
 	/**
 	 * Check whether current context can perform an action.
 	 *
 	 * @since 0.37.0
 	 *
-	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, search_content, daily_memory, use_tools, view_logs, create_own_agent, web_fetch).
+	 * @param string $action Action key (manage_agents, manage_flows, manage_settings, render_images, upload_media, search_content, daily_memory, use_tools, view_logs, create_own_agent, web_fetch, read_content).
 	 * @return bool
 	 */
 	public static function can( string $action ): bool {

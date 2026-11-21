@@ -83,7 +83,7 @@ class GetWordPressPostAbility {
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can( 'read_content' );
 	}
 
 	/**
@@ -159,6 +159,15 @@ class GetWordPressPostAbility {
 				'status'     => 404,
 				'post_id'    => $post_id,
 				'logs'       => $logs,
+			);
+		}
+
+		if ( ! PermissionHelper::can_read_post( $post ) ) {
+			return array(
+				'success'    => false,
+				'error_code' => 'wordpress_post_forbidden',
+				'error'      => 'You cannot read this post.',
+				'status'     => 403,
 			);
 		}
 

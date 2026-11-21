@@ -11,10 +11,15 @@
 namespace DataMachine\Abilities\Taxonomy;
 
 use DataMachine\Core\WordPress\TaxonomyHandler;
+use DataMachine\Abilities\PermissionHelper;
 
 defined( 'ABSPATH' ) || exit;
 
 class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
+
+	protected function isReadOnly(): bool {
+		return true;
+	}
 
 	protected function getAbilityName(): string {
 		return 'datamachine/get-taxonomy-terms';
@@ -117,29 +122,57 @@ class GetTaxonomyTermsAbility extends AbstractTaxonomyAbility {
 			return $this->abilityError( 'taxonomy_not_accessible', "Taxonomy '{$taxonomy}' is a system taxonomy and cannot be accessed", 403 );
 		}
 
-		// Build get_terms arguments
+		// An omitted taxonomy must not expose private or system taxonomies.
+		if ( ! PermissionHelper::can_manage() ) {
+			$public_taxonomies = array_values(
+				array_filter(
+					get_taxonomies( array( 'public' => true ) ),
+					static fn( $name ) => ! TaxonomyHandler::shouldSkipTaxonomy( $name )
+				)
+			);
+			if ( ! empty( $taxonomy ) && ! in_array( $taxonomy, $public_taxonomies, true ) ) {
+				return $this->abilityError( 'taxonomy_read_forbidden', 'This taxonomy is not public.', 403 );
+			}
+			$taxonomy = empty( $taxonomy ) ? $public_taxonomies : $taxonomy;
+			if ( empty( $taxonomy ) ) {
+				return array(
+					'success' => true,
+					'terms'   => array(),
+					'total'   => 0,
+				);
+			}
+		}
+
+		// Build get_terms arguments. Inputs are schema-validated; casts keep the
+		// get_terms() argument shape explicit.
 		$args = array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => $hide_empty,
-			'orderby'    => $orderby,
-			'order'      => $order,
+			'hide_empty' => (bool) $hide_empty,
+			'orderby'    => (string) $orderby,
+			'order'      => (string) $order,
 			'fields'     => 'all',
 		);
 
+		// Omitting taxonomy queries every taxonomy, as get_terms() does for null.
+		if ( is_array( $taxonomy ) ) {
+			$args['taxonomy'] = array_map( 'strval', $taxonomy );
+		} elseif ( is_string( $taxonomy ) && '' !== $taxonomy ) {
+			$args['taxonomy'] = $taxonomy;
+		}
+
 		if ( ! empty( $search ) ) {
-			$args['search'] = $search;
+			$args['search'] = (string) $search;
 		}
 
 		if ( null !== $parent ) {
-			$args['parent'] = $parent;
+			$args['parent'] = (int) $parent;
 		}
 
 		if ( null !== $number ) {
-			$args['number'] = $number;
+			$args['number'] = (int) $number;
 		}
 
 		if ( null !== $offset ) {
-			$args['offset'] = $offset;
+			$args['offset'] = (int) $offset;
 		}
 
 		$terms = get_terms( $args );
