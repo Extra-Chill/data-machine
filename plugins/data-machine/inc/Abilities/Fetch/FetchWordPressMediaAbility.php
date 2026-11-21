@@ -101,10 +101,15 @@ class FetchWordPressMediaAbility {
 	/**
 	 * Permission callback for ability.
 	 *
+	 * Operators, plus anyone who may upload to the Media Library (core
+	 * upload_files via the upload_media action), matching upload-media.
+	 * Non-operators only see attachments core would let them read; see
+	 * execute_legacy().
+	 *
 	 * @return bool True if user has permission.
 	 */
 	public function checkPermission(): bool {
-		return PermissionHelper::can_manage();
+		return PermissionHelper::can_manage() || PermissionHelper::can( 'upload_media' );
 	}
 
 	/**
@@ -201,11 +206,19 @@ class FetchWordPressMediaAbility {
 		);
 
 		$eligible_items = array();
+		$is_manager     = PermissionHelper::can_manage();
 
 		foreach ( $posts as $post ) {
 			$post_id = (string) $post->ID;
 
 			if ( in_array( $post_id, $processed_items, true ) ) {
+				continue;
+			}
+
+			// Non-operators get what core's /wp/v2/media would show them:
+			// attachments whose parent post they can read (read_post on an
+			// inherit attachment maps to the parent's status and author).
+			if ( ! $is_manager && ! PermissionHelper::can_wp_capability( 'read_post', (int) $post_id ) ) {
 				continue;
 			}
 
