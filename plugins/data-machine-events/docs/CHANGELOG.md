@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.7] - 2026-11-21
+
+### Fixed
+- stop nesting block-level HTML in description paragraphs
+
 ## [0.88.6] - 2026-11-20
 
 ### Changed
