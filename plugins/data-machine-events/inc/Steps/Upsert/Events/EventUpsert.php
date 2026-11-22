@@ -31,6 +31,7 @@ use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
 use DataMachineEvents\Blocks\Calendar\Cache\CacheInvalidator;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Core\EventOwnership;
+use DataMachineEvents\Core\DuplicateDetection\EventMergeHelper;
 use DataMachineEvents\Core\VenueParameterProvider;
 use DataMachineEvents\Core\EventSchemaProvider;
 use function DataMachineEvents\Core\datamachine_normalize_ticket_url;
@@ -383,7 +384,12 @@ class EventUpsert extends UpsertHandler {
 				)
 			);
 		}
-		$existing_post_id       = (int) $identity['post_id'];
+		$existing_post_id = (int) $identity['post_id'];
+		// The merge winner itself was trashed: restore this source's own post,
+		// so take back the claim the merge handed to the now-trashed winner.
+		if ( $existing_post_id > 0 && 'source_identity' === $identity['strategy'] && 'trash' === get_post_status( $existing_post_id ) ) {
+			EventMergeHelper::reclaimFromTrashedWinner( $existing_post_id );
+		}
 		$authoritative_venue_id = (int) $venue_resolution['term_id'];
 		$festival_match         = 'festival_lineup' === ( $identity['match']['merge_mode'] ?? '' ) ? $identity['match'] : array();
 
@@ -543,7 +549,14 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		// 5. Build meta input. Fill-only writes stamp no import provenance.
-		$meta_input = $fill_only ? array() : $this->buildEventMetaInput( $event_data, $parameters, $engine );
+		$meta_input       = $fill_only ? array() : $this->buildEventMetaInput( $event_data, $parameters, $engine );
+		$primary_identity = $existing_post_id > 0 ? (string) get_post_meta( $existing_post_id, self::SOURCE_IDENTITY_META_KEY, true ) : '';
+		$link_identity    = $fill_only || ( '' !== $primary_identity && $primary_identity !== $source_identity );
+		if ( $link_identity ) {
+			// Core's single-valued identity contract must not replace another
+			// source's primary claim when this source matched an existing event.
+			unset( $meta_input[ self::SOURCE_IDENTITY_META_KEY ], $meta_input[ self::SOURCE_NAME_META_KEY ], $meta_input[ self::SOURCE_ID_META_KEY ] );
+		}
 
 		// 6. Delegate to DM core upsert ability.
 		// DME's sorted lock set is acquired before Data Machine's identity lock.
@@ -558,7 +571,7 @@ class EventUpsert extends UpsertHandler {
 			'meta_input'   => $meta_input,
 		);
 
-		if ( '' !== $source_identity && ! $fill_only ) {
+		if ( '' !== $source_identity && ! $link_identity ) {
 			$upsert_input['identity_meta'] = array(
 				'key'   => self::SOURCE_IDENTITY_META_KEY,
 				'value' => $source_identity,
@@ -647,7 +660,7 @@ class EventUpsert extends UpsertHandler {
 
 			$post_id = (int) $result['post_id'];
 			$action  = $result['action'];
-			if ( $fill_only ) {
+			if ( $link_identity ) {
 				EventOwnership::linkSourceIdentity( $post_id, $source_identity );
 			} elseif ( '' !== $source_identity ) {
 				update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
@@ -918,6 +931,28 @@ class EventUpsert extends UpsertHandler {
 				)
 			)
 		);
+		// A merged loser and its winner are one claim, not competing owners.
+		// Keep the loser as the lookup result while it exists so the existing
+		// merge-following path retains its no-write replay behavior.
+		// If the winner was subsequently trashed, retain the original source
+		// post's existing restore-on-reimport behavior, not the inherited link.
+		foreach ( $claimant_ids as $claimant_id ) {
+			$target_id = (int) get_post_meta( $claimant_id, EventMergeHelper::MERGED_INTO_META_KEY, true );
+			if ( $target_id && 'trash' === get_post_status( $target_id )
+				&& ! EventMergeHelper::resolveMergedWinner( $claimant_id )
+				&& (string) get_post_meta( $target_id, self::SOURCE_IDENTITY_META_KEY, true ) !== $source_identity ) {
+				$claimant_ids = array_values( array_diff( $claimant_ids, array( $target_id ) ) );
+			}
+		}
+		$canonical_claims = array();
+		foreach ( $claimant_ids as $claimant_id ) {
+			$winner_id    = EventMergeHelper::resolveMergedWinner( $claimant_id );
+			$canonical_id = $winner_id ?: $claimant_id;
+			if ( ! isset( $canonical_claims[ $canonical_id ] ) || $canonical_id !== $claimant_id ) {
+				$canonical_claims[ $canonical_id ] = $claimant_id;
+			}
+		}
+		$claimant_ids = array_values( $canonical_claims );
 		if ( count( $claimant_ids ) > 1 ) {
 			sort( $claimant_ids, SORT_NUMERIC );
 			return new \WP_Error(

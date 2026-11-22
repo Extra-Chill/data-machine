@@ -35,6 +35,37 @@ class MergeEventPostsAbilities {
 	private function registerAbility(): void {
 		$register_callback = function () {
 			wp_register_ability(
+				'data-machine-events/backfill-merged-identities',
+				array(
+					'label'               => __( 'Backfill merged event identities', 'data-machine-events' ),
+					'description'         => __( 'Hand source identities and reservations from trashed merged events to their published winners. Dry-run by default; use next_after_id to continue.', 'data-machine-events' ),
+					'category'            => 'datamachine-events-events',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'dry_run'  => array(
+								'type'    => 'boolean',
+								'default' => true,
+							),
+							'limit'    => array(
+								'type'    => 'integer',
+								'minimum' => 1,
+								'maximum' => 100,
+								'default' => 50,
+							),
+							'after_id' => array(
+								'type'    => 'integer',
+								'minimum' => 0,
+								'default' => 0,
+							),
+						),
+					),
+					'execute_callback'    => array( $this, 'backfill' ),
+					'permission_callback' => AbilityPermissions::canWrite(),
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+			wp_register_ability(
 				'data-machine-events/merge-event-posts',
 				array(
 					'label'               => __( 'Merge event posts', 'data-machine-events' ),
@@ -70,6 +101,51 @@ class MergeEventPostsAbilities {
 		};
 
 		add_action( 'wp_abilities_api_init', $register_callback );
+	}
+
+	/** Repair one bounded, ID-paginated batch of historical merged losers. */
+	public function backfill( array $input ): array {
+		global $wpdb;
+		$limit   = max( 1, min( 100, (int) ( $input['limit'] ?? 50 ) ) );
+		$after   = max( 0, (int) ( $input['after_id'] ?? 0 ) );
+		$dry_run = (bool) ( $input['dry_run'] ?? true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Bounded maintenance scan with a stable cursor.
+		$ids     = $wpdb->get_col(
+			$wpdb->prepare(
+				'SELECT DISTINCT p.ID FROM %i p INNER JOIN %i pm ON pm.post_id = p.ID WHERE p.post_type = %s AND p.post_status = %s AND pm.meta_key = %s AND p.ID > %d ORDER BY p.ID ASC LIMIT %d',
+				$wpdb->posts,
+				$wpdb->postmeta,
+				Event_Post_Type::POST_TYPE,
+				'trash',
+				EventMergeHelper::MERGED_INTO_META_KEY,
+				$after,
+				$limit
+			)
+		);
+		$results = array();
+		foreach ( $ids as $id ) {
+			$after  = (int) $id;
+			$winner = EventMergeHelper::resolveMergedWinner( $after );
+			$result = array(
+				'loser_id'  => $after,
+				'winner_id' => $winner,
+				'status'    => 'skipped',
+			);
+			if ( $winner && Event_Post_Type::POST_TYPE === get_post_type( $winner ) ) {
+				$handoff          = $dry_run ? array() : EventMergeHelper::handoffSourceIdentities( $winner, $after );
+				$result['status'] = $dry_run ? 'would_transfer' : 'transferred';
+				if ( is_wp_error( $handoff ) ) {
+					$result['status'] = 'error';
+					$result['error']  = $handoff->get_error_message();
+				}
+			}
+			$results[] = $result;
+		}
+		return array(
+			'dry_run'       => $dry_run,
+			'results'       => $results,
+			'next_after_id' => $after,
+		);
 	}
 
 	/**

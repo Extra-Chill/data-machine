@@ -20,6 +20,9 @@
 
 namespace DataMachineEvents\Core\DuplicateDetection;
 
+use DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations;
+use DataMachineEvents\Core\EventOwnership;
+use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use const DataMachineEvents\Core\EVENT_TICKET_URL_META_KEY;
 
 defined( 'ABSPATH' ) || exit;
@@ -127,17 +130,31 @@ class EventMergeHelper {
 			}
 		}
 
-		update_post_meta( $loser_id, self::MERGED_INTO_META_KEY, $winner_id );
-
-		$trashed = wp_trash_post( $loser_id );
+		$handoff = self::handoffSourceIdentities( $winner_id, $loser_id );
+		$trashed = false;
+		if ( ! is_wp_error( $handoff ) ) {
+			update_post_meta( $loser_id, self::MERGED_INTO_META_KEY, $winner_id );
+			$trashed = wp_trash_post( $loser_id );
+		}
 		if ( ! $trashed ) {
+			if ( ! is_wp_error( $handoff ) ) {
+				$repository = new PostIdentityReservations();
+				$rollback   = $repository->transfer_post_reservations( $winner_id, $loser_id, $handoff['reservations'] );
+				if ( is_wp_error( $rollback ) ) {
+					do_action( 'datamachine_log', 'error', 'Failed to roll back merged source reservations.', array(
+						'winner_id' => $winner_id,
+						'loser_id'  => $loser_id,
+					) );
+				}
+				self::removeIdentityLinks( $winner_id, $handoff['links'] );
+			}
 			delete_post_meta( $loser_id, self::MERGED_INTO_META_KEY );
 			self::removeTransferredSlugs( $winner_id, $transferred_slugs );
 			self::restoreMetaValues( $loser_id, '_wp_old_slug', $loser_old_slug_values );
 			if ( $ticket_url_was_modified ) {
 				self::restoreMetaValues( $winner_id, EVENT_TICKET_URL_META_KEY, $winner_ticket_values );
 			}
-			$result['error'] = sprintf( 'Failed to trash post %d.', $loser_id );
+			$result['error'] = is_wp_error( $handoff ) ? $handoff->get_error_message() : sprintf( 'Failed to trash post %d.', $loser_id );
 			return $result;
 		}
 
@@ -146,6 +163,85 @@ class EventMergeHelper {
 		$result['success']           = true;
 
 		return $result;
+	}
+
+	/**
+	 * Preserve all source claims and durable reservations on the canonical post.
+	 *
+	 * Also used by the historical merge backfill. Returns only newly added links
+	 * and moved reservations, allowing a failed trash to undo this attempt only.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public static function handoffSourceIdentities( int $winner_id, int $loser_id ): array|\WP_Error {
+		$identities = array_merge(
+			get_post_meta( $loser_id, EventUpsert::SOURCE_IDENTITY_META_KEY, false ),
+			get_post_meta( $loser_id, EventOwnership::LINKED_SOURCE_IDENTITY_META_KEY, false )
+		);
+		$links      = array();
+		foreach ( array_unique( array_filter( array_map( 'strval', $identities ) ) ) as $identity ) {
+			if ( EventOwnership::linksSourceIdentity( $winner_id, $identity ) ) {
+				continue;
+			}
+			EventOwnership::linkSourceIdentity( $winner_id, $identity );
+			$links[] = $identity;
+		}
+		$repository   = new PostIdentityReservations();
+		$reservations = $repository->transfer_post_reservations( $loser_id, $winner_id );
+		if ( is_wp_error( $reservations ) ) {
+			self::removeIdentityLinks( $winner_id, $links );
+			return $reservations;
+		}
+		return array(
+			'links'        => $links,
+			'reservations' => $reservations,
+		);
+	}
+
+	/**
+	 * Return a merged loser's own source claims when its winner was trashed.
+	 *
+	 * Merge hands the loser's reservations to the winner. If the winner is later
+	 * trashed (not merged elsewhere), re-importing the loser's source restores
+	 * the loser, so its own primary identity must point back at it. Only the
+	 * loser's primary identity moves; nothing the winner owned is touched.
+	 *
+	 * @return bool Whether any claim was reclaimed.
+	 */
+	public static function reclaimFromTrashedWinner( int $loser_id ): bool {
+		$winner_id = (int) get_post_meta( $loser_id, self::MERGED_INTO_META_KEY, true );
+		if ( $winner_id <= 0 || 'trash' !== get_post_status( $loser_id ) || 'trash' !== get_post_status( $winner_id ) || self::resolveMergedWinner( $loser_id ) > 0 ) {
+			return false;
+		}
+		$identity = (string) get_post_meta( $loser_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true );
+		if ( '' === $identity ) {
+			return false;
+		}
+		$normalized = PostIdentityReservations::normalize_identity(
+			(string) get_post_type( $loser_id ),
+			array(
+				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
+				'value' => $identity,
+			)
+		);
+		if ( is_wp_error( $normalized ) ) {
+			return false;
+		}
+		$moved = ( new PostIdentityReservations() )->transfer_post_reservations( $winner_id, $loser_id, array( $normalized['identity_hash'] ) );
+		if ( is_wp_error( $moved ) ) {
+			return false;
+		}
+		if ( (string) get_post_meta( $winner_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) !== $identity ) {
+			self::removeIdentityLinks( $winner_id, array( $identity ) );
+		}
+		return true;
+	}
+
+	/** Remove only source identity links created by this attempt. */
+	private static function removeIdentityLinks( int $post_id, array $identities ): void {
+		foreach ( $identities as $identity ) {
+			delete_post_meta( $post_id, EventOwnership::LINKED_SOURCE_IDENTITY_META_KEY, $identity );
+		}
 	}
 
 	/**
