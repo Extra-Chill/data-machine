@@ -16,7 +16,8 @@
 
 namespace DataMachineEvents\Abilities;
 
-use DataMachineEvents\Core\Event_Post_Type;
+use DataMachine\Core\EngineData;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -147,7 +148,8 @@ class DuplicateDetectionAbilities {
 	/**
 	 * Find an existing event matching the given identity fields.
 	 *
-	 * Delegates to Data Machine's canonical duplicate-check ability.
+	 * Delegates to the canonical EventIdentity seam, so the venue resolves
+	 * and the duplicate answer match what an upsert would get.
 	 *
 	 * @param array $input { title: string, venue?: string, startDate: string }
 	 * @return array { found: bool, post_id?: int, matched_title?: string, matched_venue?: string, match_strategy?: string }
@@ -161,37 +163,26 @@ class DuplicateDetectionAbilities {
 			return array( 'found' => false );
 		}
 
-		$ability = function_exists( 'wp_has_ability' ) && wp_has_ability( 'datamachine/check-duplicate' )
-			? wp_get_ability( 'datamachine/check-duplicate' )
-			: null;
-		if ( ! $ability ) {
-			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
-		}
-
-		$result = $ability->execute(
+		$result = EventIdentity::resolve(
 			array(
 				'title'     => $title,
-				'post_type' => Event_Post_Type::POST_TYPE,
-				'scope'     => 'published',
-				'context'   => array(
-					'venue'     => $venue,
-					'startDate' => $startDate,
-				),
-			)
+				'venue'     => $venue,
+				'startDate' => $startDate,
+			),
+			new EngineData( array(), 0 ),
+			array( 'source_claim' => false )
 		);
-
-		if (
-			! is_array( $result )
-			|| 'duplicate' !== ( $result['verdict'] ?? '' )
-			|| 'event_identity_index' !== ( $result['strategy'] ?? '' )
-		) {
+		if ( $result['error'] instanceof \WP_Error ) {
+			throw new \RuntimeException( esc_html( $result['error']->get_error_message() ) );
+		}
+		if ( $result['post_id'] <= 0 ) {
 			return array( 'found' => false );
 		}
 
-		$match = $result['match'] ?? array();
+		$match = $result['match'];
 		return array(
 			'found'          => true,
-			'post_id'        => $match['post_id'] ?? 0,
+			'post_id'        => $result['post_id'],
 			'matched_title'  => $match['title'] ?? '',
 			'matched_venue'  => '',
 			'match_strategy' => $result['strategy'],

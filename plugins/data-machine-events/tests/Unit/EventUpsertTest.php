@@ -33,9 +33,13 @@ class EventUpsertTest extends EventUpsertTestCase {
 		$this->assertNotNull( $ability );
 
 		try {
-			$method = new \ReflectionMethod( $this->handler, 'findExistingEventViaAbility' );
-			$method->setAccessible( true );
-			$result = $method->invoke( $this->handler, 'Contract Test', 'Test Venue', self::future_year() . '-10-10', '' );
+			$result = \DataMachineEvents\Core\DuplicateDetection\EventIdentity::findDuplicate(
+				array(
+					'title'     => 'Contract Test',
+					'venue'     => 'Test Venue',
+					'startDate' => self::future_year() . '-10-10',
+				)
+			);
 
 			$this->assertWPError( $result );
 			$this->assertSame( 'datamachine_duplicate_contract_unavailable', $result->get_error_code() );

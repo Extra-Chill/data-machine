@@ -44,10 +44,12 @@ class EventEngineData {
 			'timezone'      => '',
 		);
 
+		$venue_term_id = 0;
 		if ( '' === $venue_name && ! empty( $config['venue'] ) && is_numeric( $config['venue'] ) ) {
 			$term = get_term( (int) $config['venue'], 'venue' );
 			if ( $term && ! is_wp_error( $term ) ) {
-				$venue_name = $term->name;
+				$venue_name    = $term->name;
+				$venue_term_id = (int) $term->term_id;
 			}
 
 			$stored_meta = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( (int) $config['venue'] );
@@ -58,8 +60,11 @@ class EventEngineData {
 			return array();
 		}
 
+		// The pinned term travels as the authoritative venue so no later step
+		// re-resolves it by name (#3887: a same-named venue elsewhere won).
 		$event_data = array(
-			'venue' => $venue_name,
+			'venue'         => $venue_name,
+			'venue_term_id' => $venue_term_id,
 		);
 
 		$camel_meta = array(
@@ -261,6 +266,13 @@ class EventEngineData {
 		$venue_source_identity = (string) ( $event_data[ \DataMachineEvents\Core\VenueSourceAliases::EVENT_FIELD ] ?? '' );
 		if ( '' !== $venue_source_identity ) {
 			$payload[ \DataMachineEvents\Core\VenueSourceAliases::EVENT_FIELD ] = $venue_source_identity;
+		}
+
+		// Venue term chosen by the flow (pinned venue). Authoritative for every
+		// identity check via EventIdentity; never re-resolved by name (#3887).
+		$venue_term_id = absint( $event_data['venue_term_id'] ?? 0 );
+		if ( $venue_term_id > 0 ) {
+			$payload['venue_term_id'] = $venue_term_id;
 		}
 
 		// Event title — stored in engine_data so pre-AI dedup gate can

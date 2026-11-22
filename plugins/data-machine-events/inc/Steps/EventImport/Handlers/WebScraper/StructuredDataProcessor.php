@@ -172,8 +172,9 @@ class StructuredDataProcessor {
 		if ( ! empty( $config['venue'] ) && is_numeric( $config['venue'] ) ) {
 			$term = get_term( (int) $config['venue'], 'venue' );
 			if ( $term && ! is_wp_error( $term ) ) {
-				$event['venue'] = $term->name;
-				$venue_meta     = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( (int) $config['venue'] );
+				$event['venue']         = $term->name;
+				$event['venue_term_id'] = (int) $term->term_id;
+				$venue_meta             = \DataMachineEvents\Core\Venue_Taxonomy::get_venue_data( (int) $config['venue'] );
 				$this->applyVenueMeta( $event, $venue_meta );
 			}
 		} elseif ( ! empty( $config['venue_name'] ) ) {
