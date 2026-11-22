@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.0] - 2026-11-22
+
+### Added
+- stable source item identity for web scraper imports
+
 ## [0.90.0] - 2026-11-22
 
 ### Added
