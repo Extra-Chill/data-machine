@@ -81,6 +81,60 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		return $term_id;
 	}
 
+	/**
+	 * @dataProvider proximity_candidates_provider
+	 */
+	public function test_proximity_checks_geography_only_within_radius( array $cities, ?int $expected_index ): void {
+		$term_ids = array();
+		foreach ( $cities as $index => $city ) {
+			$term_ids[] = $this->create_venue_with_meta(
+				'Proximity regression ' . $index,
+				array(
+					'coordinates' => 0 === $index ? '12,34.001' : '12,34.0001',
+					'city'        => $city,
+				)
+			);
+		}
+
+		// Every conflict check reads stored address metadata, even without an
+		// incoming street. Observe those reads without changing their values.
+		$checked_ids = array();
+		$observe     = static function ( $value, $term_id, $meta_key ) use ( &$checked_ids, $term_ids ) {
+			if ( in_array( (int) $term_id, $term_ids, true ) && Venue_Taxonomy::$meta_fields['address'] === $meta_key ) {
+				$checked_ids[] = (int) $term_id;
+			}
+			return $value;
+		};
+		add_filter( 'get_term_metadata', $observe, 10, 3 );
+		try {
+			$method = new \ReflectionMethod( Venue_Taxonomy::class, 'find_venue_by_proximity' );
+			$match  = $method->invoke( null, array( 'coordinates' => '12,34', 'city' => 'Charleston' ) );
+		} finally {
+			remove_filter( 'get_term_metadata', $observe, 10 );
+		}
+
+		$this->assertNotContains( $term_ids[0], $checked_ids, 'The out-of-radius venue must never reach the conflict check.' );
+		foreach ( array_slice( $term_ids, 1 ) as $term_id ) {
+			$this->assertContains( $term_id, $checked_ids, 'Every in-radius venue must still be checked for conflicts.' );
+		}
+		if ( null === $expected_index ) {
+			$this->assertNull( $match );
+		} else {
+			$this->assertInstanceOf( \WP_Term::class, $match );
+			$this->assertSame( $term_ids[ $expected_index ], (int) $match->term_id );
+		}
+	}
+
+	public static function proximity_candidates_provider(): array {
+		return array(
+			'distant venue ignored'        => array( array( 'Charleston' ), null ),
+			'unique nearby match'         => array( array( 'Charleston', 'Charleston' ), 1 ),
+			'nearby conflict rejected'    => array( array( 'Charleston', 'Atlanta' ), null ),
+			'conflict does not disqualify unique match' => array( array( 'Charleston', 'Atlanta', 'Charleston' ), 2 ),
+			'ambiguous nearby matches'    => array( array( 'Charleston', 'Charleston', 'Charleston' ), null ),
+		);
+	}
+
 	// ---------------------------------------------------------------------
 	// Part A: has_geographic_conflict semantics via resolve_venue_identity
 	// ---------------------------------------------------------------------
