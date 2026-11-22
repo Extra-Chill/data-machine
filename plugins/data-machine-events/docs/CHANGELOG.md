@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.1] - 2026-11-22
+
+### Changed
+- check venue proximity distance before geographic conflict
+
 ## [0.91.0] - 2026-11-22
 
 ### Added
