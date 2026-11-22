@@ -103,6 +103,13 @@ class EventUpsertAbilities {
 			return new \WP_Error( 'invalid_event_candidate', 'event_id must be a positive event ID.', array( 'status' => 400 ) );
 		}
 
+		if ( array_key_exists( 'venue_term_id', $event ) ) {
+			$event['venue_term_id'] = absint( $event['venue_term_id'] );
+			if ( 0 === $event['venue_term_id'] ) {
+				unset( $event['venue_term_id'] );
+			}
+		}
+
 		$venue_error = $this->validateVenueIdentity( $event, $source, $source_id );
 		if ( $venue_error ) {
 			return $venue_error;
@@ -288,6 +295,11 @@ class EventUpsertAbilities {
 							'items' => $string,
 						),
 						'venue'             => $string,
+						'venue_term_id'     => array(
+							'type'        => 'integer',
+							'minimum'     => 1,
+							'description' => 'Existing venue term ID chosen by the caller. Authoritative over the venue name; a non-existent ID falls back to name resolution.',
+						),
 						'venueAddress'      => $string,
 						'venueCity'         => $string,
 						'venueState'        => $string,

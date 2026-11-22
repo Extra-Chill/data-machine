@@ -414,6 +414,53 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( 0, $this->countEventsWithTitle( $input['event']['title'] ) );
 	}
 
+	public function test_schema_declares_venue_term_id_as_positive_integer(): void {
+		$method = new \ReflectionMethod( $this->ability, 'getInputSchema' );
+		$method->setAccessible( true );
+		$schema = $method->invoke( $this->ability );
+		$field  = $schema['properties']['event']['properties']['venue_term_id'] ?? array();
+
+		$this->assertSame( 'integer', $field['type'] ?? null );
+		$this->assertSame( 1, $field['minimum'] ?? null );
+	}
+
+	public function test_pinned_venue_term_id_wins_over_ambiguous_venue_name(): void {
+		$name      = 'Shared Ability Venue ' . uniqid();
+		$columbus  = $this->venueTerm( $name, 'Columbus', 'OH', 'shared-ability-columbus-' . uniqid() );
+		$nashville = $this->venueTerm( $name, 'Nashville', 'TN', 'shared-ability-nashville-' . uniqid() );
+		$this->assertNotSame( $columbus, $nashville );
+
+		$input = $this->validInput();
+		unset( $input['event']['venueAddress'], $input['event']['venueCity'], $input['event']['venueState'], $input['event']['venueCountry'] );
+		$input['event']['venue'] = $name;
+
+		$unpinned = $this->ability->executeUpsertEvent( $input );
+		$this->assertWPError( $unpinned, 'Precondition: the bare shared name is ambiguous.' );
+		$this->assertSame( 'ambiguous_venue', $unpinned->get_error_code() );
+
+		$input['event']['venue_term_id'] = $nashville;
+		$result                          = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $nashville, $result['normalized']['venue_id'] );
+		$this->assertSame( array( $nashville ), wp_get_object_terms( $result['event_id'], 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
+	public function test_nonexistent_venue_term_id_falls_back_to_name_resolution(): void {
+		$input = $this->validInput();
+		$name  = $input['event']['venue'];
+		$term  = $this->venueTerm( $name, 'Charleston', 'SC', 'fallback-ability-' . uniqid() );
+
+		$input['event']['venue_term_id'] = 999999999;
+		$result                          = $this->ability->executeUpsertEvent( $input );
+
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $term, $result['normalized']['venue_id'] );
+		$this->assertSame( array( $term ), wp_get_object_terms( $result['event_id'], 'venue', array( 'fields' => 'ids' ) ) );
+	}
+
 	public function test_lock_timeout_preserves_retryable_transient_contract(): void {
 		$force_timeout = static function ( string $query ): string {
 			return str_contains( $query, 'GET_LOCK' ) ? 'SELECT 0' : $query;
@@ -506,6 +553,17 @@ class EventUpsertAbilitiesTest extends WP_UnitTestCase {
 				'eventStatus'  => 'EventScheduled',
 			),
 		);
+	}
+
+	private function venueTerm( string $name, string $city, string $state, string $slug ): int {
+		$term = wp_insert_term( $name, 'venue', array( 'slug' => $slug ) );
+		$this->assertNotWPError( $term );
+		$term_id = (int) $term['term_id'];
+		update_term_meta( $term_id, '_venue_city', $city );
+		update_term_meta( $term_id, '_venue_state', $state );
+		update_term_meta( $term_id, '_venue_country', 'US' );
+
+		return $term_id;
 	}
 
 	private function createEventCandidate( string $title ): int {
