@@ -48,7 +48,7 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 
 		$raw['name']      = 'Completely renamed show';
 		$raw['startDate'] = self::future_year() . '-11-20T23:00:00';
-		$edited          = $this->process( array( $raw ) )[0];
+		$edited           = $this->process( array( $raw ) )[0];
 		$this->assertSame( $first['metadata']['item_identifier'], $edited['metadata']['item_identifier'] );
 		$this->assertNotSame( $first['metadata']['event_identifier'], $edited['metadata']['event_identifier'] );
 		$updated = $this->upsertItem( $edited );
@@ -58,11 +58,11 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 	}
 
 	public function test_shared_listing_url_is_not_identity(): void {
-		$first        = $this->rawEvent();
-		$first['url'] = 'https://example.com/shared-listing';
-		$second       = $first;
+		$first          = $this->rawEvent();
+		$first['url']   = 'https://example.com/shared-listing';
+		$second         = $first;
 		$second['name'] = 'Another event';
-		$items         = $this->process( array( $first, $second ) );
+		$items          = $this->process( array( $first, $second ) );
 		$this->assertCount( 2, $items );
 		foreach ( $items as $item ) {
 			$payload = json_decode( $item['content'], true );
@@ -72,6 +72,19 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 		$first['url'] = self::SOURCE_URL;
 		$single       = $this->process( array( $first ) )[0];
 		$this->assertSame( $single['metadata']['event_identifier'], $single['metadata']['item_identifier'] );
+	}
+
+	public function test_series_id_repeated_across_occurrences_is_not_identity(): void {
+		$first               = $this->rawEvent();
+		$first['@id']        = 'https://example.com/series/weekly-jam';
+		$second              = $first;
+		$second['startDate'] = self::future_year() . '-11-27T20:00:00';
+		$items               = $this->process( array( $first, $second ) );
+		$this->assertCount( 2, $items );
+		$this->assertNotSame( $items[0]['metadata']['item_identifier'], $items[1]['metadata']['item_identifier'] );
+		foreach ( $items as $item ) {
+			$this->assertSame( $item['metadata']['event_identifier'], $item['metadata']['item_identifier'] );
+		}
 	}
 
 	public function test_unique_detail_url_is_identity_but_ticket_url_is_not(): void {
@@ -106,9 +119,9 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 		$method    = new \ReflectionMethod( $extractor, 'normalizeItem' );
 		foreach ( array( 'Original title', 'Edited title' ) as $title ) {
 			$event = $method->invoke( $extractor, array(
-'id' => 'squarespace-123',
-'title' => $title
-), array() );
+				'id'    => 'squarespace-123',
+				'title' => $title,
+			), array() );
 			$this->assertSame( 'squarespace-123', $event['source_item_id'] );
 		}
 	}
@@ -119,9 +132,9 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 			'name'      => 'Original scraper show ' . $this->flow_step_id,
 			'startDate' => self::future_year() . '-11-20T20:00:00',
 			'location'  => array(
-'@type' => 'Place',
-'name' => 'Scraper test venue'
-),
+				'@type' => 'Place',
+				'name'  => 'Scraper test venue',
+			),
 		);
 	}
 
