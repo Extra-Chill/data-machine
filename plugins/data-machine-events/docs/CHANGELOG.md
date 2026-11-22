@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.9] - 2026-11-22
+
+### Fixed
+- merge hands source identity and reservations to the winner
+
 ## [0.88.8] - 2026-11-22
 
 ### Changed
