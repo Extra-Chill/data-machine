@@ -25,6 +25,7 @@ use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Core\VenueSourceAliases;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
 use DataMachineEvents\Core\TextNormalization;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -260,6 +261,38 @@ class EventTaxonomyAssigner {
 			);
 		}
 
+		$lookup = $this->venueLookup( $parameters, $engine, $handler_config, $post_id );
+		if ( 'resolve' !== $lookup['action'] ) {
+			return array(
+				'term_id' => 0,
+				'action'  => $lookup['action'],
+			);
+		}
+
+		$venue_result = Venue_Taxonomy::find_or_create_venue( $lookup['name'], $lookup['metadata'], array( 'post_id' => $post_id ) );
+
+		return array(
+			'term_id'     => absint( $venue_result['term_id'] ?? 0 ),
+			'action'      => ! empty( $venue_result['term_id'] ) ? 'assign' : 'skip',
+			'matched_via' => (string) ( $venue_result['matched_via'] ?? '' ),
+		);
+	}
+
+	/**
+	 * Build the venue name and metadata every venue resolution uses.
+	 *
+	 * Shared by the persisting resolver (resolveVenue) and the read-only
+	 * identity seam (EventIdentity::resolveVenue) so both see the same name,
+	 * merged geography, source venue alias, and unverified-field flags.
+	 *
+	 * @param array      $parameters     Event parameters.
+	 * @param EngineData $engine         Engine data helper.
+	 * @param array      $handler_config Handler configuration.
+	 * @param int        $post_id        Event post ID for log context.
+	 * @param bool       $log            Whether to log the artist-name collision.
+	 * @return array{action:string, name:string, metadata:array} `resolve`, `clear`, or `skip`.
+	 */
+	public function venueLookup( array $parameters, EngineData $engine, array $handler_config = array(), int $post_id = 0, bool $log = true ): array {
 		$venue_name = VenueParameterProvider::resolveField( 'venue', $parameters, $engine->all() );
 
 		if ( empty( $venue_name ) ) {
@@ -271,25 +304,29 @@ class EventTaxonomyAssigner {
 
 		if ( empty( $venue_name ) ) {
 			return array(
-				'term_id' => 0,
-				'action'  => 'clear',
+				'action'   => 'clear',
+				'name'     => '',
+				'metadata' => array(),
 			);
 		}
 
 		if ( $this->isVenueNameMatchingArtist( $venue_name, $handler_config ) ) {
-			do_action(
-				'datamachine_log',
-				'warning',
-				'Venue candidate matches pre-selected artist name; leaving venue unassigned',
-				array(
-					'post_id'     => $post_id,
-					'venue_name'  => $venue_name,
-					'artist_name' => $this->getPreSelectedArtistName( $handler_config ),
-				)
-			);
+			if ( $log ) {
+				do_action(
+					'datamachine_log',
+					'warning',
+					'Venue candidate matches pre-selected artist name; leaving venue unassigned',
+					array(
+						'post_id'     => $post_id,
+						'venue_name'  => $venue_name,
+						'artist_name' => $this->getPreSelectedArtistName( $handler_config ),
+					)
+				);
+			}
 			return array(
-				'term_id' => 0,
-				'action'  => 'skip',
+				'action'   => 'skip',
+				'name'     => (string) $venue_name,
+				'metadata' => array(),
 			);
 		}
 
@@ -300,12 +337,10 @@ class EventTaxonomyAssigner {
 		$venue_metadata = $this->withVenueSourceIdentity( $venue_metadata, $engine );
 		$venue_metadata = $this->withUnverifiedLocationFields( $venue_metadata, $engine );
 
-		$venue_result = Venue_Taxonomy::find_or_create_venue( $venue_name, $venue_metadata, array( 'post_id' => $post_id ) );
-
 		return array(
-			'term_id'     => absint( $venue_result['term_id'] ?? 0 ),
-			'action'      => ! empty( $venue_result['term_id'] ) ? 'assign' : 'skip',
-			'matched_via' => (string) ( $venue_result['matched_via'] ?? '' ),
+			'action'   => 'resolve',
+			'name'     => (string) $venue_name,
+			'metadata' => $venue_metadata,
 		);
 	}
 
@@ -313,44 +348,18 @@ class EventTaxonomyAssigner {
 	 * Venue term a human explicitly chose for this event, if any.
 	 *
 	 * A caller that already knows the exact venue (for example a submission
-	 * form where the submitter picked an existing venue) seeds
-	 * `venue_term_id` into engine data. That choice is authoritative: the
-	 * term is assigned as-is and name/address resolution, which can be
-	 * thrown off by a typo or an AI rewrite, never runs. The chosen term's
-	 * stored data is not merged with extracted venue fields, so a pick
-	 * cannot alter the existing venue.
-	 *
-	 * Engine data is set by the workflow's caller, never by AI tool
-	 * parameters, so the model cannot redirect an event to another venue
-	 * through this key. An ID that is not an existing venue term is ignored
-	 * and resolution falls back to the venue name.
+	 * form where the submitter picked an existing venue, or a flow pinned to
+	 * one venue) seeds `venue_term_id` into engine data. That choice is
+	 * authoritative: the term is assigned as-is and name/address resolution,
+	 * which can be thrown off by a typo or an AI rewrite, never runs. See
+	 * EventIdentity::explicitVenueTermId().
 	 *
 	 * @param EngineData $engine  Engine data helper.
 	 * @param int        $post_id Event post ID for log context.
 	 * @return int Venue term ID, or 0 when none was chosen or it is invalid.
 	 */
 	private function resolveExplicitVenueTermId( EngineData $engine, int $post_id ): int {
-		$term_id = absint( $engine->get( 'venue_term_id' ) ?? 0 );
-		if ( $term_id <= 0 ) {
-			return 0;
-		}
-
-		$term = get_term( $term_id, 'venue' );
-		if ( $term instanceof \WP_Term ) {
-			return (int) $term->term_id;
-		}
-
-		do_action(
-			'datamachine_log',
-			'warning',
-			'Explicit venue_term_id is not an existing venue term; falling back to venue name resolution',
-			array(
-				'post_id'       => $post_id,
-				'venue_term_id' => $term_id,
-			)
-		);
-
-		return 0;
+		return EventIdentity::explicitVenueTermId( $engine, $post_id );
 	}
 
 	/**

@@ -3,7 +3,7 @@
  * EventUpsert fallback dedupe tests.
  *
  * Covers the title-contract + venue + start_datetime collapse rule used by
- * EventUpsert::findExistingEventViaAbility() once source-identity matching
+ * EventIdentity::findDuplicate() once source-identity matching
  * misses. Split out of EventUpsertTest to keep each file under the
  * structural line-count threshold.
  *

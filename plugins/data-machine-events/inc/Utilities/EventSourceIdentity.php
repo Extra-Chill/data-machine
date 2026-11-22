@@ -8,7 +8,8 @@
 namespace DataMachineEvents\Utilities;
 
 use DataMachine\Core\ExecutionContext;
-use DataMachineEvents\Core\Event_Post_Type;
+use DataMachine\Core\EngineData;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -94,37 +95,25 @@ class EventSourceIdentity {
 	 * @return bool True when upsert would resolve an existing canonical event.
 	 */
 	private static function canonicalEventExists( array $event ): bool {
-		$ability = function_exists( 'wp_has_ability' ) && wp_has_ability( 'datamachine/check-duplicate' )
-			? wp_get_ability( 'datamachine/check-duplicate' )
-			: null;
-		if ( ! $ability ) {
-			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
-		}
-
-		$result = $ability->execute(
+		// The packet is the engine data the upsert will see, so the venue
+		// (explicit, pinned, or source-aliased term) resolves the same way.
+		$identity = EventIdentity::resolve(
 			array(
 				'title'     => (string) ( $event['title'] ?? '' ),
-				'post_type' => Event_Post_Type::POST_TYPE,
-				'scope'     => 'published',
-				'context'   => array(
-					'venue'     => (string) ( $event['venue'] ?? '' ),
-					'startDate' => EventIdentifierGenerator::normalizeStartDateTime(
-						(string) ( $event['startDate'] ?? '' ),
-						(string) ( $event['startTime'] ?? '' ),
-						(string) ( $event['venueTimezone'] ?? '' )
-					),
-					'ticketUrl' => (string) ( $event['ticketUrl'] ?? '' ),
-					'address'   => (string) ( $event['venueAddress'] ?? '' ),
-					'city'      => (string) ( $event['venueCity'] ?? '' ),
-					'state'     => (string) ( $event['venueState'] ?? '' ),
-					'country'   => (string) ( $event['venueCountry'] ?? '' ),
+				'startDate' => EventIdentifierGenerator::normalizeStartDateTime(
+					(string) ( $event['startDate'] ?? '' ),
+					(string) ( $event['startTime'] ?? '' ),
+					(string) ( $event['venueTimezone'] ?? '' )
 				),
-			)
+			),
+			new EngineData( $event, 0 ),
+			array( 'source_claim' => false )
 		);
+		if ( $identity['error'] instanceof \WP_Error ) {
+			throw new \RuntimeException( esc_html( $identity['error']->get_error_message() ) );
+		}
 
-		return is_array( $result )
-			&& 'duplicate' === ( $result['verdict'] ?? '' )
-			&& 'event_identity_index' === ( $result['strategy'] ?? '' );
+		return $identity['post_id'] > 0;
 	}
 
 	/**

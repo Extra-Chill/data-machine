@@ -41,6 +41,10 @@ namespace DataMachine\Core {
 		public function get( string $key ): mixed {
 			return $this->data[ $key ] ?? null;
 		}
+
+		public function all(): array {
+			return $this->data;
+		}
 	}
 
 	class JobStatus {
@@ -73,6 +77,7 @@ namespace DataMachineEvents\Core {
 namespace {
 	class WP_Post {
 		public string $post_title;
+		public string $post_content = '';
 
 		public function __construct( string $post_title ) {
 			$this->post_title = $post_title;
@@ -85,6 +90,33 @@ namespace {
 		return $GLOBALS['smoke_posts'][ $post_id ] ?? null;
 	}
 
+	function get_post_status( int $post_id ) {
+		return isset( $GLOBALS['smoke_posts'][ $post_id ] ) ? 'publish' : false;
+	}
+
+	function get_term( int $term_id, string $taxonomy = '' ) {
+		return null;
+	}
+
+	function wp_get_object_terms( int $post_id, string $taxonomy, array $args = array() ): array {
+		return array();
+	}
+
+	function absint( $value ): int {
+		return abs( (int) $value );
+	}
+
+	function is_wp_error( $value ): bool {
+		return $value instanceof WP_Error;
+	}
+
+	function parse_blocks( string $content ): array {
+		return array();
+	}
+
+	class WP_Error {}
+	class WP_Term {}
+
 	function smoke_seed_post( int $post_id, string $title, string $start_datetime ): void {
 		$GLOBALS['smoke_posts'][ $post_id ]                     = new WP_Post( $title );
 		\DataMachineEvents\Core\EventDatesTable::$rows[ $post_id ] = (object) array(
@@ -95,12 +127,60 @@ namespace {
 
 namespace DataMachineEvents\Core {
 	class Event_Post_Type {
-		public const POST_TYPE = \DATA_MACHINE_EVENTS_POST_TYPE;
+		public const POST_TYPE                 = \DATA_MACHINE_EVENTS_POST_TYPE;
+		public const EVENT_DETAILS_BLOCK_NAME = 'data-machine-events/event-details';
+	}
+
+	class VenueParameterProvider {
+		public static function resolveField( string $key, array $parameters, array $engine ): string {
+			return (string) ( $engine[ $key ] ?? $parameters[ $key ] ?? '' );
+		}
+	}
+
+	class Venue_Taxonomy {
+		public static function resolve_venue_identity( string $name, array $data = array() ): array {
+			return array(
+				'term'                 => null,
+				'term_id'              => null,
+				'match_status'         => 'no_match',
+				'matched_via'          => '',
+				'conflicting_term_ids' => array(),
+				'venue_name'           => $name,
+			);
+		}
+	}
+}
+
+namespace DataMachineEvents\Core\DuplicateDetection {
+	class EventMergeHelper {
+		public static function resolveMergedWinner( int $post_id ): int {
+			return 0;
+		}
+	}
+}
+
+namespace DataMachineEvents\Steps\Upsert\Events {
+	class EventTaxonomyAssigner {
+		public function venueLookup( array $parameters, $engine, array $config = array(), int $post_id = 0, bool $log = true ): array {
+			$name = (string) ( $engine->get( 'venue' ) ?? '' );
+			return array(
+				'action'   => '' === $name ? 'clear' : 'resolve',
+				'name'     => $name,
+				'metadata' => array(),
+			);
+		}
+	}
+
+	class EventUpsert {
+		public static function findExistingEventBySourceIdentity( string $source_identity ): int {
+			return 0;
+		}
 	}
 }
 
 namespace {
 	require_once dirname( __DIR__ ) . '/inc/Utilities/EventIdentifierGenerator.php';
+	require_once dirname( __DIR__ ) . '/inc/Core/DuplicateDetection/EventIdentity.php';
 	require_once dirname( __DIR__ ) . '/inc/Core/DuplicateDetection/PreAIEventDedupGate.php';
 
 	use DataMachine\Core\EngineData;

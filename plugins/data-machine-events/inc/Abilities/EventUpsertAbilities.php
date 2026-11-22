@@ -7,9 +7,9 @@
 
 namespace DataMachineEvents\Abilities;
 
+use DataMachine\Core\EngineData;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
 use DataMachineEvents\Core\Event_Type_Taxonomy;
-use DataMachineEvents\Core\VenueParameterProvider;
-use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 
 defined( 'ABSPATH' ) || exit;
@@ -103,7 +103,7 @@ class EventUpsertAbilities {
 			return new \WP_Error( 'invalid_event_candidate', 'event_id must be a positive event ID.', array( 'status' => 400 ) );
 		}
 
-		$venue_error = $this->validateVenueIdentity( $event );
+		$venue_error = $this->validateVenueIdentity( $event, $source, $source_id );
 		if ( $venue_error ) {
 			return $venue_error;
 		}
@@ -195,20 +195,35 @@ class EventUpsertAbilities {
 	/**
 	 * Reject geographically ambiguous existing venue identities before writes.
 	 *
-	 * @param array $event Canonical event fields.
+	 * Uses the canonical EventIdentity seam, so an explicit `venue_term_id`
+	 * or a curated source alias is never second-guessed by a name match, and a
+	 * re-import of an event this source already claims keeps that event's
+	 * venue instead of failing on an ambiguous name (#4012).
+	 *
+	 * @param array  $event     Canonical event fields.
+	 * @param string $source    Stable source namespace.
+	 * @param string $source_id Stable item ID within the source.
 	 * @return \WP_Error|null Venue conflict error, or null when safe.
 	 */
-	private function validateVenueIdentity( array $event ): ?\WP_Error {
+	private function validateVenueIdentity( array $event, string $source = '', string $source_id = '' ): ?\WP_Error {
 		$venue_name = trim( (string) ( $event['venue'] ?? '' ) );
 		if ( '' === $venue_name ) {
 			return null;
 		}
 
-		$identity = Venue_Taxonomy::resolve_venue_identity(
-			$venue_name,
-			VenueParameterProvider::extractFromParameters( $event )
+		$identity = EventIdentity::resolve(
+			array_merge(
+				$event,
+				array(
+					'source'    => $source,
+					'source_id' => $source_id,
+				)
+			),
+			new EngineData( $event, 0 ),
+			array( 'duplicates' => false )
 		);
-		if ( 'ambiguous' !== $identity['match_status'] ) {
+		// Source claim conflicts are reported by the upsert with their own codes.
+		if ( $identity['error'] instanceof \WP_Error || $identity['venue_term_id'] > 0 || 'ambiguous' !== $identity['venue_match']['status'] ) {
 			return null;
 		}
 

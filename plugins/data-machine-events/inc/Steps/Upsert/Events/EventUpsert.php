@@ -24,6 +24,7 @@ namespace DataMachineEvents\Steps\Upsert\Events;
 use DataMachine\Core\AbilityResult;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\PluginSettings;
+use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
 use DataMachineEvents\Core\TextNormalization;
 use DataMachineEvents\Core\EventTitleCleaner;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
@@ -191,6 +192,9 @@ class EventUpsert extends UpsertHandler {
 		);
 
 		$identity_start = self::composeIdentityStart( $startDate, $start_time );
+		// Lock on the same venue answer the gate and duplicate detection get
+		// (EventIdentity): an explicit or source-aliased term wins over a name.
+		$identity_venue = EventIdentity::resolveVenue( $parameters, $engine, array( 'handler_config' => $handler_config ) );
 		$lock_keys      = $this->acquireUpsertLocks(
 			$title,
 			$venue,
@@ -202,7 +206,8 @@ class EventUpsert extends UpsertHandler {
 				'state'   => VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() ),
 				'country' => VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() ),
 			),
-			absint( $parameters['event_id'] ?? 0 )
+			absint( $parameters['event_id'] ?? 0 ),
+			$identity_venue['venue_term_id']
 		);
 		if ( null === $lock_keys ) {
 			return array(
@@ -276,7 +281,7 @@ class EventUpsert extends UpsertHandler {
 	 * Execute the find-or-create logic within an advisory lock.
 	 *
 	 * Separated from executeUpsert() so the lock boundary is clear:
-	 * the lock is held from before findExistingEventViaAbility() through the
+	 * the lock is held from before EventIdentity::resolve() through the
 	 * completion of the DM core upsert and post-processing.
 	 *
 	 * Domain-specific identity resolution (fuzzy title/venue/date matching,
@@ -309,76 +314,78 @@ class EventUpsert extends UpsertHandler {
 		// through whenever the incoming venue string differs from the
 		// canonical taxonomy term name. See issue #252.
 		// A missing duplicate contract is retryable; it must never become a create.
-		$venueAddress     = VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() );
-		$venueCity        = VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() );
-		$venueState       = VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() );
-		$venueCountry     = VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() );
-		$source_identity  = (string) ( $parameters['source_identity'] ?? '' );
-		$existing_post_id = $this->resolveExistingEventCandidate(
-			$source_identity,
-			absint( $parameters['event_id'] ?? 0 ),
-			(string) ( $parameters['source'] ?? '' ),
-			(string) ( $parameters['source_id'] ?? '' )
+		$venueAddress      = VenueParameterProvider::resolveField( 'venueAddress', $parameters, $engine->all() );
+		$venueCity         = VenueParameterProvider::resolveField( 'venueCity', $parameters, $engine->all() );
+		$venueState        = VenueParameterProvider::resolveField( 'venueState', $parameters, $engine->all() );
+		$venueCountry      = VenueParameterProvider::resolveField( 'venueCountry', $parameters, $engine->all() );
+		$source_identity   = (string) ( $parameters['source_identity'] ?? '' );
+		$explicit_festival = trim( (string) ( $handler_config['explicit_festival'] ?? '' ) );
+		$festival_venue    = array( 'festival' => '' );
+		$venue_resolution  = array(
+			'term_id' => 0,
+			'action'  => 'skip',
 		);
-		if ( is_wp_error( $existing_post_id ) ) {
-			return $this->lifecycleErrorResponse( $existing_post_id, $title );
+		// One canonical identity answer (#4012): the source claim (linked
+		// identities and merge winner included), the venue persistence will
+		// assign, and domain duplicate detection keyed on that venue term.
+		// Resolving the venue before duplicate detection matters: name-only
+		// re-resolution is ambiguous whenever two venue terms share a name,
+		// which returned "clear" and created duplicate events on re-import (#883).
+		$identity = EventIdentity::resolve(
+			array_merge(
+				$parameters,
+				array(
+					'title'     => $title,
+					'venue'     => $venue,
+					'startDate' => $startDate,
+					'ticketUrl' => $ticketUrl,
+				)
+			),
+			$engine,
+			array(
+				'handler_config' => $handler_config,
+				'source_claim'   => fn( string $identity_key ) => $this->resolveExistingEventCandidate(
+					$identity_key,
+					absint( $parameters['event_id'] ?? 0 ),
+					(string) ( $parameters['source'] ?? '' ),
+					(string) ( $parameters['source_id'] ?? '' )
+				),
+				'persist_venue'  => function () use ( &$venue_resolution, &$festival_venue, &$parameters, $engine, $handler_config, $explicit_festival, $venue, $venueAddress, $venueCity, $venueState, $venueCountry ): array {
+					$venue_resolution = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
+					$festival_venue   = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( $venue, array(
+						'address' => $venueAddress,
+						'city'    => $venueCity,
+						'state'   => $venueState,
+						'country' => $venueCountry,
+					) );
+					if ( '' !== $explicit_festival ) {
+						$parameters['festival'] = $explicit_festival;
+					} elseif ( '' !== $festival_venue['festival'] ) {
+						$parameters['festival'] = $festival_venue['festival'];
+					}
+					return array_merge( $venue_resolution, array( 'festival' => $parameters['festival'] ?? '' ) );
+				},
+			)
+		);
+		if ( $identity['error'] instanceof \WP_Error ) {
+			return $this->lifecycleErrorResponse( $identity['error'], $title );
 		}
 		// A source whose event was merged into another canonical event must
 		// not republish the trashed duplicate. Ordinary trash still restores
 		// on re-import (#591); only merge losers carry a winner pointer.
-		if ( $existing_post_id > 0 && 'trash' === get_post_status( $existing_post_id ) ) {
-			$merged_winner_id = \DataMachineEvents\Core\DuplicateDetection\EventMergeHelper::resolveMergedWinner( $existing_post_id );
-			if ( $merged_winner_id > 0 ) {
-				return $this->successResponse(
-					array(
-						'post_id'     => $merged_winner_id,
-						'post_url'    => get_permalink( $merged_winner_id ),
-						'action'      => 'no_change',
-						'merged_from' => $existing_post_id,
-					)
-				);
-			}
-		}
-		// Resolve the venue once, before duplicate detection, so dedup sees the
-		// same term persistence will assign. Name-only re-resolution inside the
-		// duplicate strategy is ambiguous whenever two venue terms share a name,
-		// which returned "clear" and created duplicate events on re-import (#883).
-		$venue_resolution       = $this->taxonomy_assigner->resolveVenue( $parameters, $engine, $handler_config );
-		$authoritative_venue_id = (int) $venue_resolution['term_id'];
-		$festival_venue         = \DataMachineEvents\Core\Venue_Taxonomy::parse_festival_venue( $venue, array(
-			'address' => $venueAddress,
-			'city'    => $venueCity,
-			'state'   => $venueState,
-			'country' => $venueCountry,
-		) );
-		$explicit_festival      = trim( (string) ( $handler_config['explicit_festival'] ?? '' ) );
-		if ( '' !== $explicit_festival ) {
-			$parameters['festival'] = $explicit_festival;
-		} elseif ( '' !== $festival_venue['festival'] ) {
-			$parameters['festival'] = $festival_venue['festival'];
-		}
-
-		$festival_match = array();
-		if ( $existing_post_id <= 0 ) {
-			$duplicate_result = $this->findExistingEventViaAbility(
-				$title,
-				$venue,
-				$startDate,
-				$ticketUrl,
-				$venueAddress,
-				$venueCity,
-				$venueState,
-				$venueCountry,
-				'assign' === $venue_resolution['action'] ? $authoritative_venue_id : 0,
-				(string) ( $parameters['source'] ?? '' ),
-				$engine->get( 'festival' ) ?? $parameters['festival'] ?? '',
-				$festival_match
+		if ( 'merged_winner' === $identity['strategy'] ) {
+			return $this->successResponse(
+				array(
+					'post_id'     => $identity['post_id'],
+					'post_url'    => get_permalink( $identity['post_id'] ),
+					'action'      => 'no_change',
+					'merged_from' => $identity['merged_from'],
+				)
 			);
-			if ( is_wp_error( $duplicate_result ) ) {
-				return $this->lifecycleErrorResponse( $duplicate_result, $title );
-			}
-			$existing_post_id = $duplicate_result;
 		}
+		$existing_post_id       = (int) $identity['post_id'];
+		$authoritative_venue_id = (int) $venue_resolution['term_id'];
+		$festival_match         = 'festival_lineup' === ( $identity['match']['merge_mode'] ?? '' ) ? $identity['match'] : array();
 
 		if ( $existing_post_id > 0 && 'festival_lineup' === ( $festival_match['merge_mode'] ?? '' ) ) {
 			// A set contributes lineup taxonomy only. Never persist incoming event
@@ -871,7 +878,7 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $source_identity Stable hashed source identity.
 	 * @return int|\WP_Error Matching event ID, zero, or an ambiguous claimant conflict.
 	 */
-	private function findExistingEventBySourceIdentity( string $source_identity ): int|\WP_Error {
+	public static function findExistingEventBySourceIdentity( string $source_identity ): int|\WP_Error {
 		if ( '' === $source_identity ) {
 			return 0;
 		}
@@ -1028,152 +1035,6 @@ class EventUpsert extends UpsertHandler {
 	}
 
 	/**
-	 * Find existing event using DM core's duplicate detection system.
-	 *
-	 * Calls the `datamachine/check-duplicate` ability which delegates to
-	 * the registered EventDuplicateStrategy using event-owned date queries.
-	 *
-	 * The indexed strategy is date-aware: every query scopes by date_only,
-	 * so recurring series (same title/venue, different date) are never
-	 * falsely matched. See #423.
-	 *
-	 * The geographic context fields let EventDuplicateStrategy
-	 * resolve the incoming venue via the same address-first cascade the
-	 * upsert path uses (Venue_Taxonomy::find_or_create_venue). See #252.
-	 *
-	 * @param string $title     Event title.
-	 * @param string $venue     Venue name.
-	 * @param string $startDate Start date.
-	 * @param string $ticketUrl Ticket URL.
-	 * @param string $address   Venue street address (for address-aware venue resolution).
-	 * @param string $city      Venue city (required alongside address).
-	 * @param string $state     Venue state or region.
-	 * @param string $country   Venue country.
-	 * @param int    $venue_term_id Venue term already resolved by the upsert
-	 *                              path (0 when unresolved). When set, dedup
-	 *                              matches by this term instead of re-resolving
-	 *                              the venue by name (#883).
-	 * @param string $source        Import source slug (e.g. ticketmaster),
-	 *                              used for the cross-source venue fallback.
-	 * @return int|\WP_Error Post ID, zero when clear, or a contract error.
-	 */
-	private function findExistingEventViaAbility(
-		string $title,
-		string $venue,
-		string $startDate,
-		string $ticketUrl,
-		string $address = '',
-		string $city = '',
-		string $state = '',
-		string $country = '',
-		int $venue_term_id = 0,
-		string $source = '',
-		string|array $festival = '',
-		array &$festival_match = array()
-	): int|\WP_Error {
-		$duplicate_check = wp_has_ability( 'datamachine/check-duplicate' )
-			? wp_get_ability( 'datamachine/check-duplicate' )
-			: null;
-
-		if ( ! $duplicate_check ) {
-			return new \WP_Error(
-				'datamachine_duplicate_contract_unavailable',
-				'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.',
-				array(
-					'status'    => 503,
-					'retryable' => true,
-				)
-			);
-		}
-
-		$result = $duplicate_check->execute(
-			array(
-				'title'     => $title,
-				'post_type' => Event_Post_Type::POST_TYPE,
-				'scope'     => 'published',
-				'context'   => array(
-					'venue'         => $venue,
-					'startDate'     => $startDate,
-					'ticketUrl'     => $ticketUrl,
-					'address'       => $address,
-					'city'          => $city,
-					'state'         => $state,
-					'country'       => $country,
-					'venue_term_id' => $venue_term_id,
-					'source'        => $source,
-					'festival'      => $festival,
-				),
-			)
-		);
-
-		if (
-			! is_array( $result )
-			|| 'duplicate' !== ( $result['verdict'] ?? '' )
-			|| 'event_identity_index' !== ( $result['strategy'] ?? '' )
-		) {
-			return 0;
-		}
-
-		$post_id = (int) ( $result['match']['post_id'] ?? 0 );
-		if ( $post_id <= 0 ) {
-			return 0;
-		}
-
-		if ( 'festival_lineup' === ( $result['match']['merge_mode'] ?? '' ) ) {
-			$festival_match = $result['match'];
-			return $post_id;
-		}
-
-		// Defensive date guard: EventDuplicateStrategy is date-aware (queries
-		// by date_only), so its own matches are always date-correct. However
-		// DM core may run additional strategies that match on title alone.
-		// If such a strategy returned this match and the existing event is
-		// on a genuinely different calendar date, treat it as a distinct
-		// recurring-series event rather than a duplicate.
-		// See: https://github.com/Extra-Chill/data-machine/issues/1108
-		if ( ! empty( $startDate ) ) {
-			$existing_data      = $this->extractEventData( $post_id );
-			$existing_startDate = $existing_data['startDate'] ?? '';
-
-			if ( ! empty( $existing_startDate ) ) {
-				$existing_date_only = self::extractDateForQuery( $existing_startDate );
-				$incoming_date_only = self::extractDateForQuery( $startDate );
-
-				if ( $existing_date_only !== $incoming_date_only ) {
-					do_action(
-						'datamachine_log',
-						'info',
-						'Event Upsert: Ability matched title but date differs — treating as new event (recurring series)',
-						array(
-							'title'            => $title,
-							'venue'            => $venue,
-							'incoming_date'    => $incoming_date_only,
-							'existing_date'    => $existing_date_only,
-							'existing_post_id' => $post_id,
-						)
-					);
-
-					return 0;
-				}
-
-				$existing_identity_start = self::composeIdentityStart( $existing_startDate, (string) ( $existing_data['startTime'] ?? '' ) );
-				$existing_timestamp      = strtotime( $existing_identity_start );
-				$incoming_timestamp      = strtotime( $startDate );
-				if ( preg_match( '/\d{2}:\d{2}/', $existing_identity_start )
-					&& preg_match( '/\d{2}:\d{2}/', $startDate )
-					&& false !== $existing_timestamp
-					&& false !== $incoming_timestamp
-					&& abs( $existing_timestamp - $incoming_timestamp ) > 7200
-				) {
-					return 0;
-				}
-			}
-		}
-
-		return $post_id;
-	}
-
-	/**
 	 * Acquire deterministic MySQL advisory locks for an event identity.
 	 *
 	 * A concrete source lock serializes updates even when source data changes its
@@ -1193,12 +1054,13 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $source_identity Optional stable source identity.
 	 * @param array  $venue_context   Venue address geography.
 	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @param int    $venue_term_id   Venue term from EventIdentity (0 when unresolved).
 	 * @return array|null The acquired lock keys, or null on timeout/error.
 	 */
-	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): ?array {
+	private function acquireUpsertLocks( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0, int $venue_term_id = 0 ): ?array {
 		global $wpdb;
 
-		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context, $candidate_id );
+		$lock_keys = $this->buildUpsertLockKeys( $title, $venue, $startDate, $source_identity, $venue_context, $candidate_id, $venue_term_id );
 		$acquired  = array();
 		$deadline  = microtime( true ) + 10;
 		$complete  = false;
@@ -1273,12 +1135,16 @@ class EventUpsert extends UpsertHandler {
 	 * @param string $source_identity Optional stable source identity.
 	 * @param array  $venue_context   Venue address geography.
 	 * @param int    $candidate_id    Existing canonical event candidate.
+	 * @param int    $venue_term_id   Venue term from EventIdentity. When set it
+	 *                                is the venue scope; the name is not re-resolved.
 	 * @return array Ordered advisory lock keys.
 	 */
-	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0 ): array {
+	private function buildUpsertLockKeys( string $title, string $venue, string $startDate, string $source_identity = '', array $venue_context = array(), int $candidate_id = 0, int $venue_term_id = 0 ): array {
 		$blog_id   = get_current_blog_id();
 		$date_only = self::extractDateForQuery( $startDate );
-		$identity  = \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity( $venue, $venue_context );
+		$identity  = $venue_term_id > 0
+			? array( 'term_id' => $venue_term_id )
+			: \DataMachineEvents\Core\Venue_Taxonomy::resolve_venue_identity( $venue, $venue_context );
 
 		if ( ! empty( $identity['term_id'] ) ) {
 			$venue_scopes = array( 'term:' . (int) $identity['term_id'] );
@@ -1389,29 +1255,6 @@ class EventUpsert extends UpsertHandler {
 		}
 
 		return trim( $start_date ) . ' ' . trim( $start_time );
-	}
-
-	/**
-	 * Extract event data from existing post
-	 *
-	 * @param int $post_id Post ID
-	 * @return array Event attributes from event-details block
-	 */
-	private function extractEventData( int $post_id ): array {
-		$post = get_post( $post_id );
-		if ( ! $post ) {
-			return array();
-		}
-
-		$blocks = parse_blocks( $post->post_content );
-
-		foreach ( $blocks as $block ) {
-			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === $block['blockName'] ) {
-				return $block['attrs'];
-			}
-		}
-
-		return array();
 	}
 
 	/**

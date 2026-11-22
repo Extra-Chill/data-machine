@@ -74,11 +74,6 @@ class PreAIEventDedupGate {
 			(string) ( $engine->get( 'startTime' ) ?? '' ),
 			(string) ( $engine->get( 'venueTimezone' ) ?? '' )
 		);
-		$ticketUrl = $engine->get( 'ticketUrl' ) ?? '';
-		$address   = $engine->get( 'venueAddress' ) ?? '';
-		$city      = $engine->get( 'venueCity' ) ?? '';
-		$state     = $engine->get( 'venueState' ) ?? '';
-		$country   = $engine->get( 'venueCountry' ) ?? '';
 
 		// Need at least title + startDate for a meaningful lookup.
 		// Without these, let the AI step run normally.
@@ -86,44 +81,37 @@ class PreAIEventDedupGate {
 			return null;
 		}
 
-		$duplicate_check = function_exists( 'wp_has_ability' ) && wp_has_ability( 'datamachine/check-duplicate' )
-			? wp_get_ability( 'datamachine/check-duplicate' )
-			: null;
-		if ( ! $duplicate_check ) {
-			throw new \RuntimeException( 'Data Machine 0.39.0 or newer is required: datamachine/check-duplicate is unavailable.' );
+		// The same identity answer the upsert will get (#4012): source claim,
+		// explicit/pinned or source-aliased venue term, then duplicate
+		// detection keyed on that term.
+		$event       = array(
+			'title'     => $title,
+			'startDate' => $startDate,
+		);
+		$source      = trim( (string) ( $engine->get( 'source_type' ) ?? '' ) );
+		$source_item = trim( (string) ( $engine->get( 'item_identifier' ) ?? '' ) );
+		if ( '' !== $source && '' !== $source_item ) {
+			$event['source']    = $source;
+			$event['source_id'] = $source_item;
 		}
 
-		$match = $duplicate_check->execute( array(
-			'title'     => $title,
-			'post_type' => \DataMachineEvents\Core\Event_Post_Type::POST_TYPE,
-			'scope'     => 'published',
-			'context'   => array(
-				'venue'     => $venue,
-				'startDate' => $startDate,
-				'ticketUrl' => $ticketUrl,
-				'address'   => $address,
-				'city'      => $city,
-				'state'     => $state,
-				'country'   => $country,
-			),
-		) );
-
-		if (
-			! is_array( $match )
-			|| 'duplicate' !== ( $match['verdict'] ?? '' )
-			|| 'event_identity_index' !== ( $match['strategy'] ?? '' )
-		) {
+		$identity = EventIdentity::resolve( $event, $engine, array( 'handler_config' => self::upsertHandlerConfig( $engine ) ) );
+		if ( $identity['error'] instanceof \WP_Error ) {
+			if ( 'datamachine_duplicate_contract_unavailable' === $identity['error']->get_error_code() ) {
+				throw new \RuntimeException( esc_html( $identity['error']->get_error_message() ) );
+			}
+			// Claim conflicts are reported by the upsert, not swallowed here.
 			return null;
 		}
 
-		// Event exists. Decide whether the packet is a changed revision that
-		// must still reach upsert.
-		$existing_post_id = (int) ( $match['match']['post_id'] ?? 0 );
-		// The guard above already verified `strategy` is `event_identity_index`,
-		// so the key is known to exist here.
-		$strategy = (string) $match['strategy'];
+		$existing_post_id = (int) $identity['post_id'];
+		$strategy         = (string) $identity['strategy'];
+		// A trashed claimant is restored by the upsert on re-import (#591).
+		if ( $existing_post_id <= 0 || '' === $strategy || ! in_array( get_post_status( $existing_post_id ), array( 'publish', 'future', 'draft', 'pending', 'private' ), true ) ) {
+			return null;
+		}
 
-		if ( $existing_post_id > 0 && self::isChangedRevision( $title, $startDate, $existing_post_id ) ) {
+		if ( self::isChangedRevision( $title, $startDate, $existing_post_id ) ) {
 			do_action(
 				'datamachine_log',
 				'debug',
@@ -135,7 +123,7 @@ class PreAIEventDedupGate {
 					'startDate'     => $startDate,
 					'existing_post' => $existing_post_id,
 					'strategy'      => $strategy,
-					'reason'        => (string) ( $match['reason'] ?? '' ),
+					'reason'        => $identity['reason'],
 				)
 			);
 
@@ -154,7 +142,7 @@ class PreAIEventDedupGate {
 				'startDate'     => $startDate,
 				'existing_post' => $existing_post_id,
 				'strategy'      => $strategy,
-				'reason'        => (string) ( $match['reason'] ?? '' ),
+				'reason'        => $identity['reason'],
 			)
 		);
 
@@ -215,6 +203,24 @@ class PreAIEventDedupGate {
 		$existing_start = EventIdentifierGenerator::normalizeStartDateTime( (string) $existing_dates->start_datetime );
 
 		return '' !== $existing_start && $existing_start !== $startDate;
+	}
+
+	/**
+	 * Handler configuration of the pipeline's upsert_event step.
+	 *
+	 * @param EngineData $engine Engine data.
+	 * @return array Upsert handler config, or an empty array.
+	 */
+	private static function upsertHandlerConfig( EngineData $engine ): array {
+		$flow_config = $engine->get( 'flow_config' );
+		foreach ( is_array( $flow_config ) ? $flow_config : array() as $step_config ) {
+			$config = is_array( $step_config ) ? ( $step_config['handler_configs']['upsert_event'] ?? null ) : null;
+			if ( is_array( $config ) ) {
+				return $config;
+			}
+		}
+
+		return array();
 	}
 
 	/**
