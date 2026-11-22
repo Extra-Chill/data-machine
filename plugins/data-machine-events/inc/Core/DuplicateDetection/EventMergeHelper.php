@@ -139,9 +139,12 @@ class EventMergeHelper {
 		if ( ! $trashed ) {
 			if ( ! is_wp_error( $handoff ) ) {
 				$repository = new PostIdentityReservations();
-				$rollback = $repository->transfer_post_reservations( $winner_id, $loser_id, $handoff['reservations'] );
+				$rollback   = $repository->transfer_post_reservations( $winner_id, $loser_id, $handoff['reservations'] );
 				if ( is_wp_error( $rollback ) ) {
-					do_action( 'datamachine_log', 'error', 'Failed to roll back merged source reservations.', array( 'winner_id' => $winner_id, 'loser_id' => $loser_id ) );
+					do_action( 'datamachine_log', 'error', 'Failed to roll back merged source reservations.', array(
+						'winner_id' => $winner_id,
+						'loser_id'  => $loser_id,
+					) );
 				}
 				self::removeIdentityLinks( $winner_id, $handoff['links'] );
 			}

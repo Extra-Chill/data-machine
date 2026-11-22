@@ -39,9 +39,9 @@ class EventMergeIdentityHandoffTest extends EventUpsertTestCase {
 		$identity = PostIdentityReservations::normalize_identity(
 			'data_machine_events',
 			array(
-'key' => EventUpsert::SOURCE_IDENTITY_META_KEY,
-'value' => $source_identity
-)
+				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
+				'value' => $source_identity,
+			)
 		);
 		$now      = current_time( 'mysql', true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- Regression fixture.
@@ -130,9 +130,9 @@ class EventMergeIdentityHandoffTest extends EventUpsertTestCase {
 		wp_trash_post( $loser );
 		$ability = new MergeEventPostsAbilities();
 		$input   = array(
-'after_id' => $loser - 1,
-'limit' => 1
-);
+			'after_id' => $loser - 1,
+			'limit'    => 1,
+		);
 		$dry     = $ability->backfill( $input );
 		$this->assertSame( $loser, $dry['next_after_id'] );
 		$this->assertCount( 1, $dry['results'] );

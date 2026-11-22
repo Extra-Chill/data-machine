@@ -44,20 +44,20 @@ class MergeEventPostsAbilities {
 						'type'       => 'object',
 						'properties' => array(
 							'dry_run'  => array(
-'type' => 'boolean',
-'default' => true
-),
+								'type'    => 'boolean',
+								'default' => true,
+							),
 							'limit'    => array(
-'type' => 'integer',
-'minimum' => 1,
-'maximum' => 100,
-'default' => 50
-),
+								'type'    => 'integer',
+								'minimum' => 1,
+								'maximum' => 100,
+								'default' => 50,
+							),
 							'after_id' => array(
-'type' => 'integer',
-'minimum' => 0,
-'default' => 0
-),
+								'type'    => 'integer',
+								'minimum' => 0,
+								'default' => 0,
+							),
 						),
 					),
 					'execute_callback'    => array( $this, 'backfill' ),
@@ -127,10 +127,10 @@ class MergeEventPostsAbilities {
 			$after  = (int) $id;
 			$winner = EventMergeHelper::resolveMergedWinner( $after );
 			$result = array(
-'loser_id' => $after,
-'winner_id' => $winner,
-'status' => 'skipped'
-);
+				'loser_id'  => $after,
+				'winner_id' => $winner,
+				'status'    => 'skipped',
+			);
 			if ( $winner && Event_Post_Type::POST_TYPE === get_post_type( $winner ) ) {
 				$handoff          = $dry_run ? array() : EventMergeHelper::handoffSourceIdentities( $winner, $after );
 				$result['status'] = $dry_run ? 'would_transfer' : 'transferred';
@@ -142,10 +142,10 @@ class MergeEventPostsAbilities {
 			$results[] = $result;
 		}
 		return array(
-'dry_run' => $dry_run,
-'results' => $results,
-'next_after_id' => $after
-);
+			'dry_run'       => $dry_run,
+			'results'       => $results,
+			'next_after_id' => $after,
+		);
 	}
 
 	/**
