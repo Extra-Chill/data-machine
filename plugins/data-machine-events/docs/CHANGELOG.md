@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.88.8] - 2026-11-22
+
+### Changed
+- canonical EventIdentity::resolve seam for venue and duplicate identity
+
 ## [0.88.7] - 2026-11-21
 
 ### Fixed
