@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.89.0] - 2026-11-22
+
+### Added
+- declare venue_term_id on the upsert-event ability contract
+
 ## [0.88.9] - 2026-11-22
 
 ### Fixed
