@@ -209,8 +209,8 @@ class EventIdentity {
 			'venue_term_id' => $term_id,
 			'venue_match'   => self::venueMatch(
 				(string) $identity['match_status'],
-				(string) ( $identity['matched_via'] ?? '' ),
-				array_map( 'intval', (array) ( $identity['conflicting_term_ids'] ?? array() ) )
+				(string) $identity['matched_via'],
+				array_map( 'intval', (array) $identity['conflicting_term_ids'] )
 			),
 		);
 	}
