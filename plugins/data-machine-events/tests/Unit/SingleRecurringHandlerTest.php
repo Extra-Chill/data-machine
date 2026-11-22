@@ -51,6 +51,22 @@ class SingleRecurringHandlerTest extends WP_UnitTestCase {
 		return $method->invoke( $this->handler, $config, $event_date );
 	}
 
+	public function test_renamed_occurrence_keeps_source_identity(): void {
+		$context = \DataMachine\Core\ExecutionContext::fromFlow( 219, 219, 'recurring-stable-test', null, 'single_recurring' );
+		$method  = $this->reflection->getMethod( 'executeFetch' );
+		$config  = array(
+			'event_title' => 'Original recurring title',
+			'day_of_week' => ( (int) wp_date( 'w' ) + 1 ) % 7,
+			'venue_name'  => 'Recurring test venue',
+		);
+		$first = $method->invoke( $this->handler, $config, $context );
+		$config['event_title'] = 'Renamed recurring title';
+		$edited = $method->invoke( $this->handler, $config, $context );
+		$this->assertNotEmpty( $first['metadata']['item_identifier'] );
+		$this->assertSame( $first['metadata']['item_identifier'], $edited['metadata']['item_identifier'] );
+		$this->assertNotSame( $first['metadata']['event_identifier'], $edited['metadata']['event_identifier'] );
+	}
+
 	public function test_today_counts_before_configured_start_time(): void {
 		$monday = $this->monday();
 		$now    = $monday->setTime( 8, 0 );

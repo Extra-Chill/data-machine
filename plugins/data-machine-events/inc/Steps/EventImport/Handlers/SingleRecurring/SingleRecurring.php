@@ -104,9 +104,13 @@ class SingleRecurring extends EventImportHandler {
 		$next_date       = $next_occurrence->format( 'Y-m-d' );
 
 		$standardized_event = $this->buildEventData( $config, $next_date );
-		$venue_name         = $config['venue_name'] ?? '';
-		$source_identity    = \DataMachineEvents\Utilities\EventSourceIdentity::resolve( $standardized_event, $context );
-		$event_identifier   = $source_identity['event_identifier'];
+		if ( null !== $context->getFlowId() ) {
+			$standardized_event['source_item_id'] = 'single_recurring:' . $context->getFlowId() . ':' . $next_date;
+		}
+
+		$venue_name       = $config['venue_name'] ?? '';
+		$source_identity  = \DataMachineEvents\Utilities\EventSourceIdentity::resolve( $standardized_event, $context );
+		$event_identifier = $source_identity['event_identifier'];
 
 		$context->log(
 			'info',

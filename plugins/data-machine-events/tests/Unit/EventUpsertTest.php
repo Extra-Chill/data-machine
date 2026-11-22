@@ -23,6 +23,33 @@ use DataMachineEvents\Blocks\Calendar\Query\UpcomingFilter;
 
 class EventUpsertTest extends EventUpsertTestCase {
 
+	public function test_stable_source_reimport_updates_same_post_after_title_and_time_edits(): void {
+		$context = \DataMachine\Core\ExecutionContext::fromFlow( 219, 219, 'upsert-stable-test', null, 'dice_fm' );
+		$event   = array(
+			'title'          => 'Original stable provider show ' . uniqid(),
+			'venue'          => 'Stable provider venue ' . uniqid(),
+			'startDate'      => self::future_year() . '-11-20',
+			'startTime'      => '20:00',
+			'source_item_id' => 'dice-' . uniqid(),
+		);
+		$resolved = \DataMachineEvents\Utilities\EventSourceIdentity::resolve( $event, $context );
+		$event['source_identity'] = \DataMachineEvents\Core\DuplicateDetection\EventIdentity::sourceIdentity(
+			array(
+				'source'    => 'dice_fm',
+				'source_id' => $resolved['item_identifier'],
+			),
+			new EngineData( $event, 0 )
+		);
+		$created = $this->invoke_upsert( $event );
+		$this->assertTrue( $created['success'] ?? false, wp_json_encode( $created ) );
+		$event['title']     = 'Completely renamed provider show';
+		$event['startTime'] = '23:00';
+		$updated = $this->invoke_upsert( $event );
+		$this->assertTrue( $updated['success'] ?? false, wp_json_encode( $updated ) );
+		$this->assertSame( $created['data']['post_id'], $updated['data']['post_id'] );
+		$this->assertSame( $event['title'], get_the_title( (int) $updated['data']['post_id'] ) );
+	}
+
 	public function test_handler_instantiation() {
 		$this->assertInstanceOf( EventUpsert::class, $this->handler );
 	}

@@ -273,6 +273,7 @@ class DiceFm extends EventImportHandler {
 		$end_parsed   = $this->parseDateTimeUtc( $event['date_end'] ?? '', $timezone );
 
 		return array(
+			'source_item_id'   => trim( (string) ( $event['id'] ?? $event['_id'] ?? '' ) ),
 			'title'            => sanitize_text_field( $event['name'] ?? '' ),
 			'startDate'        => $start_parsed['date'],
 			'endDate'          => $end_parsed['date'],
