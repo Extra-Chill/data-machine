@@ -184,10 +184,6 @@ class EventMergeHelper {
 				continue;
 			}
 			EventOwnership::linkSourceIdentity( $winner_id, $identity );
-			if ( ! EventOwnership::linksSourceIdentity( $winner_id, $identity ) ) {
-				self::removeIdentityLinks( $winner_id, $links );
-				return new \WP_Error( 'event_identity_transfer_failed', 'Failed to transfer event source identity.' );
-			}
 			$links[] = $identity;
 		}
 		$repository   = new PostIdentityReservations();
@@ -222,7 +218,7 @@ class EventMergeHelper {
 			return false;
 		}
 		$normalized = PostIdentityReservations::normalize_identity(
-			get_post_type( $loser_id ),
+			(string) get_post_type( $loser_id ),
 			array(
 				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
 				'value' => $identity,
@@ -235,7 +231,7 @@ class EventMergeHelper {
 		if ( is_wp_error( $moved ) ) {
 			return false;
 		}
-		if ( $identity !== (string) get_post_meta( $winner_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) ) {
+		if ( (string) get_post_meta( $winner_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) !== $identity ) {
 			self::removeIdentityLinks( $winner_id, array( $identity ) );
 		}
 		return true;

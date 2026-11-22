@@ -940,7 +940,7 @@ class EventUpsert extends UpsertHandler {
 			$target_id = (int) get_post_meta( $claimant_id, EventMergeHelper::MERGED_INTO_META_KEY, true );
 			if ( $target_id && 'trash' === get_post_status( $target_id )
 				&& ! EventMergeHelper::resolveMergedWinner( $claimant_id )
-				&& $source_identity !== (string) get_post_meta( $target_id, self::SOURCE_IDENTITY_META_KEY, true ) ) {
+				&& (string) get_post_meta( $target_id, self::SOURCE_IDENTITY_META_KEY, true ) !== $source_identity ) {
 				$claimant_ids = array_values( array_diff( $claimant_ids, array( $target_id ) ) );
 			}
 		}
