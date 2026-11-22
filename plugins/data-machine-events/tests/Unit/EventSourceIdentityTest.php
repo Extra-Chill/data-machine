@@ -138,6 +138,61 @@ class EventSourceIdentityTest extends WP_UnitTestCase {
 		);
 	}
 
+	public function test_stable_id_survives_title_and_time_edits(): void {
+		$event                   = $this->event();
+		$event['source_item_id'] = 'provider-123';
+		$first                   = EventSourceIdentity::resolve( $event, $this->context() );
+		$event['title']          = 'A completely different title';
+		$event['startTime']      = '23:00';
+		$edited                  = EventSourceIdentity::resolve( $event, $this->context() );
+
+		$this->assertSame( 'provider-123', $first['item_identifier'] );
+		$this->assertSame( $first['item_identifier'], $edited['item_identifier'] );
+		$this->assertNotSame( $first['event_identifier'], $edited['event_identifier'] );
+	}
+
+	public function test_processed_content_identity_links_stable_identity_to_canonical_post(): void {
+		$event   = $this->event();
+		$current = $this->currentIdentifier( $event );
+		$this->seedCanonicalEvent( $event );
+		$post_id = $this->post_ids[0];
+		( new ProcessedItems() )->add_processed_item( $this->flow_step_id, $this->source_type, $current, 4001 );
+		$event['source_item_id'] = 'provider-migration';
+
+		$resolved = EventSourceIdentity::resolve( $event, $this->context() );
+		$this->assertSame( 'provider-migration', $resolved['item_identifier'] );
+		$stable = \DataMachineEvents\Core\DuplicateDetection\EventIdentity::sourceIdentity(
+			array(
+				'source'    => $this->source_type,
+				'source_id' => $resolved['item_identifier'],
+			),
+			new \DataMachine\Core\EngineData( $event, 0 )
+		);
+		$this->assertTrue( \DataMachineEvents\Core\EventOwnership::linksSourceIdentity( $post_id, $stable ) );
+
+		$event['title']     = 'Renamed beyond recognition';
+		$event['startTime'] = '23:00';
+		$identity = \DataMachineEvents\Core\DuplicateDetection\EventIdentity::resolve(
+			array(
+				'title'     => $event['title'],
+				'source'    => $this->source_type,
+				'source_id' => $resolved['item_identifier'],
+			),
+			new \DataMachine\Core\EngineData( $event, 0 )
+		);
+		$this->assertSame( $post_id, $identity['post_id'] );
+		$this->assertSame( 'source_identity', $identity['strategy'] );
+	}
+
+	public function test_processed_content_without_canonical_event_advances_to_stable_id(): void {
+		$event = $this->event();
+		( new ProcessedItems() )->add_processed_item( $this->flow_step_id, $this->source_type, $this->currentIdentifier( $event ), 4002 );
+		$event['source_item_id'] = 'missing-canonical';
+		$resolved = EventSourceIdentity::resolve( $event, $this->context() );
+		$this->assertSame( 'missing-canonical', $resolved['item_identifier'] );
+		$this->assertFalse( ( new ProcessedItems() )->has_item_been_processed( $this->flow_step_id, $this->source_type, 'missing-canonical' ) );
+	}
+
 	private function event(): array {
 		return array(
 			'title'         => 'Motown Throwdown ' . $this->flow_step_id,
