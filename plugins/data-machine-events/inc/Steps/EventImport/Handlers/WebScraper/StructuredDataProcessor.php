@@ -46,8 +46,25 @@ class StructuredDataProcessor {
 		ExecutionContext $context
 	): ?array {
 		$eligible_items = array();
+		$url_counts     = array();
+		foreach ( $events as $event ) {
+			$url = is_string( $event['url'] ?? null ) ? trim( $event['url'] ) : '';
+			if ( '' !== $url ) {
+				$url_counts[ $url ] = ( $url_counts[ $url ] ?? 0 ) + 1;
+			}
+		}
 
 		foreach ( $events as $raw_event ) {
+			// Count before filtering: an ineligible sibling still makes a URL shared.
+			if ( empty( $raw_event['source_item_id'] ) ) {
+				$id  = is_string( $raw_event['@id'] ?? null ) ? trim( $raw_event['@id'] ) : '';
+				$url = is_string( $raw_event['url'] ?? null ) ? trim( $raw_event['url'] ) : '';
+				if ( '' !== $id ) {
+					$raw_event['source_item_id'] = $id;
+				} elseif ( '' !== $url && 1 === $url_counts[ $url ] && untrailingslashit( $url ) !== untrailingslashit( $source_url ) ) {
+					$raw_event['source_item_id'] = $url;
+				}
+			}
 			$event_config = $config;
 			$event        = TitleVenuePrefixNormalizer::normalize( $raw_event, $event_config );
 			// The AI also sees raw_source: do not reintroduce room names there.

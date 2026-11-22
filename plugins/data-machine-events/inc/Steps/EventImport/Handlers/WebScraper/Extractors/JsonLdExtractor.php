@@ -257,6 +257,13 @@ class JsonLdExtractor extends BaseExtractor {
 			'description' => $event_data['description'] ?? '',
 		);
 
+		// Keep event-level identity separate from offers and venue URLs.
+		foreach ( array( '@id', 'url' ) as $field ) {
+			if ( is_string( $event_data[ $field ] ?? null ) ) {
+				$event[ $field ] = trim( $event_data[ $field ] );
+			}
+		}
+
 		$this->parseDates( $event, $event_data );
 		$this->parsePerformerAndOrganizer( $event, $event_data );
 		$this->parseLocation( $event, $event_data );

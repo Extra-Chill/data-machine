@@ -1027,6 +1027,10 @@ class SquarespaceExtractor extends BaseExtractor {
 			'source_url'    => '',
 		);
 
+		if ( is_scalar( $item['id'] ?? null ) && '' !== trim( (string) $item['id'] ) ) {
+			$event['source_item_id'] = trim( (string) $item['id'] );
+		}
+
 		// Extract venue from event's location object (takes priority over page_venue)
 		$this->parseEventLocation( $event, $item );
 
