@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.5] - 2026-11-22
+
+### Fixed
+- merge hands source identity and reservations to the winner
+
 ## [0.205.4] - 2026-11-21
 
 ### Fixed
