@@ -1604,12 +1604,14 @@ class Venue_Taxonomy {
 		$matches = array();
 		foreach ( $venues as $venue ) {
 			$other = $parse( (string) get_term_meta( $venue->term_id, '_venue_coordinates', true ) );
-			if ( ! $other || self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
+			if ( ! $other ) {
 				continue;
 			}
 			$a = sin( deg2rad( $point[0] - $other[0] ) / 2 ) ** 2
 				+ cos( deg2rad( $point[0] ) ) * cos( deg2rad( $other[0] ) ) * sin( deg2rad( $point[1] - $other[1] ) / 2 ) ** 2;
-			if ( 6371000 * 2 * asin( sqrt( min( 1, $a ) ) ) <= 25 ) {
+			// Only nearby venues need the expensive address and geography checks.
+			if ( 6371000 * 2 * asin( sqrt( min( 1, $a ) ) ) <= 25
+				&& ! self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
 				$matches[] = $venue;
 			}
 		}
