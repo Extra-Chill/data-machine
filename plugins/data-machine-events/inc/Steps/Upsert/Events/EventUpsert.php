@@ -385,6 +385,11 @@ class EventUpsert extends UpsertHandler {
 			);
 		}
 		$existing_post_id       = (int) $identity['post_id'];
+		// The merge winner itself was trashed: restore this source's own post,
+		// so take back the claim the merge handed to the now-trashed winner.
+		if ( $existing_post_id > 0 && 'source_identity' === $identity['strategy'] && 'trash' === get_post_status( $existing_post_id ) ) {
+			EventMergeHelper::reclaimFromTrashedWinner( $existing_post_id );
+		}
 		$authoritative_venue_id = (int) $venue_resolution['term_id'];
 		$festival_match         = 'festival_lineup' === ( $identity['match']['merge_mode'] ?? '' ) ? $identity['match'] : array();
 

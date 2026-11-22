@@ -194,9 +194,48 @@ class EventMergeHelper {
 			return $reservations;
 		}
 		return array(
-'links' => $links,
-'reservations' => $reservations
-);
+			'links'        => $links,
+			'reservations' => $reservations,
+		);
+	}
+
+	/**
+	 * Return a merged loser's own source claims when its winner was trashed.
+	 *
+	 * Merge hands the loser's reservations to the winner. If the winner is later
+	 * trashed (not merged elsewhere), re-importing the loser's source restores
+	 * the loser, so its own primary identity must point back at it. Only the
+	 * loser's primary identity moves; nothing the winner owned is touched.
+	 *
+	 * @return bool Whether any claim was reclaimed.
+	 */
+	public static function reclaimFromTrashedWinner( int $loser_id ): bool {
+		$winner_id = (int) get_post_meta( $loser_id, self::MERGED_INTO_META_KEY, true );
+		if ( $winner_id <= 0 || 'trash' !== get_post_status( $loser_id ) || 'trash' !== get_post_status( $winner_id ) || self::resolveMergedWinner( $loser_id ) > 0 ) {
+			return false;
+		}
+		$identity = (string) get_post_meta( $loser_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true );
+		if ( '' === $identity ) {
+			return false;
+		}
+		$normalized = PostIdentityReservations::normalize_identity(
+			get_post_type( $loser_id ),
+			array(
+				'key'   => EventUpsert::SOURCE_IDENTITY_META_KEY,
+				'value' => $identity,
+			)
+		);
+		if ( is_wp_error( $normalized ) ) {
+			return false;
+		}
+		$moved = ( new PostIdentityReservations() )->transfer_post_reservations( $winner_id, $loser_id, array( $normalized['identity_hash'] ) );
+		if ( is_wp_error( $moved ) ) {
+			return false;
+		}
+		if ( $identity !== (string) get_post_meta( $winner_id, EventUpsert::SOURCE_IDENTITY_META_KEY, true ) ) {
+			self::removeIdentityLinks( $winner_id, array( $identity ) );
+		}
+		return true;
 	}
 
 	/** Remove only source identity links created by this attempt. */
