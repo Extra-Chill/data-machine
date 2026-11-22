@@ -384,7 +384,7 @@ class EventUpsert extends UpsertHandler {
 				)
 			);
 		}
-		$existing_post_id       = (int) $identity['post_id'];
+		$existing_post_id = (int) $identity['post_id'];
 		// The merge winner itself was trashed: restore this source's own post,
 		// so take back the claim the merge handed to the now-trashed winner.
 		if ( $existing_post_id > 0 && 'source_identity' === $identity['strategy'] && 'trash' === get_post_status( $existing_post_id ) ) {
