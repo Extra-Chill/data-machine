@@ -517,6 +517,46 @@ class PostIdentityReservations extends BaseRepository {
 		return false === $result ? 0 : (int) $result;
 	}
 
+	/**
+	 * Reassign a merged post's reservations without changing their identity or state.
+	 *
+	 * Pass the returned hashes when reversing a failed merge so unrelated winner
+	 * reservations are never moved. An empty list is a no-op.
+	 *
+	 * @return string[]|\WP_Error Transferred reservation hashes.
+	 */
+	public function transfer_post_reservations( int $from_id, int $to_id, ?array $hashes = null ): array|\WP_Error {
+		if ( $from_id <= 0 || $to_id <= 0 || $from_id === $to_id ) {
+			return new \WP_Error( 'identity_transfer_invalid', 'Distinct positive post IDs are required.' );
+		}
+		if ( null === $hashes ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+			$hashes = $this->wpdb->get_col( $this->wpdb->prepare( 'SELECT identity_hash FROM %i WHERE post_id = %d', $this->table_name, $from_id ) );
+			if ( $this->wpdb->last_error ) {
+				return new \WP_Error( 'identity_transfer_failed', 'Could not read post identity reservations.' );
+			}
+		}
+		if ( empty( $hashes ) ) {
+			return array();
+		}
+		$placeholders = implode( ',', array_fill( 0, count( $hashes ), '%s' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $this->wpdb->query(
+			$this->wpdb->prepare(
+				"UPDATE %i SET post_id = %d, updated_at = %s WHERE post_id = %d AND identity_hash IN ({$placeholders})",
+				$this->table_name,
+				$to_id,
+				current_time( 'mysql', true ),
+				$from_id,
+				...$hashes
+			)
+		);
+		if ( false === $updated ) {
+			return new \WP_Error( 'identity_transfer_failed', 'Could not transfer post identity reservations.' );
+		}
+		return $hashes;
+	}
+
 	/** @return true|\WP_Error */
 	public function mark_complete( array $identity, int $post_id ) {
 		$post = get_post( $post_id );
