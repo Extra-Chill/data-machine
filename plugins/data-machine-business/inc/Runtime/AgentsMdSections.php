@@ -56,7 +56,7 @@ Data Machine Business owns analytics, revenue, performance, and media-maintenanc
 **Default routing**
 - Traffic and audience analytics: `{$wp} datamachine analytics ga <action>`
 - Search performance and indexing: `{$wp} datamachine analytics gsc <action>` or `{$wp} datamachine analytics bing <action>`
-- Publisher revenue reporting: `{$wp} datamachine analytics mediavine <action>`
+- Publisher revenue reporting: `{$wp} datamachine analytics mediavine <action>` (ad revenue) and `{$wp} datamachine analytics amazon <action>` (Amazon Associates affiliate revenue, import-based: `import --file=<report.csv>`, then `summary`; check `coverage` before reporting totals)
 - Read-only Stripe revenue and billing reports: `{$wp} datamachine analytics stripe <action>`
 - Stripe Payment Links (human approval required): `{$wp} datamachine stripe payment-link stage --name=<name> --amount=<n> [--interval=month]`
 - Web performance diagnostics: `{$wp} datamachine analytics pagespeed <action>`
