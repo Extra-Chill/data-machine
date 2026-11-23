@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.6] - 2026-11-23
+
+### Fixed
+- let fetch handlers report a failed fetch
+
 ## [0.205.5] - 2026-11-22
 
 ### Fixed
