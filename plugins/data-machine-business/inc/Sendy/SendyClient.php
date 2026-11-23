@@ -399,7 +399,7 @@ class SendyClient {
 			}
 			$body[ $field ] = $campaign[ $field ];
 		}
-		if ( ! is_email( $body['from_email'] ) || ! is_email( $body['reply_to'] ) ) {
+		if ( ! is_email( $campaign['from_email'] ) || ! is_email( $campaign['reply_to'] ) ) {
 			$result['message'] = 'from_email and reply_to must be valid email addresses.';
 			return $result;
 		}
@@ -412,6 +412,7 @@ class SendyClient {
 				$body[ $field ] = $campaign[ $field ];
 			}
 		}
+		$has_target = false;
 		foreach ( array( 'list_ids', 'segment_ids', 'exclude_list_ids', 'exclude_segment_ids' ) as $field ) {
 			$ids = $campaign[ $field ] ?? array();
 			if ( ! is_array( $ids ) ) {
@@ -427,8 +428,11 @@ class SendyClient {
 			// Sendy's API uses the plural "segments" for this exclusion key.
 			$key          = 'exclude_segment_ids' === $field ? 'exclude_segments_ids' : $field;
 			$body[ $key ] = implode( ',', array_unique( $ids ) );
+			if ( ! empty( $ids ) && in_array( $field, array( 'list_ids', 'segment_ids' ), true ) ) {
+				$has_target = true;
+			}
 		}
-		if ( '' === $body['list_ids'] && '' === $body['segment_ids'] ) {
+		if ( ! $has_target ) {
 			$result['message'] = 'At least one list or segment ID is required.';
 			return $result;
 		}

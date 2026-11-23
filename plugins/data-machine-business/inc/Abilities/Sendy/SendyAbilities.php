@@ -244,7 +244,10 @@ class SendyAbilities {
 		foreach ( array( 'list_ids', 'segment_ids', 'exclude_list_ids', 'exclude_segment_ids' ) as $field ) {
 			$send_properties[ $field ] = array(
 				'type'  => 'array',
-				'items' => array( 'type' => 'string', 'minLength' => 1 ),
+				'items' => array(
+					'type'      => 'string',
+					'minLength' => 1,
+				),
 			);
 		}
 		wp_register_ability(
