@@ -371,6 +371,123 @@ class SendyClient {
 	}
 
 	/**
+	 * Create a new campaign and send or schedule it. Never updates a draft.
+	 *
+	 * Target arrays contain individual Sendy IDs, not comma-separated values.
+	 * Only explicitly supported fields are forwarded; extra cannot override targets.
+	 *
+	 * @param array $campaign Content, sender, target arrays and optional schedule.
+	 * @return array Normalized result, including failures before transport.
+	 */
+	public function send_campaign( array $campaign ): array {
+		$result = array(
+			'success'     => false,
+			'campaign_id' => null,
+			'message'     => '',
+			'scheduled'   => false,
+			'raw'         => '',
+		);
+
+		$body = array(
+			'api_key'       => $this->api_key,
+			'send_campaign' => 1,
+		);
+		foreach ( array( 'from_name', 'from_email', 'reply_to', 'subject', 'html_text', 'brand_id' ) as $field ) {
+			if ( ! isset( $campaign[ $field ] ) || ! is_string( $campaign[ $field ] ) || '' === trim( $campaign[ $field ] ) ) {
+				$result['message'] = $field . ' is required.';
+				return $result;
+			}
+			$body[ $field ] = $campaign[ $field ];
+		}
+		if ( ! is_email( $campaign['from_email'] ) || ! is_email( $campaign['reply_to'] ) ) {
+			$result['message'] = 'from_email and reply_to must be valid email addresses.';
+			return $result;
+		}
+		foreach ( array( 'plain_text', 'title', 'query_string' ) as $field ) {
+			if ( isset( $campaign[ $field ] ) ) {
+				if ( ! is_string( $campaign[ $field ] ) ) {
+					$result['message'] = $field . ' must be a string.';
+					return $result;
+				}
+				$body[ $field ] = $campaign[ $field ];
+			}
+		}
+		$has_target = false;
+		foreach ( array( 'list_ids', 'segment_ids', 'exclude_list_ids', 'exclude_segment_ids' ) as $field ) {
+			$ids = $campaign[ $field ] ?? array();
+			if ( ! is_array( $ids ) ) {
+				$result['message'] = $field . ' must be an array of individual IDs.';
+				return $result;
+			}
+			foreach ( $ids as $id ) {
+				if ( ! is_string( $id ) || '' === trim( $id ) || trim( $id ) !== $id || false !== strpos( $id, ',' ) ) {
+					$result['message'] = $field . ' contains an empty or ambiguous ID.';
+					return $result;
+				}
+			}
+			// Sendy's API uses the plural "segments" for this exclusion key.
+			$key          = 'exclude_segment_ids' === $field ? 'exclude_segments_ids' : $field;
+			$body[ $key ] = implode( ',', array_unique( $ids ) );
+			if ( ! empty( $ids ) && in_array( $field, array( 'list_ids', 'segment_ids' ), true ) ) {
+				$has_target = true;
+			}
+		}
+		if ( ! $has_target ) {
+			$result['message'] = 'At least one list or segment ID is required.';
+			return $result;
+		}
+
+		$when = $campaign['schedule_date_time'] ?? '';
+		$zone = $campaign['schedule_timezone'] ?? '';
+		if ( ! is_string( $when ) || ! is_string( $zone ) || ( '' === $when && '' !== $zone ) ) {
+			$result['message'] = 'schedule_timezone requires schedule_date_time.';
+			return $result;
+		}
+		if ( '' !== $when ) {
+			if ( ! in_array( $zone, \DateTimeZone::listIdentifiers( \DateTimeZone::ALL_WITH_BC ), true ) ) {
+				$result['message'] = 'A valid schedule_timezone is required.';
+				return $result;
+			}
+			$date = \DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $when, new \DateTimeZone( $zone ) );
+			if ( ! $date || $date->format( 'Y-m-d H:i' ) !== $when || 0 !== (int) $date->format( 'i' ) % 5 || $date->getTimestamp() <= time() ) {
+				$result['message'] = 'schedule_date_time must be a future Y-m-d H:i time in five-minute steps.';
+				return $result;
+			}
+			$body['schedule_date_time'] = $when;
+			$body['schedule_timezone']  = $zone;
+		}
+		if ( ! $this->has_api_config() ) {
+			$result['message'] = 'Sendy API key or URL not configured.';
+			return $result;
+		}
+
+		$response = wp_remote_post(
+			$this->sendy_url . '/api/campaigns/create.php',
+			array(
+				'headers' => array( 'Content-Type' => 'application/x-www-form-urlencoded' ),
+				'body'    => $body,
+				'timeout' => 30,
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			$result['message'] = $this->normalize_transport_error( $response )->get_error_message();
+			return $result;
+		}
+		$result['raw']     = (string) wp_remote_retrieve_body( $response );
+		$raw               = trim( $result['raw'] );
+		$status            = wp_remote_retrieve_response_code( $response );
+		$result['message'] = '' !== $raw ? $raw : 'Empty Sendy response.';
+		if ( $status >= 200 && $status < 300 ) {
+			$result['success'] = in_array( $raw, array( 'Campaign created and now sending', 'Campaign scheduled' ), true ) || ctype_digit( $raw );
+			if ( $result['success'] ) {
+				$result['scheduled']   = 'Campaign scheduled' === $raw || ( ctype_digit( $raw ) && '' !== $when );
+				$result['campaign_id'] = ctype_digit( $raw ) ? $raw : null;
+			}
+		}
+		return $result;
+	}
+
+	/**
 	 * Update an unsent Sendy campaign draft in the Sendy DB.
 	 *
 	 * @param int   $campaign_id Campaign primary key.

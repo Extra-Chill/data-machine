@@ -135,12 +135,13 @@ assert_provider_bootstrap(
 	array(
 		'datamachine/sendy-subscribe',
 		'datamachine/sendy-push-campaign',
+		'datamachine/sendy-send-campaign',
 		'datamachine/sendy-list-campaigns',
 		'datamachine/sendy-get-campaign',
 		'datamachine/sendy-delete-campaign',
 		'datamachine/sendy-metrics',
 	) === $sendy,
-	'Sendy public ability contract is unchanged'
+	'Sendy public ability contract includes sending alongside draft management'
 );
 
 $discovery_log = array();
