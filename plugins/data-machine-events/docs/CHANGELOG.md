@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.5] - 2026-11-23
+
+### Changed
+- bound proximity candidates and reject address mismatches early
+
 ## [0.91.4] - 2026-11-23
 
 ### Fixed
