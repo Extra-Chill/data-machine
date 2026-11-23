@@ -130,6 +130,14 @@ class Venue_Taxonomy {
 	private const FUZZY_NAME_ONE_EDIT_MAX_LENGTH = 12;
 
 	/**
+	 * Coordinates within this distance count as strong location evidence
+	 * when ranking same-name venue candidates (#4030).
+	 *
+	 * @var int
+	 */
+	private const EVIDENCE_PROXIMITY_METERS = 150;
+
+	/**
 	 * Bounded ordinal word map for address matching (#803).
 	 *
 	 * @var array<string,string>
@@ -1127,6 +1135,17 @@ class Venue_Taxonomy {
 			}
 
 			if ( count( $compatible ) > 1 ) {
+				$ranked = self::select_by_location_evidence( $venue_name, $compatible, $venue_data );
+				if ( $ranked ) {
+					return array(
+						'term'                 => $ranked,
+						'ambiguous'            => false,
+						'conflict'             => false,
+						'conflicting_term_ids' => array(),
+						'matched_via'          => 'evidence_ranked',
+					);
+				}
+
 				return array(
 					'term'                 => null,
 					'ambiguous'            => true,
@@ -1295,8 +1314,194 @@ class Venue_Taxonomy {
 			return $no_match;
 		}
 
+		if ( count( $compatible ) > 1 ) {
+			$ranked = self::select_by_location_evidence( $venue_name, $compatible, $venue_data );
+			if ( $ranked ) {
+				$no_match['term']        = $ranked;
+				$no_match['matched_via'] = 'evidence_ranked';
+				return $no_match;
+			}
+		}
+
 		$no_match['ambiguous'] = count( $compatible ) > 1;
 		return $no_match;
+	}
+
+	/**
+	 * Choose one same-name candidate by location evidence (#4030).
+	 *
+	 * Several compatible same-name terms are no longer automatically
+	 * ambiguous. Candidates carrying strong evidence (stored coordinates near
+	 * the incoming coordinates, or the same street identity plus postal code)
+	 * are preferred; a single such candidate wins. When the remaining
+	 * candidates all sit at the same coordinates they are one venue split
+	 * across terms, so the term with the most events wins. Anything else
+	 * (different streets, no coordinate agreement) stays ambiguous.
+	 *
+	 * Without strong evidence, all compatible candidates are considered only
+	 * when the incoming side carries no coordinates: incoming coordinates that
+	 * agree with none of the candidates are not evidence for any of them.
+	 *
+	 * @param string               $venue_name Venue name as supplied (for logging).
+	 * @param \WP_Term[]           $candidates Compatible same-name candidates.
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return \WP_Term|null Selected term, or null when still ambiguous.
+	 */
+	private static function select_by_location_evidence( string $venue_name, array $candidates, array $venue_data ): ?\WP_Term {
+		$candidates = array_values( $candidates );
+		$strong     = array_values(
+			array_filter(
+				$candidates,
+				static fn( $venue ) => self::has_strong_location_evidence( (int) $venue->term_id, $venue_data )
+			)
+		);
+
+		if ( $strong ) {
+			$pool = $strong;
+		} elseif ( null === self::incoming_coordinates( $venue_data ) ) {
+			$pool = $candidates;
+		} else {
+			return null;
+		}
+
+		$reason = 'strong_evidence';
+		if ( count( $pool ) > 1 ) {
+			if ( ! self::candidates_share_coordinates( $pool ) ) {
+				return null;
+			}
+
+			usort(
+				$pool,
+				static function ( $a, $b ) {
+					$by_count = (int) $b->count <=> (int) $a->count;
+					return 0 !== $by_count ? $by_count : (int) $a->term_id <=> (int) $b->term_id;
+				}
+			);
+			$reason = 'shared_coordinates';
+		}
+
+		$selected = $pool[0];
+
+		do_action(
+			'datamachine_log',
+			'info',
+			'Venue matched via evidence-ranked selection among same-name candidates',
+			array(
+				'input_name'   => $venue_name,
+				'matched_name' => $selected->name,
+				'matched_id'   => (int) $selected->term_id,
+				'matched_via'  => 'evidence_ranked',
+				'reason'       => $reason,
+				'candidates'   => array_map( static fn( $venue ) => (int) $venue->term_id, $candidates ),
+			)
+		);
+
+		return $selected;
+	}
+
+	/**
+	 * Whether every candidate's stored coordinates lie within the evidence
+	 * radius of every other candidate's (#4030).
+	 *
+	 * @param \WP_Term[] $candidates Venue terms.
+	 * @return bool False when any candidate lacks usable coordinates.
+	 */
+	private static function candidates_share_coordinates( array $candidates ): bool {
+		$points = array();
+		foreach ( $candidates as $venue ) {
+			$point = self::parse_coordinates( (string) get_term_meta( (int) $venue->term_id, self::$meta_fields['coordinates'], true ) );
+			if ( null === $point ) {
+				return false;
+			}
+			$points[] = $point;
+		}
+
+		$total = count( $points );
+		for ( $i = 0; $i < $total; $i++ ) {
+			for ( $j = $i + 1; $j < $total; $j++ ) {
+				if ( self::coordinate_distance_meters( $points[ $i ], $points[ $j ] ) > self::EVIDENCE_PROXIMITY_METERS ) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Strong location evidence for a stored venue (#4030): stored coordinates
+	 * within the evidence radius of the incoming coordinates, or the same
+	 * street identity plus the same postal code.
+	 *
+	 * @param int                  $term_id    Stored venue term ID.
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return bool
+	 */
+	private static function has_strong_location_evidence( int $term_id, array $venue_data ): bool {
+		return self::has_nearby_coordinates( $term_id, $venue_data )
+			|| self::has_matching_street_and_postal_code( $term_id, $venue_data );
+	}
+
+	/**
+	 * Whether a stored venue sits within the evidence radius of the incoming coordinates.
+	 *
+	 * @param int                  $term_id    Stored venue term ID.
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return bool
+	 */
+	private static function has_nearby_coordinates( int $term_id, array $venue_data ): bool {
+		$point = self::incoming_coordinates( $venue_data );
+		if ( null === $point ) {
+			return false;
+		}
+
+		$stored = self::parse_coordinates( (string) get_term_meta( $term_id, self::$meta_fields['coordinates'], true ) );
+
+		return null !== $stored && self::coordinate_distance_meters( $point, $stored ) <= self::EVIDENCE_PROXIMITY_METERS;
+	}
+
+	/**
+	 * Verified incoming coordinates as a [lat, lng] pair.
+	 *
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return float[]|null
+	 */
+	private static function incoming_coordinates( array $venue_data ): ?array {
+		if ( self::is_unverified_field( $venue_data, 'coordinates' ) ) {
+			return null;
+		}
+
+		return self::parse_coordinates( (string) ( $venue_data['coordinates'] ?? '' ) );
+	}
+
+	/**
+	 * Parse a "lat,lng" string into a [lat, lng] pair.
+	 *
+	 * @param string $value Coordinate string.
+	 * @return float[]|null Null when malformed or out of range.
+	 */
+	private static function parse_coordinates( string $value ): ?array {
+		$parts = explode( ',', $value );
+		if ( 2 !== count( $parts ) || ! is_numeric( trim( $parts[0] ) ) || ! is_numeric( trim( $parts[1] ) ) ) {
+			return null;
+		}
+		$point = array_map( 'floatval', $parts );
+
+		return abs( $point[0] ) <= 90 && abs( $point[1] ) <= 180 ? $point : null;
+	}
+
+	/**
+	 * Haversine distance between two [lat, lng] pairs, in meters.
+	 *
+	 * @param float[] $a First point.
+	 * @param float[] $b Second point.
+	 * @return float
+	 */
+	private static function coordinate_distance_meters( array $a, array $b ): float {
+		$h = sin( deg2rad( $a[0] - $b[0] ) / 2 ) ** 2
+			+ cos( deg2rad( $a[0] ) ) * cos( deg2rad( $b[0] ) ) * sin( deg2rad( $a[1] - $b[1] ) / 2 ) ** 2;
+
+		return 6371000 * 2 * asin( sqrt( min( 1, $h ) ) );
 	}
 
 	/**
@@ -1579,18 +1784,7 @@ class Venue_Taxonomy {
 
 	/** Reuse only a unique venue within 25m, with no conflicting geography. */
 	private static function find_venue_by_proximity( array $venue_data ): ?\WP_Term {
-		if ( self::is_unverified_field( $venue_data, 'coordinates' ) ) {
-			return null;
-		}
-		$parse = static function ( string $value ): ?array {
-			$parts = explode( ',', $value );
-			if ( 2 !== count( $parts ) || ! is_numeric( trim( $parts[0] ) ) || ! is_numeric( trim( $parts[1] ) ) ) {
-				return null;
-			}
-			$point = array_map( 'floatval', $parts );
-			return abs( $point[0] ) <= 90 && abs( $point[1] ) <= 180 ? $point : null;
-		};
-		$point = $parse( (string) ( $venue_data['coordinates'] ?? '' ) );
+		$point = self::incoming_coordinates( $venue_data );
 		if ( ! $point ) {
 			return null;
 		}
@@ -1603,14 +1797,12 @@ class Venue_Taxonomy {
 		}
 		$matches = array();
 		foreach ( $venues as $venue ) {
-			$other = $parse( (string) get_term_meta( $venue->term_id, '_venue_coordinates', true ) );
+			$other = self::parse_coordinates( (string) get_term_meta( $venue->term_id, '_venue_coordinates', true ) );
 			if ( ! $other ) {
 				continue;
 			}
-			$a = sin( deg2rad( $point[0] - $other[0] ) / 2 ) ** 2
-				+ cos( deg2rad( $point[0] ) ) * cos( deg2rad( $other[0] ) ) * sin( deg2rad( $point[1] - $other[1] ) / 2 ) ** 2;
 			// Only nearby venues need the expensive address and geography checks.
-			if ( 6371000 * 2 * asin( sqrt( min( 1, $a ) ) ) <= 25
+			if ( self::coordinate_distance_meters( $point, $other ) <= 25
 				&& ! self::has_geographic_conflict( (int) $venue->term_id, $venue_data ) ) {
 				$matches[] = $venue;
 			}
@@ -1663,6 +1855,25 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Nearby coordinates plus an equal postal code reconcile differing city
+	 * labels (#4030). State and country conflicts are still checked independently.
+	 *
+	 * @param int                  $term_id    Stored venue term ID.
+	 * @param array<string, mixed> $venue_data Incoming venue metadata.
+	 * @return bool
+	 */
+	private static function has_matching_coordinates_and_postal_code( int $term_id, array $venue_data ): bool {
+		if ( self::is_unverified_field( $venue_data, 'zip' ) ) {
+			return false;
+		}
+
+		$zip        = trim( (string) ( $venue_data['zip'] ?? '' ) );
+		$stored_zip = trim( (string) get_term_meta( $term_id, self::$meta_fields['zip'], true ) );
+
+		return '' !== $zip && $zip === $stored_zip && self::has_nearby_coordinates( $term_id, $venue_data );
+	}
+
+	/**
 	 * Whether a venue-data field was supplied by the AI step, not the source.
 	 *
 	 * @param array  $venue_data Incoming venue metadata.
@@ -1689,10 +1900,13 @@ class Venue_Taxonomy {
 	 * @return bool
 	 */
 	private static function has_geographic_conflict( int $term_id, array $venue_data ): bool {
-		$street_and_postal_match = self::has_matching_street_and_postal_code( $term_id, $venue_data );
+		// Equal street + postal code, or equal coordinates + postal code
+		// (#4030: "Palms" vs "Isle of Palms"), reconcile differing city labels.
+		$skip_city = self::has_matching_street_and_postal_code( $term_id, $venue_data )
+			|| self::has_matching_coordinates_and_postal_code( $term_id, $venue_data );
 
 		foreach ( array( 'address', 'city', 'state', 'country' ) as $field ) {
-			if ( 'city' === $field && $street_and_postal_match ) {
+			if ( 'city' === $field && $skip_city ) {
 				continue;
 			}
 
