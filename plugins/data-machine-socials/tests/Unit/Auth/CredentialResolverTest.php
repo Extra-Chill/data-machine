@@ -64,6 +64,44 @@ final class CredentialResolverTest extends WP_UnitTestCase {
 		$this->assertSame( 'example-token', $resolved['token'] );
 	}
 
+	public function test_expired_token_refreshes_even_when_authentication_required(): void {
+		// is_authenticated() is false because the access token expired, but the
+		// provider can still refresh it from a stored refresh token.
+		$provider = $this->stubProvider( false, 'refreshed-token' );
+
+		$resolved = CredentialResolver::token( 'example', 'Example' );
+
+		$this->assertIsArray( $resolved );
+		$this->assertSame( $provider, $resolved['provider'] );
+		$this->assertSame( 'refreshed-token', $resolved['token'] );
+		$this->assertSame( 1, $provider->token_calls );
+	}
+
+	public function test_expired_token_with_failed_refresh_returns_missing_auth(): void {
+		$provider = $this->stubProvider( false, null );
+
+		$result = CredentialResolver::token( 'example', 'Example' );
+
+		$this->assertMissingAuth( $result, 'Example access token is missing or expired. Re-authorize in WP Admin > Data Machine > Settings.' );
+		$this->assertSame( 1, $provider->token_calls );
+	}
+
+	public function test_provider_without_token_lifecycle_still_requires_authentication(): void {
+		$provider = new class() {
+			public function is_authenticated(): bool {
+				return false;
+			}
+		};
+		$this->provider_filter = static function ( $providers ) use ( $provider ) {
+			$providers['example'] = $provider;
+			return $providers;
+		};
+		add_filter( 'datamachine_auth_providers', $this->provider_filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
+
+		$this->assertMissingAuth( CredentialResolver::token( 'example', 'Example' ), 'Example not authenticated' );
+	}
+
 	/**
 	 * @dataProvider emptyTokenProvider
 	 */
