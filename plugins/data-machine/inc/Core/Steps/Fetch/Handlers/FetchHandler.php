@@ -80,7 +80,7 @@ abstract class FetchHandler {
 			return $result;
 		}
 
-		if ( empty( $result ) || ! is_array( $result ) ) {
+		if ( empty( $result ) ) {
 			$this->recordFetchDiagnostics( $context, $stages );
 			return array();
 		}

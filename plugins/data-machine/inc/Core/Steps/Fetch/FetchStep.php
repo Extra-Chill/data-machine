@@ -251,8 +251,8 @@ class FetchStep extends Step {
 			);
 
 			return array(
-				'status'  => 'failed',
-				'packets' => $this->dataPackets,
+				'status'     => 'failed',
+				'packets'    => $this->dataPackets,
 				'reason'     => 'handler_failed',
 				'error'      => $packets->get_error_message(),
 				'error_code' => (string) $packets->get_error_code(),
