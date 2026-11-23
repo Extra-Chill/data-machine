@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.3] - 2026-11-23
+
+### Changed
+- narrow venue address lookup candidates in SQL
+
 ## [0.91.2] - 2026-11-23
 
 ### Fixed
