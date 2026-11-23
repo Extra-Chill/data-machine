@@ -181,12 +181,12 @@ abstract class FetchHandler {
 			$diagnostics['invalid_items']             = max( 0, (int) $diagnostics['source_materialized'] - $valid_items );
 			$diagnostics['identified_items']          = count( $identifiers );
 			$diagnostics['identifierless_items']      = $identifierless_items;
-			$diagnostics['unique_identifiers']        = (int) ( $counts['unique'] ?? 0 );
-			$diagnostics['duplicate_identifiers']     = (int) ( $counts['duplicates'] ?? 0 );
-			$diagnostics['eligible_before_max_items'] = (int) ( $counts['eligible'] ?? 0 ) + $identifierless_items;
-			$diagnostics['processed_skipped']         = (int) ( $counts['processed_skipped'] ?? 0 );
-			$diagnostics['reprocess_eligible']        = (int) ( $counts['processed_reprocess_eligible'] ?? 0 );
-			$diagnostics['actively_claimed']          = (int) ( $counts['actively_claimed'] ?? 0 );
+			$diagnostics['unique_identifiers']        = $counts['unique'];
+			$diagnostics['duplicate_identifiers']     = $counts['duplicates'];
+			$diagnostics['eligible_before_max_items'] = $counts['eligible'] + $identifierless_items;
+			$diagnostics['processed_skipped']         = $counts['processed_skipped'];
+			$diagnostics['reprocess_eligible']        = $counts['processed_reprocess_eligible'];
+			$diagnostics['actively_claimed']          = $counts['actively_claimed'];
 		}
 
 		foreach ( $candidates as $candidate ) {
@@ -381,35 +381,6 @@ abstract class FetchHandler {
 		}
 
 		return $normalized;
-	}
-
-	/**
-	 * Mark items as processed and fire handler-specific side effects.
-	 *
-	 * Called AFTER max_items cap so only items that will actually be
-	 * imported get marked. Items cut by the cap remain unmarked and
-	 * will be picked up in future fetch cycles.
-	 *
-	 * @param array            $items   Items that survived filtering and capping.
-	 * @param ExecutionContext $context Execution context.
-	 */
-	private function markProcessed( array $items, ExecutionContext $context ): void {
-		foreach ( $items as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
-
-			$item_identifier = $item['metadata']['item_identifier'] ?? null;
-
-			if ( null === $item_identifier || '' === $item_identifier ) {
-				continue;
-			}
-
-			$context->markItemProcessed( (string) $item_identifier );
-
-			// Hook for handler-specific side effects (e.g., storeItemContext).
-			$this->onItemProcessed( $context, $item );
-		}
 	}
 
 	/**

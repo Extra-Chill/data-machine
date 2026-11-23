@@ -4,6 +4,7 @@ namespace DataMachine\Core\Steps\Fetch;
 
 use DataMachine\Core\DataPacket;
 use DataMachine\Core\RunMetrics;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachine\Core\Steps\QueueableTrait;
 use DataMachine\Core\Steps\Step;
 use DataMachine\Core\Steps\StepTypeRegistrationTrait;
@@ -327,7 +328,7 @@ class FetchStep extends Step {
 	 */
 	private function execute_handler( string $handler_name, array $handler_settings, string $job_id ): array|\WP_Error {
 		$handler = $this->get_handler_object( $handler_name );
-		if ( ! $handler ) {
+		if ( ! $handler instanceof FetchHandler ) {
 			$this->log(
 				'error',
 				'Handler not found or invalid',
