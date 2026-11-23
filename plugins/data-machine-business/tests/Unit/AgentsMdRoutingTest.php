@@ -23,6 +23,7 @@ class AgentsMdRoutingTest extends \PHPUnit\Framework\TestCase {
 				'datamachine analytics gsc <action>',
 				'datamachine analytics bing <action>',
 				'datamachine analytics mediavine <action>',
+				'datamachine analytics amazon <action>',
 				'datamachine analytics pagespeed <action>',
 				'datamachine media <action>',
 			) as $route

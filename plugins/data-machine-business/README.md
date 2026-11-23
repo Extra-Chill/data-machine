@@ -31,6 +31,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Slack | Fetch channel messages and publish messages or thread replies | Abilities, fetch/publish handlers |
 | Discord | Fetch channel messages and publish text or embeds | Abilities, fetch/publish handlers |
 | Amazon Associates | Search products and generate Creators API affiliate links | AI tool |
+| [Amazon Associates reports](docs/amazon-associates-reports.md) | Import Associates Central earnings/orders reports; affiliate revenue summaries by tracking ID with coverage provenance | Ability, WP-CLI |
 | Sendy | Subscribe users, create or update campaigns, and read email-funnel metrics | Abilities |
 | Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
 | [Stripe](docs/stripe.md) | Read-only subscriptions, MRR, renewals, past-due invoices/subscriptions, charges, and payouts | Ability, WP-CLI |
@@ -55,6 +56,7 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/bing-webmaster` | Query Bing search, traffic, page, and crawl statistics |
 | `datamachine/pagespeed` | Run full, performance-focused, or opportunity-focused PageSpeed audits |
 | `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, multi-period backfills, and bounded device/country/source/ad-unit reports with source provenance |
+| `datamachine/amazon-associates-reports` | Import Amazon Associates report downloads and read affiliate ad fees, revenue, items and orders by tracking ID, with import coverage provenance |
 | `datamachine/stripe-reports` | Bounded read-only Stripe billing and revenue reports with restricted-key authentication and source provenance |
 | `datamachine/stripe-stage-payment-link` | Stage a capped, one-time or recurring Stripe Payment Link for human approval; nothing is created in Stripe until approved |
 | `datamachine/content-performance` | Rank posts within a category by GA4 engagement while accounting for traffic and sample size |
@@ -229,6 +231,22 @@ wp datamachine analytics mediavine ad_units --format=csv
 
 See [Mediavine Reports](docs/mediavine.md) for exact report grains, fields, and attribution caveats.
 
+### Amazon Associates Reports
+
+```bash
+wp datamachine analytics amazon <action>
+```
+
+Actions: `import`, `summary`, `earnings`, `orders`, and `coverage`. Amazon Associates has no public earnings API, so download reports from Associates Central (Reports → Download, CSV or TSV) and import them; re-importing the same report window replaces it.
+
+```bash
+wp datamachine analytics amazon import --file=Fee-Earnings-2026-10.csv
+wp datamachine analytics amazon summary --start-date=2026-10-01 --end-date=2026-10-31 --format=json
+wp datamachine analytics amazon coverage
+```
+
+See [Amazon Associates Reports](docs/amazon-associates-reports.md) for the parser contract, storage, and coverage semantics.
+
 ### PageSpeed Insights
 
 ```bash
@@ -362,6 +380,8 @@ Audits run without credentials at the public quota. To use a higher quota, store
 ### Amazon Associates
 
 Join Amazon Associates, create Amazon Creators API credentials, and configure the credential ID, credential secret, partner tag, and marketplace in the `amazon_affiliate_link` tool settings. See [Amazon Affiliate Link](docs/amazon-affiliate-link.md).
+
+Affiliate earnings reporting needs no credentials: it reads imported Associates Central reports. See [Amazon Associates Reports](docs/amazon-associates-reports.md).
 
 ### Sendy
 
