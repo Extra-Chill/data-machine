@@ -1811,75 +1811,60 @@ class Venue_Taxonomy {
 		$lat_delta = rad2deg( $angle );
 		$min_lat   = max( -90, $point[0] - $lat_delta );
 		$max_lat   = min( 90, $point[0] + $lat_delta );
-		$taxonomy  = 'venue';
-		$meta_key  = self::$meta_fields['coordinates'];
 
 		// A circle touching a pole can include every longitude.
-		if ( $min_lat <= -90 || $max_lat >= 90 ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$ids = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
-					 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
-					 WHERE tt.taxonomy = %s AND tm.meta_key = %s
-					 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f",
-					$taxonomy,
-					$meta_key,
-					$min_lat,
-					$max_lat
-				)
-			);
-
-			return array_map( 'intval', $ids );
+		$check_lng = $min_lat > -90 && $max_lat < 90;
+		$min_lng   = -180.0;
+		$max_lng   = 180.0;
+		if ( $check_lng ) {
+			$lng_delta = rad2deg( asin( min( 1, sin( $angle ) / cos( deg2rad( $point[0] ) ) ) ) );
+			$min_lng   = $point[1] - $lng_delta;
+			$max_lng   = $point[1] + $lng_delta;
 		}
 
-		$lng_delta = rad2deg( asin( min( 1, sin( $angle ) / cos( deg2rad( $point[0] ) ) ) ) );
-		$min_lng   = $point[1] - $lng_delta;
-		$max_lng   = $point[1] + $lng_delta;
-
-		if ( $min_lng < -180 || $max_lng > 180 ) {
-			// The box crosses the antimeridian: match either side of it.
-			$low  = $min_lng < -180 ? $min_lng + 360 : $min_lng;
-			$high = $max_lng > 180 ? $max_lng - 360 : $max_lng;
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-			$ids = $wpdb->get_col(
-				$wpdb->prepare(
-					"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
-					 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
-					 WHERE tt.taxonomy = %s AND tm.meta_key = %s
-					 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f
-					 AND ( (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) >= %f
-					    OR (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) <= %f )",
-					$taxonomy,
-					$meta_key,
-					$min_lat,
-					$max_lat,
-					$low,
-					$high
-				)
-			);
-
-			return array_map( 'intval', $ids );
-		}
-
+		// Read only the raw coordinate strings (portable SQL, no term objects or
+		// meta cache priming), then box-filter in PHP. PHP still applies the exact
+		// distance and conflict rules to the survivors.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-		$ids = $wpdb->get_col(
+		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
+				"SELECT tm.term_id, tm.meta_value FROM {$wpdb->termmeta} tm
 				 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
-				 WHERE tt.taxonomy = %s AND tm.meta_key = %s
-				 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f
-				 AND (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) BETWEEN %f AND %f",
-				$taxonomy,
-				$meta_key,
-				$min_lat,
-				$max_lat,
-				$min_lng,
-				$max_lng
+				 WHERE tt.taxonomy = %s AND tm.meta_key = %s",
+				'venue',
+				self::$meta_fields['coordinates']
 			)
 		);
 
-		return array_map( 'intval', $ids );
+		$ids = array();
+		foreach ( (array) $rows as $row ) {
+			$parts = explode( ',', (string) $row->meta_value );
+			if ( 2 !== count( $parts ) || ! is_numeric( trim( $parts[0] ) ) || ! is_numeric( trim( $parts[1] ) ) ) {
+				continue;
+			}
+			$lat = (float) $parts[0];
+			$lng = (float) $parts[1];
+			if ( $lat < $min_lat || $lat > $max_lat ) {
+				continue;
+			}
+			if ( $check_lng && ! self::longitude_in_window( $lng, $min_lng, $max_lng ) ) {
+				continue;
+			}
+			$ids[ (int) $row->term_id ] = true;
+		}
+
+		return array_keys( $ids );
+	}
+
+	/** Longitude window test that handles a box crossing the antimeridian. */
+	private static function longitude_in_window( float $lng, float $min_lng, float $max_lng ): bool {
+		if ( $min_lng < -180 ) {
+			return $lng >= $min_lng + 360 || $lng <= $max_lng;
+		}
+		if ( $max_lng > 180 ) {
+			return $lng >= $min_lng || $lng <= $max_lng - 360;
+		}
+		return $lng >= $min_lng && $lng <= $max_lng;
 	}
 
 	/** Reuse only a unique venue within 25m, with no conflicting geography. */
