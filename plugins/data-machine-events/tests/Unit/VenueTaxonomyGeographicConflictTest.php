@@ -1085,4 +1085,143 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		$this->assertSame( 'matched', $result['match_status'] );
 		$this->assertSame( $id, $result['term_id'] );
 	}
+	// ---------------------------------------------------------------------
+	// #4029: address lookup narrows candidates in SQL
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Run find_venue_by_address() and capture the venue terms it loaded.
+	 *
+	 * @return array{0: int|null, 1: int[]}
+	 */
+	private function find_by_address_capturing_candidates( string $address, string $city, string $state = '', string $country = '', string $zip = '' ): array {
+		$loaded  = array();
+		$capture = static function ( $terms, $taxonomies ) use ( &$loaded ) {
+			if ( in_array( 'venue', (array) $taxonomies, true ) && is_array( $terms ) ) {
+				foreach ( $terms as $term ) {
+					if ( $term instanceof \WP_Term ) {
+						$loaded[] = (int) $term->term_id;
+					}
+				}
+			}
+			return $terms;
+		};
+		add_filter( 'get_terms', $capture, 10, 2 );
+		try {
+			$match = Venue_Taxonomy::find_venue_by_address( $address, $city, $state, $country, $zip );
+		} finally {
+			remove_filter( 'get_terms', $capture, 10 );
+		}
+
+		return array( $match, $loaded );
+	}
+
+	public function test_address_lookup_matches_same_city_case_and_whitespace_insensitively(): void {
+		$term_id = $this->create_venue_with_meta(
+			'Same City Address Venue ' . uniqid(),
+			array(
+				'address' => '32 Ann St',
+				'city'    => ' Charleston ',
+				'state'   => 'SC',
+				'country' => 'US',
+			)
+		);
+
+		list( $match, $loaded ) = $this->find_by_address_capturing_candidates( '32 Ann Street', 'CHARLESTON', 'SC', 'US' );
+
+		$this->assertSame( $term_id, $match );
+		$this->assertContains( $term_id, $loaded );
+	}
+
+	public function test_address_lookup_matches_differing_city_with_equal_street_and_postal(): void {
+		$term_id = $this->create_venue_with_meta(
+			'Postal Reconcile Venue ' . uniqid(),
+			array(
+				'address' => '2301 Noisette Blvd',
+				'city'    => 'North Charleston',
+				'state'   => 'SC',
+				'country' => 'US',
+				'zip'     => '29405',
+			)
+		);
+
+		list( $match, $loaded ) = $this->find_by_address_capturing_candidates( '2301 Noisette Blvd', 'Charleston', 'SC', 'US', '29405' );
+
+		$this->assertSame( $term_id, $match );
+		$this->assertContains( $term_id, $loaded );
+	}
+
+	public function test_address_lookup_rejects_differing_city_without_postal_match(): void {
+		$term_id = $this->create_venue_with_meta(
+			'No Postal Venue ' . uniqid(),
+			array(
+				'address' => '2301 Noisette Blvd',
+				'city'    => 'Savannah',
+				'state'   => 'SC',
+				'country' => 'US',
+				'zip'     => '29405',
+			)
+		);
+
+		list( $no_zip ) = $this->find_by_address_capturing_candidates( '2301 Noisette Blvd', 'Columbia', 'SC', 'US' );
+		list( $other_zip, $loaded ) = $this->find_by_address_capturing_candidates( '2301 Noisette Blvd', 'Columbia', 'SC', 'US', '29201' );
+
+		$this->assertNull( $no_zip );
+		$this->assertNull( $other_zip );
+		$this->assertNotContains( $term_id, $loaded );
+	}
+
+	public function test_address_lookup_does_not_load_unrelated_city_venues(): void {
+		$same_city = $this->create_venue_with_meta(
+			'Candidate Same City ' . uniqid(),
+			array(
+				'address' => '500 Fake Ave',
+				'city'    => 'Austin',
+				'state'   => 'TX',
+			)
+		);
+		$same_zip  = $this->create_venue_with_meta(
+			'Candidate Same Zip ' . uniqid(),
+			array(
+				'address' => '900 Other Rd',
+				'city'    => 'Round Rock',
+				'state'   => 'TX',
+				'zip'     => '78701',
+			)
+		);
+		$unrelated = array();
+		foreach ( array( 'Denver', 'Portland', 'Boston' ) as $city ) {
+			$unrelated[] = $this->create_venue_with_meta(
+				'Candidate Unrelated ' . $city . ' ' . uniqid(),
+				array(
+					'address' => '500 Fake Ave',
+					'city'    => $city,
+					'zip'     => '80202',
+				)
+			);
+		}
+
+		list( $match, $loaded ) = $this->find_by_address_capturing_candidates( '500 Fake Ave', 'Austin', 'TX', '', '78701' );
+
+		$this->assertSame( $same_city, $match );
+		$this->assertContains( $same_city, $loaded );
+		$this->assertContains( $same_zip, $loaded );
+		foreach ( $unrelated as $term_id ) {
+			$this->assertNotContains( $term_id, $loaded, 'Unrelated-city venues must not be loaded as address candidates.' );
+		}
+
+		$args = Venue_Taxonomy::address_candidate_query_args( ' Austin ', '' );
+		$this->assertSame( 'Austin', $args['meta_query'][1][0]['value'] );
+		$this->assertCount( 2, $args['meta_query'][1], 'No postal clause without a postal code.' );
+	}
+
+	public function test_address_normalizers_are_memoized_consistently(): void {
+		$first  = Venue_Taxonomy::normalize_address_for_matching( '8504 South Congress Avenue' );
+		$second = Venue_Taxonomy::normalize_address_for_matching( '8504 South Congress Avenue' );
+		$this->assertSame( $first, $second );
+		$this->assertSame(
+			Venue_Taxonomy::street_identity_key( '8504 S Congress Ave' ),
+			Venue_Taxonomy::street_identity_key( '8504 South Congress Avenue' )
+		);
+	}
 }

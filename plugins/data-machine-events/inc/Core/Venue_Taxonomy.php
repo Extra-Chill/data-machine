@@ -138,6 +138,16 @@ class Venue_Taxonomy {
 	private const EVIDENCE_PROXIMITY_METERS = 150;
 
 	/**
+	 * Per-request memo size cap for pure address normalizers (#4029).
+	 *
+	 * Normalization is deterministic, so results are memoized by input
+	 * string; the cap keeps long-running CLI/queue processes bounded.
+	 *
+	 * @var int
+	 */
+	private const ADDRESS_MEMO_LIMIT = 10000;
+
+	/**
 	 * Bounded ordinal word map for address matching (#803).
 	 *
 	 * @var array<string,string>
@@ -2044,6 +2054,28 @@ class Venue_Taxonomy {
 	 * @return string Space-separated identity key.
 	 */
 	public static function street_identity_key( string $address ): string {
+		static $memo = array();
+
+		if ( isset( $memo[ $address ] ) ) {
+			return $memo[ $address ];
+		}
+
+		if ( count( $memo ) >= self::ADDRESS_MEMO_LIMIT ) {
+			$memo = array();
+		}
+
+		$memo[ $address ] = self::compute_street_identity_key( $address );
+
+		return $memo[ $address ];
+	}
+
+	/**
+	 * Uncached implementation of street_identity_key().
+	 *
+	 * @param string $address Raw address string.
+	 * @return string Space-separated identity key.
+	 */
+	private static function compute_street_identity_key( string $address ): string {
 		$normalized = self::normalize_address_for_matching( $address );
 
 		if ( '' === $normalized ) {
@@ -2995,6 +3027,28 @@ class Venue_Taxonomy {
 	 * @return string Normalized address for matching
 	 */
 	public static function normalize_address_for_matching( string $address ): string {
+		static $memo = array();
+
+		if ( isset( $memo[ $address ] ) ) {
+			return $memo[ $address ];
+		}
+
+		if ( count( $memo ) >= self::ADDRESS_MEMO_LIMIT ) {
+			$memo = array();
+		}
+
+		$memo[ $address ] = self::compute_normalized_address( $address );
+
+		return $memo[ $address ];
+	}
+
+	/**
+	 * Uncached implementation of normalize_address_for_matching().
+	 *
+	 * @param string $address Raw address string
+	 * @return string Normalized address for matching
+	 */
+	private static function compute_normalized_address( string $address ): string {
 		$address = strtolower( trim( $address ) );
 
 		// Strip suite/unit/apartment/room suffixes that produce false
@@ -3109,6 +3163,55 @@ class Venue_Taxonomy {
 	}
 
 	/**
+	 * Build the get_terms() args that narrow address-match candidates (#4029).
+	 *
+	 * find_venue_by_address() only accepts a venue whose trimmed, lowercased
+	 * city equals the incoming city, or whose street and postal code match
+	 * (has_matching_street_and_postal_code(), #3903). Both rules require the
+	 * stored value to contain the incoming value, so a LIKE on the trimmed
+	 * input is a strict superset of every venue the PHP loop could accept:
+	 * it tolerates surrounding whitespace in stored meta, and MySQL's
+	 * case-insensitive collation folds at least as much as strtolower().
+	 * The full matching rules still run unchanged on the narrowed set.
+	 *
+	 * @param string $city Incoming city.
+	 * @param string $zip  Incoming verified postal code ('' when absent or unverified).
+	 * @return array<string, mixed>
+	 */
+	public static function address_candidate_query_args( string $city, string $zip = '' ): array {
+		$candidates = array(
+			'relation' => 'OR',
+			array(
+				'key'     => self::$meta_fields['city'],
+				'value'   => trim( $city ),
+				'compare' => 'LIKE',
+			),
+		);
+
+		$zip = trim( $zip );
+		if ( '' !== $zip ) {
+			$candidates[] = array(
+				'key'     => self::$meta_fields['zip'],
+				'value'   => $zip,
+				'compare' => 'LIKE',
+			);
+		}
+
+		return array(
+			'taxonomy'   => 'venue',
+			'hide_empty' => false,
+			'meta_query' => array(
+				'relation' => 'AND',
+				array(
+					'key'     => self::$meta_fields['city'],
+					'compare' => 'EXISTS',
+				),
+				$candidates,
+			),
+		);
+	}
+
+	/**
 	 * Find existing venue by address and geographic context.
 	 *
 	 * @param string $address Street address.
@@ -3132,26 +3235,19 @@ class Venue_Taxonomy {
 		$normalized_address = self::normalize_address_for_matching( $address );
 		$normalized_city    = strtolower( trim( $city ) );
 
-		$venues = get_terms(
-			array(
-				'taxonomy'   => 'venue',
-				'hide_empty' => false,
-				'meta_query' => array(
-					array(
-						'key'     => '_venue_city',
-						'compare' => 'EXISTS',
-					),
-				),
-			)
-		);
+		$venues = get_terms( self::address_candidate_query_args( $city, $zip ) );
 
-		if ( is_wp_error( $venues ) || empty( $venues ) ) {
+		if ( ! is_array( $venues ) || empty( $venues ) ) {
 			return null;
 		}
 
 		$matches = array();
 
 		foreach ( $venues as $venue ) {
+			if ( ! $venue instanceof \WP_Term ) {
+				continue;
+			}
+
 			$venue_address = get_term_meta( $venue->term_id, '_venue_address', true );
 			$venue_city    = get_term_meta( $venue->term_id, '_venue_city', true );
 
