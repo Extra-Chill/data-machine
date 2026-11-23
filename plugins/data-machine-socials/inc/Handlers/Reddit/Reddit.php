@@ -92,7 +92,7 @@ class Reddit extends FetchHandler {
 	 * The ability resolves (and refreshes) the Reddit OAuth token server-side,
 	 * so no credentials are passed through ability input.
 	 */
-	protected function executeFetch( array $config, ExecutionContext $context ): array {
+	protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error {
 		/*
 		 * Build the core fresh-candidate collector. Selection-time eligibility
 		 * (processed/claimed/reprocess) is decided by Data Machine core, not by
@@ -131,7 +131,9 @@ class Reddit extends FetchHandler {
 				);
 			}
 			$context->log( 'error', 'Reddit: ' . $result->get_error_message(), array( 'code' => $result->get_error_code() ) );
-			return array();
+			// A failed fetch (e.g. missing_auth) must fail the job, not read as
+			// "no new items". See data-machine#4028.
+			return $result;
 		}
 
 		// Log ability logs

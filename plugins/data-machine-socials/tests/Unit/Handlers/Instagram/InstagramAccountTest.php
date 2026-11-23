@@ -99,7 +99,7 @@ class InstagramAccountTest extends WP_UnitTestCase {
 			'size'     => 100,
 		) : null );
 		$handler = new class() extends InstagramAccount {
-			public function fetchForTest( array $config, ExecutionContext $context ): array {
+			public function fetchForTest( array $config, ExecutionContext $context ): array|\WP_Error {
 				return $this->executeFetch( $config, $context );
 			}
 		};

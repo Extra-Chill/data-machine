@@ -255,6 +255,14 @@ class StaleListingReconciler {
 		$handler = new UniversalWebScraper();
 		$results = $handler->get_fetch_data( 'direct', $config, null );
 
+		if ( is_wp_error( $results ) ) {
+			return new \WP_Error(
+				'stale_listings_fetch_failed',
+				'Source fetch failed; refusing to reconcile: ' . $results->get_error_message(),
+				array( 'fetch_error_code' => (string) $results->get_error_code() )
+			);
+		}
+
 		if ( empty( $results ) ) {
 			return new \WP_Error(
 				'stale_listings_fetch_failed',

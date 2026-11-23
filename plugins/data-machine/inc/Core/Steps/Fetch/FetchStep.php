@@ -245,15 +245,17 @@ class FetchStep extends Step {
 						'packet_count' => 0,
 						'reason'       => 'handler_failed',
 						'error'        => $packets->get_error_message(),
+						'error_code'   => (string) $packets->get_error_code(),
 					)
 				)
 			);
 
 			return array(
-				'status'  => 'failed',
-				'packets' => $this->dataPackets,
-				'reason'  => 'handler_failed',
-				'error'   => $packets->get_error_message(),
+				'status'     => 'failed',
+				'packets'    => $this->dataPackets,
+				'reason'     => 'handler_failed',
+				'error'      => $packets->get_error_message(),
+				'error_code' => (string) $packets->get_error_code(),
 			);
 		}
 
@@ -325,7 +327,7 @@ class FetchStep extends Step {
 	 */
 	private function execute_handler( string $handler_name, array $handler_settings, string $job_id ): array|\WP_Error {
 		$handler = $this->get_handler_object( $handler_name );
-		if ( ! $handler ) {
+		if ( ! $handler || ! method_exists( $handler, 'get_fetch_data' ) ) {
 			$this->log(
 				'error',
 				'Handler not found or invalid',

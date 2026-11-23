@@ -55,14 +55,17 @@ abstract class FetchHandler {
 	 *
 	 * - `{ items: [ {title, content, metadata}, ... ] }` — explicit item list.
 	 * - `{ title, content, metadata, file_info }` — single item (treated as list of one).
-	 * - `[]` or non-array — empty result.
+	 * - `[]` or non-array — empty result: the source answered and had nothing new.
+	 * - `WP_Error` — the fetch failed (auth, provider or transport error). It is
+	 *   returned unchanged so FetchStep fails the job instead of reporting
+	 *   `completed_no_items`.
 	 *
 	 * @param int|string  $pipeline_id    Pipeline ID or 'direct' for direct execution.
 	 * @param array       $handler_config Handler configuration array.
 	 * @param string|null $job_id         Optional job ID.
-	 * @return DataPacket[] Array of DataPackets (empty on failure/no data).
+	 * @return DataPacket[]|\WP_Error DataPackets (empty when the source had nothing new), or the handler's fetch failure.
 	 */
-	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array {
+	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array|\WP_Error {
 		$config              = $this->extractConfig( $handler_config );
 		$context             = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
 		$stages              = $this->initialFetchDiagnostics( $config, $context );
@@ -71,7 +74,13 @@ abstract class FetchHandler {
 
 		$result = $this->executeFetch( $config, $context );
 
-		if ( empty( $result ) || ! is_array( $result ) ) {
+		if ( is_wp_error( $result ) ) {
+			$stages['fetch_error_code'] = (string) $result->get_error_code();
+			$this->recordFetchDiagnostics( $context, $stages );
+			return $result;
+		}
+
+		if ( empty( $result ) ) {
 			$this->recordFetchDiagnostics( $context, $stages );
 			return array();
 		}
@@ -172,12 +181,12 @@ abstract class FetchHandler {
 			$diagnostics['invalid_items']             = max( 0, (int) $diagnostics['source_materialized'] - $valid_items );
 			$diagnostics['identified_items']          = count( $identifiers );
 			$diagnostics['identifierless_items']      = $identifierless_items;
-			$diagnostics['unique_identifiers']        = (int) ( $counts['unique'] ?? 0 );
-			$diagnostics['duplicate_identifiers']     = (int) ( $counts['duplicates'] ?? 0 );
-			$diagnostics['eligible_before_max_items'] = (int) ( $counts['eligible'] ?? 0 ) + $identifierless_items;
-			$diagnostics['processed_skipped']         = (int) ( $counts['processed_skipped'] ?? 0 );
-			$diagnostics['reprocess_eligible']        = (int) ( $counts['processed_reprocess_eligible'] ?? 0 );
-			$diagnostics['actively_claimed']          = (int) ( $counts['actively_claimed'] ?? 0 );
+			$diagnostics['unique_identifiers']        = $counts['unique'];
+			$diagnostics['duplicate_identifiers']     = $counts['duplicates'];
+			$diagnostics['eligible_before_max_items'] = $counts['eligible'] + $identifierless_items;
+			$diagnostics['processed_skipped']         = $counts['processed_skipped'];
+			$diagnostics['reprocess_eligible']        = $counts['processed_reprocess_eligible'];
+			$diagnostics['actively_claimed']          = $counts['actively_claimed'];
 		}
 
 		foreach ( $candidates as $candidate ) {
@@ -375,35 +384,6 @@ abstract class FetchHandler {
 	}
 
 	/**
-	 * Mark items as processed and fire handler-specific side effects.
-	 *
-	 * Called AFTER max_items cap so only items that will actually be
-	 * imported get marked. Items cut by the cap remain unmarked and
-	 * will be picked up in future fetch cycles.
-	 *
-	 * @param array            $items   Items that survived filtering and capping.
-	 * @param ExecutionContext $context Execution context.
-	 */
-	private function markProcessed( array $items, ExecutionContext $context ): void {
-		foreach ( $items as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
-			}
-
-			$item_identifier = $item['metadata']['item_identifier'] ?? null;
-
-			if ( null === $item_identifier || '' === $item_identifier ) {
-				continue;
-			}
-
-			$context->markItemProcessed( (string) $item_identifier );
-
-			// Hook for handler-specific side effects (e.g., storeItemContext).
-			$this->onItemProcessed( $context, $item );
-		}
-	}
-
-	/**
 	 * Called after an item is marked as processed during dedup.
 	 *
 	 * Override in subclasses to add handler-specific side effects.
@@ -490,9 +470,14 @@ abstract class FetchHandler {
 	 *
 	 * @param array            $config  Handler-specific configuration
 	 * @param ExecutionContext $context Execution context for deduplication, logging, etc.
-	 * @return array Processed items array
+	 * Return an empty array only when the source answered and had nothing new.
+	 * Return a WP_Error when the fetch itself failed (missing or expired auth,
+	 * provider/API error, transport failure) so the job fails visibly.
+	 * Handlers declaring a narrower `: array` return type remain valid.
+	 *
+	 * @return array|\WP_Error Processed items array, or the fetch failure.
 	 */
-	abstract protected function executeFetch( array $config, ExecutionContext $context ): array;
+	abstract protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error;
 
 	/**
 	 * Extract handler-specific config from handler config
