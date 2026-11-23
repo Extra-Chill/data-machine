@@ -3,8 +3,8 @@
 define( 'ABSPATH', __DIR__ );
 require_once dirname( __DIR__ ) . '/inc/Core/Venue_Taxonomy.php';
 
-// Execute the production SQL against an in-memory database with MySQL's
-// SUBSTRING_INDEX function, rather than mocking the candidate query result.
+// Execute the production SQL against an in-memory database rather than
+// mocking the candidate query result.
 $wpdb = new class {
 	public string $termmeta = 'termmeta';
 	public string $term_taxonomy = 'term_taxonomy';
@@ -26,6 +26,9 @@ $wpdb = new class {
 	}
 	public function get_col( $sql ) {
 		return $this->db->query( $sql )->fetchAll( PDO::FETCH_COLUMN );
+	}
+	public function get_results( $sql ) {
+		return $this->db->query( $sql )->fetchAll( PDO::FETCH_OBJ );
 	}
 };
 $insert = $wpdb->db->prepare( 'INSERT INTO termmeta VALUES (?, ?, ?)' );
@@ -56,4 +59,4 @@ $wpdb->db->exec( "UPDATE termmeta SET meta_value = '40,-100' WHERE term_id = 750
 if ( array() !== $method->invoke( null, array( 12, 34 ) ) ) {
 	throw new RuntimeException( 'Coordinate update returned stale candidates' );
 }
-echo "PASS: SQL boxes exclude 7500 distant venues; ordinary, dateline, poles, numeric formatting, radius boundary, and updates.\n";
+echo "PASS: proximity boxes exclude 7500 distant venues; ordinary, dateline, poles, numeric formatting, radius boundary, and updates.\n";
