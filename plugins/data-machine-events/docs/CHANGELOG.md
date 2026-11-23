@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.4] - 2026-11-23
+
+### Fixed
+- let fetch handlers report a failed fetch
+
 ## [0.91.3] - 2026-11-23
 
 ### Changed
