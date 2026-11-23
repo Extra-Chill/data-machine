@@ -3237,13 +3237,17 @@ class Venue_Taxonomy {
 
 		$venues = get_terms( self::address_candidate_query_args( $city, $zip ) );
 
-		if ( is_wp_error( $venues ) || empty( $venues ) ) {
+		if ( ! is_array( $venues ) || empty( $venues ) ) {
 			return null;
 		}
 
 		$matches = array();
 
 		foreach ( $venues as $venue ) {
+			if ( ! $venue instanceof \WP_Term ) {
+				continue;
+			}
+
 			$venue_address = get_term_meta( $venue->term_id, '_venue_address', true );
 			$venue_city    = get_term_meta( $venue->term_id, '_venue_city', true );
 
