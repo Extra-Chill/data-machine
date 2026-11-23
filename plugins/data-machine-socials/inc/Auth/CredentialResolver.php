@@ -101,9 +101,20 @@ final class CredentialResolver {
 	 * @return ($expected_class is null ? array{provider: object, token: string}|\WP_Error : array{provider: T, token: string}|\WP_Error)
 	 */
 	public static function token( string $platform, string $label, bool $require_authenticated = true, ?string $expected_class = null ): array|\WP_Error {
-		$provider = self::provider( $platform, $label, $require_authenticated, $expected_class );
+		$provider = self::provider( $platform, $label, false, $expected_class );
 		if ( is_wp_error( $provider ) ) {
 			return $provider;
+		}
+
+		// Providers with a token lifecycle skip the is_authenticated() gate:
+		// is_authenticated() turns false the moment the access token expires,
+		// which would reject the request before get_valid_access_token() could
+		// use the stored refresh token. The token lookup is the authority.
+		if ( $require_authenticated && ! method_exists( $provider, 'get_valid_access_token' ) ) {
+			$provider = self::check( $provider, $label, true, $expected_class );
+			if ( is_wp_error( $provider ) ) {
+				return $provider;
+			}
 		}
 
 		$token = self::accessToken( $provider );
