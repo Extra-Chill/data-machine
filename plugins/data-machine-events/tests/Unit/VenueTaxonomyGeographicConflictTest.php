@@ -125,6 +125,60 @@ class VenueTaxonomyGeographicConflictTest extends WP_UnitTestCase {
 		}
 	}
 
+	/** @dataProvider coordinate_boxes_provider */
+	public function test_proximity_box_does_not_read_distant_venue_meta( string $incoming, string $nearby ): void {
+		$near_id = $this->create_venue_with_meta( 'Box nearby', array( 'coordinates' => $nearby ) );
+		$distant = array();
+		for ( $i = 0; $i < 30; ++$i ) {
+			$distant[] = $this->create_venue_with_meta( 'Box distant ' . $i, array( 'coordinates' => '40,-100' ) );
+		}
+		$reads   = array();
+		$observe = static function ( $value, $term_id ) use ( &$reads ) {
+			$reads[] = (int) $term_id;
+			return $value;
+		};
+		add_filter( 'get_term_metadata', $observe, 10, 2 );
+		try {
+			$method = new \ReflectionMethod( Venue_Taxonomy::class, 'find_venue_by_proximity' );
+			$match  = $method->invoke( null, array( 'coordinates' => $incoming ) );
+		} finally {
+			remove_filter( 'get_term_metadata', $observe, 10 );
+		}
+		$this->assertInstanceOf( \WP_Term::class, $match );
+		$this->assertSame( $near_id, (int) $match->term_id );
+		$this->assertSame( array(), array_values( array_intersect( $distant, $reads ) ) );
+
+		// No request-local stale index: moving a venue must change the result.
+		update_term_meta( $near_id, '_venue_coordinates', '40,-100' );
+		$this->assertNull( $method->invoke( null, array( 'coordinates' => $incoming ) ) );
+	}
+
+	public static function coordinate_boxes_provider(): array {
+		return array(
+			'ordinary'       => array( '12,34', '12.0001,34' ),
+			'east dateline'  => array( '0,179.99995', '0,-179.99995' ),
+			'west dateline'  => array( '0,-179.99995', '0,179.99995' ),
+			'north pole'     => array( '90,0', '89.9999,150' ),
+			'south pole'     => array( '-90,0', '-89.9999,-150' ),
+			'formatted meta' => array( '12,34', ' 1.20001e1, 3.4e1 ' ),
+		);
+	}
+
+	public function test_address_without_street_does_not_query_venues(): void {
+		$queries = 0;
+		$observe = static function ( $args ) use ( &$queries ) {
+			++$queries;
+			return $args;
+		};
+		add_filter( 'get_terms_args', $observe );
+		try {
+			$this->assertNull( Venue_Taxonomy::find_venue_by_address( 'Charleston SC', 'Charleston' ) );
+		} finally {
+			remove_filter( 'get_terms_args', $observe );
+		}
+		$this->assertSame( 0, $queries );
+	}
+
 	public static function proximity_candidates_provider(): array {
 		return array(
 			'distant venue ignored'        => array( array( 'Charleston' ), null ),

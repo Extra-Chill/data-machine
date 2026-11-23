@@ -1792,15 +1792,68 @@ class Venue_Taxonomy {
 			&& self::has_positive_location_evidence( $term_id, $venue_data );
 	}
 
+	/**
+	 * Select coordinate candidates in SQL before loading terms or their metadata.
+	 *
+	 * Coordinates are stored as "lat,lng", not separate numeric meta fields.
+	 * The box is a superset of the 25m circle; PHP still validates coordinates
+	 * and applies the exact distance and conflict rules. No index is cached, so
+	 * term-meta updates are visible immediately.
+	 *
+	 * @param float[] $point Incoming latitude and longitude.
+	 * @return int[] Candidate term IDs.
+	 */
+	private static function proximity_candidate_ids( array $point ): array {
+		global $wpdb;
+
+		// A small margin avoids excluding points on the floating-point boundary.
+		$angle     = 25.2 / 6371000;
+		$lat_delta = rad2deg( $angle );
+		$min_lat   = max( -90, $point[0] - $lat_delta );
+		$max_lat   = min( 90, $point[0] + $lat_delta );
+		$latitude  = '(SUBSTRING_INDEX(tm.meta_value, \',\', 1) + 0)';
+		$longitude = '(SUBSTRING_INDEX(tm.meta_value, \',\', -1) + 0)';
+		$where     = $wpdb->prepare( "$latitude BETWEEN %f AND %f", $min_lat, $max_lat );
+
+		// A circle touching a pole can include every longitude.
+		if ( $min_lat > -90 && $max_lat < 90 ) {
+			$lng_delta = rad2deg( asin( min( 1, sin( $angle ) / cos( deg2rad( $point[0] ) ) ) ) );
+			$min_lng   = $point[1] - $lng_delta;
+			$max_lng   = $point[1] + $lng_delta;
+			if ( $min_lng < -180 ) {
+				$where .= $wpdb->prepare( " AND ($longitude >= %f OR $longitude <= %f)", $min_lng + 360, $max_lng );
+			} elseif ( $max_lng > 180 ) {
+				$where .= $wpdb->prepare( " AND ($longitude >= %f OR $longitude <= %f)", $min_lng, $max_lng - 360 );
+			} else {
+				$where .= $wpdb->prepare( " AND $longitude BETWEEN %f AND %f", $min_lng, $max_lng );
+			}
+		}
+
+		// Only the fixed SQL expressions above are interpolated; values are prepared.
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
+		return array_map( 'intval', $wpdb->get_col( $wpdb->prepare(
+			"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
+			 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
+			 WHERE tt.taxonomy = %s AND tm.meta_key = %s AND $where",
+			'venue',
+			self::$meta_fields['coordinates']
+		) ) );
+	}
+
 	/** Reuse only a unique venue within 25m, with no conflicting geography. */
 	private static function find_venue_by_proximity( array $venue_data ): ?\WP_Term {
 		$point = self::incoming_coordinates( $venue_data );
 		if ( ! $point ) {
 			return null;
 		}
+		$candidate_ids = self::proximity_candidate_ids( $point );
+		if ( empty( $candidate_ids ) ) {
+			return null;
+		}
 		$venues = get_terms( array(
 			'taxonomy'   => 'venue',
 			'hide_empty' => false,
+			'include'    => $candidate_ids,
 		) );
 		if ( is_wp_error( $venues ) ) {
 			return null;
@@ -3228,12 +3281,21 @@ class Venue_Taxonomy {
 		string $country = '',
 		string $zip = ''
 	): ?int {
-		if ( empty( $address ) || empty( $city ) ) {
+		if ( empty( $address ) || empty( $city ) || ! self::address_has_street_component( $address ) ) {
 			return null;
 		}
 
 		$normalized_address = self::normalize_address_for_matching( $address );
 		$normalized_city    = strtolower( trim( $city ) );
+		$street_key         = self::street_identity_key( $address );
+		$zip                = trim( $zip );
+		$venue_data         = array(
+			'address' => $address,
+			'city'    => $city,
+			'state'   => $state,
+			'country' => $country,
+			'zip'     => $zip,
+		);
 
 		$venues = get_terms( self::address_candidate_query_args( $city, $zip ) );
 
@@ -3255,20 +3317,20 @@ class Venue_Taxonomy {
 				continue;
 			}
 
-			$venue_data               = array(
-				'address' => $address,
-				'city'    => $city,
-				'state'   => $state,
-				'country' => $country,
-				'zip'     => $zip,
-			);
-			$street_and_postal_match  = self::has_matching_street_and_postal_code( (int) $venue->term_id, $venue_data );
-			$venue_normalized_address = self::normalize_address_for_matching( $venue_address );
-			$venue_normalized_city    = strtolower( trim( $venue_city ) );
+			$venue_normalized_city = strtolower( trim( $venue_city ) );
+			// LIKE is deliberately a superset. Reject substring-only city/zip
+			// hits before any stored-address normalization or street matching.
+			if ( $venue_normalized_city !== $normalized_city
+				&& ( '' === $zip || $zip !== trim( (string) get_term_meta( $venue->term_id, self::$meta_fields['zip'], true ) ) ) ) {
+				continue;
+			}
 
-			if ( self::address_has_street_component( $address ) &&
-				self::address_has_street_component( $venue_address ) &&
-				( $venue_normalized_address === $normalized_address || self::street_identity_key( $address ) === self::street_identity_key( $venue_address ) || self::normalized_address_is_subset( $normalized_address, $venue_normalized_address ) ) &&
+			$street_and_postal_match  = $venue_normalized_city !== $normalized_city
+				&& self::has_matching_street_and_postal_code( (int) $venue->term_id, $venue_data );
+			$venue_normalized_address = self::normalize_address_for_matching( $venue_address );
+
+			if ( self::address_has_street_component( $venue_address ) &&
+				( $venue_normalized_address === $normalized_address || $street_key === self::street_identity_key( $venue_address ) || self::normalized_address_is_subset( $normalized_address, $venue_normalized_address ) ) &&
 				( $venue_normalized_city === $normalized_city || $street_and_postal_match ) &&
 				! self::has_geographic_conflict(
 					$venue->term_id,
