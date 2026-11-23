@@ -245,6 +245,7 @@ class FetchStep extends Step {
 						'packet_count' => 0,
 						'reason'       => 'handler_failed',
 						'error'        => $packets->get_error_message(),
+						'error_code'   => (string) $packets->get_error_code(),
 					)
 				)
 			);
@@ -252,8 +253,9 @@ class FetchStep extends Step {
 			return array(
 				'status'  => 'failed',
 				'packets' => $this->dataPackets,
-				'reason'  => 'handler_failed',
-				'error'   => $packets->get_error_message(),
+				'reason'     => 'handler_failed',
+				'error'      => $packets->get_error_message(),
+				'error_code' => (string) $packets->get_error_code(),
 			);
 		}
 

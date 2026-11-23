@@ -18,13 +18,14 @@ class InstagramAccount extends FetchHandler {
 		self::registerHandler( 'instagram_account', 'fetch', self::class, 'Instagram account (public)', 'Fetch public Business/Creator posts by username', true, InstagramAuth::class, InstagramAccountSettings::class, null, 'instagram' );
 	}
 
-	protected function executeFetch( array $config, ExecutionContext $context ): array {
+	protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error {
 		$config['max_items'] = (int) ( $config['max_items'] ?? $this->getDefaultMaxItems() );
 		$collector           = new FreshCandidateCollector( $context, $config['max_items'] );
 		$result              = ( new FetchInstagramAccountAbility() )->executeWithCollector( $config, $collector );
 		if ( is_wp_error( $result ) ) {
 			$context->log( 'error', $result->get_error_message(), array( 'code' => $result->get_error_code() ) );
-			return array();
+			// Provider/auth failure fails the job (data-machine#3748, #4028).
+			return $result;
 		}
 		$items = array();
 		foreach ( $result['items'] as $candidate ) {

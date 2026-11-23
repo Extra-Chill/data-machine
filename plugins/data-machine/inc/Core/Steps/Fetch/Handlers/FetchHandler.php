@@ -55,14 +55,17 @@ abstract class FetchHandler {
 	 *
 	 * - `{ items: [ {title, content, metadata}, ... ] }` — explicit item list.
 	 * - `{ title, content, metadata, file_info }` — single item (treated as list of one).
-	 * - `[]` or non-array — empty result.
+	 * - `[]` or non-array — empty result: the source answered and had nothing new.
+	 * - `WP_Error` — the fetch failed (auth, provider or transport error). It is
+	 *   returned unchanged so FetchStep fails the job instead of reporting
+	 *   `completed_no_items`.
 	 *
 	 * @param int|string  $pipeline_id    Pipeline ID or 'direct' for direct execution.
 	 * @param array       $handler_config Handler configuration array.
 	 * @param string|null $job_id         Optional job ID.
-	 * @return DataPacket[] Array of DataPackets (empty on failure/no data).
+	 * @return DataPacket[]|\WP_Error DataPackets (empty when the source had nothing new), or the handler's fetch failure.
 	 */
-	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array {
+	final public function get_fetch_data( int|string $pipeline_id, array $handler_config, ?string $job_id = null ): array|\WP_Error {
 		$config              = $this->extractConfig( $handler_config );
 		$context             = ExecutionContext::fromConfig( $handler_config, $job_id, $this->handler_type );
 		$stages              = $this->initialFetchDiagnostics( $config, $context );
@@ -70,6 +73,12 @@ abstract class FetchHandler {
 		$stages['max_items'] = max( 0, $max_items );
 
 		$result = $this->executeFetch( $config, $context );
+
+		if ( is_wp_error( $result ) ) {
+			$stages['fetch_error_code'] = (string) $result->get_error_code();
+			$this->recordFetchDiagnostics( $context, $stages );
+			return $result;
+		}
 
 		if ( empty( $result ) || ! is_array( $result ) ) {
 			$this->recordFetchDiagnostics( $context, $stages );
@@ -490,9 +499,14 @@ abstract class FetchHandler {
 	 *
 	 * @param array            $config  Handler-specific configuration
 	 * @param ExecutionContext $context Execution context for deduplication, logging, etc.
-	 * @return array Processed items array
+	 * Return an empty array only when the source answered and had nothing new.
+	 * Return a WP_Error when the fetch itself failed (missing or expired auth,
+	 * provider/API error, transport failure) so the job fails visibly.
+	 * Handlers declaring a narrower `: array` return type remain valid.
+	 *
+	 * @return array|\WP_Error Processed items array, or the fetch failure.
 	 */
-	abstract protected function executeFetch( array $config, ExecutionContext $context ): array;
+	abstract protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error;
 
 	/**
 	 * Extract handler-specific config from handler config

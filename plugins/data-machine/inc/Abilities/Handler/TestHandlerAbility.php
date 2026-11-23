@@ -348,6 +348,21 @@ class TestHandlerAbility {
 
 		$elapsed_ms = round( ( microtime( true ) - $start_ms ) * 1000, 1 );
 
+		if ( is_wp_error( $packets ) ) {
+			return new \WP_Error(
+				'handler_fetch_failed',
+				$packets->get_error_message(),
+				array(
+					'status'            => 502,
+					'fetch_error_code'  => (string) $packets->get_error_code(),
+					'handler_slug'      => $this->boundOutputString( (string) $handler_slug, 256 ),
+					'handler_label'     => $this->boundOutputString( (string) $handler_label, 256 ),
+					'config_used'       => $config_used,
+					'execution_time_ms' => $elapsed_ms,
+				)
+			);
+		}
+
 		if ( ! is_array( $packets ) ) {
 			$packets = array();
 		}
