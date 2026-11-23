@@ -168,12 +168,9 @@ final class ProviderModules {
 			),
 			new ProviderModule(
 				'amazon-affiliate',
-				array_merge( $abilities, $tools ),
-				array( 'tool:amazon_affiliate_link', 'datamachine/amazon-associates-reports' ),
-				static function (): void {
-					new \DataMachineBusiness\Tools\AmazonAffiliateLink();
-					new \DataMachineBusiness\Abilities\Analytics\AmazonAssociatesReportsAbilities();
-				}
+				$tools,
+				array( 'tool:amazon_affiliate_link' ),
+				static fn() => new \DataMachineBusiness\Tools\AmazonAffiliateLink()
 			),
 			new ProviderModule(
 				'media-hygiene',
