@@ -202,7 +202,7 @@ final class ProviderModules {
 			new ProviderModule(
 				'sendy',
 				$abilities,
-				array( 'datamachine/sendy-subscribe', 'datamachine/sendy-push-campaign', 'datamachine/sendy-list-campaigns', 'datamachine/sendy-get-campaign', 'datamachine/sendy-delete-campaign', 'datamachine/sendy-metrics' ),
+				array( 'datamachine/sendy-subscribe', 'datamachine/sendy-push-campaign', 'datamachine/sendy-send-campaign', 'datamachine/sendy-list-campaigns', 'datamachine/sendy-get-campaign', 'datamachine/sendy-delete-campaign', 'datamachine/sendy-metrics' ),
 				static fn() => new \DataMachineBusiness\Abilities\Sendy\SendyAbilities()
 			),
 			new ProviderModule(

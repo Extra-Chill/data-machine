@@ -81,6 +81,7 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/fetch-messages-discord` | Fetch Discord channel history with before/after pagination |
 | `datamachine/sendy-subscribe` | Subscribe an email address to a Sendy list; intentionally supports public callers |
 | `datamachine/sendy-push-campaign` | Create or update a Sendy campaign |
+| `datamachine/sendy-send-campaign` | Send or schedule a new campaign to lists or segments |
 | `datamachine/sendy-list-campaigns` | List Sendy campaigns with status and engagement summaries |
 | `datamachine/sendy-get-campaign` | Get one Sendy campaign |
 | `datamachine/sendy-delete-campaign` | Delete a draft Sendy campaign |
@@ -364,6 +365,8 @@ Audits run without credentials at the public quota. To use a higher quota, store
 Join Amazon Associates, create Amazon Creators API credentials, and configure the credential ID, credential secret, partner tag, and marketplace in the `amazon_affiliate_link` tool settings. See [Amazon Affiliate Link](docs/amazon-affiliate-link.md).
 
 ### Sendy
+
+`datamachine/sendy-send-campaign` sends a **new** campaign; it cannot send an existing draft. It accepts the push content/sender fields, optional `title`, target ID arrays and scheduling fields. It uses the same configuration and management permission as push, is destructive/non-idempotent, and is not exposed in REST. See [Sendy sending and scheduling](docs/sendy.md) for the contract.
 
 Campaign abilities resolve credentials from the DMB-owned `datamachine_sendy_config` network option or `datamachine_sendy_config` filter. Configure `api_key` and `sendy_url` for campaign create/update, plus a `db` array containing `host`, `user`, `pass`, `name`, and optional `port` for list/get/delete. List and get need read access; delete also needs permission to delete draft rows. Credentials are never accepted or returned by the campaign abilities; consumers supply only campaign content, sender identity, IDs, and filters. Consumer-specific list and brand IDs remain consumer policy.
 

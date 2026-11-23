@@ -239,6 +239,7 @@ namespace {
 	function wp_remote_post( string $url, array $args ) {
 		global $http_mode, $http_fixtures;
 		$GLOBALS['sendy_http_urls'][] = $url;
+		$GLOBALS['sendy_http_body'] = $args['body'];
 		if ( 'timeout' === $http_mode ) {
 			return new WP_Error( 'http_request_failed', 'cURL error 28: api-secret timed out' );
 		}
@@ -263,6 +264,7 @@ namespace {
 	$abilities = new \DataMachineBusiness\Abilities\Sendy\SendyAbilities();
 	$campaign_abilities = array(
 		'datamachine/sendy-push-campaign',
+		'datamachine/sendy-send-campaign',
 		'datamachine/sendy-list-campaigns',
 		'datamachine/sendy-get-campaign',
 		'datamachine/sendy-delete-campaign',
@@ -305,6 +307,30 @@ namespace {
 	assert_sendy( is_wp_error( $bad_input ) && 'sendy_validation_error' === $bad_input->get_error_code(), 'campaign input validation is explicit' );
 	$bad_list = $abilities->execute_list_campaigns( array( 'status' => 'unknown' ) );
 	assert_sendy( is_wp_error( $bad_list ) && 'sendy_validation_error' === $bad_list->get_error_code(), 'campaign list validation is explicit' );
+
+	$send_input = $campaign_input + array( 'title' => 'Newsletter title', 'list_ids' => array( 'ListA', 'ListB' ) );
+	$http_fixtures['send'] = array( 'code' => 200, 'body' => 'Campaign created and now sending' );
+	$http_mode = 'send';
+	$sent = $abilities->execute_send_campaign( $send_input );
+	assert_sendy( $sent['success'] && ! $sent['scheduled'], 'send-now response normalized' );
+	assert_sendy( 1 === $GLOBALS['sendy_http_body']['send_campaign'] && 'ListA,ListB' === $GLOBALS['sendy_http_body']['list_ids'], 'send-now POST sends comma-joined targets' );
+	$send_input += array( 'exclude_list_ids' => array( 'Excluded' ), 'exclude_segment_ids' => array( 'Segment' ), 'schedule_date_time' => '2099-10-19 09:00', 'schedule_timezone' => 'America/New_York' );
+	$http_fixtures['send']['body'] = 'Campaign scheduled';
+	$scheduled = $abilities->execute_send_campaign( $send_input );
+	assert_sendy( $scheduled['success'] && $scheduled['scheduled'], 'scheduled response normalized' );
+	assert_sendy( 'Excluded' === $GLOBALS['sendy_http_body']['exclude_list_ids'] && 'Segment' === $GLOBALS['sendy_http_body']['exclude_segments_ids'], 'exclusions forwarded using Sendy spelling' );
+	assert_sendy( '2099-10-19 09:00' === $GLOBALS['sendy_http_body']['schedule_date_time'] && 'America/New_York' === $GLOBALS['sendy_http_body']['schedule_timezone'], 'schedule forwarded' );
+	$calls_before = count( $GLOBALS['sendy_http_urls'] );
+	foreach ( array( array( 'list_ids' => array() ), array( 'list_ids' => array( 'A,B' ) ), array( 'schedule_date_time' => 'tomorrow' ), array( 'schedule_date_time' => '2099-02-30 09:00' ), array( 'schedule_date_time' => '2099-10-19 09:01' ) ) as $override ) {
+		assert_sendy( ! $abilities->execute_send_campaign( array_merge( $send_input, $override ) )['success'], 'invalid send rejected' );
+	}
+	assert_sendy( $calls_before === count( $GLOBALS['sendy_http_urls'] ), 'invalid sends never call HTTP' );
+	$segment_input = array_merge( $send_input, array( 'list_ids' => array(), 'segment_ids' => array( 'SegmentOnly' ) ) );
+	assert_sendy( $abilities->execute_send_campaign( $segment_input )['success'], 'segment-only audience is supported' );
+	$http_fixtures['send']['body'] = 'Invalid API key';
+	assert_sendy( ! $abilities->execute_send_campaign( $send_input )['success'], 'Sendy error string is failure' );
+	assert_sendy( $registered['datamachine/sendy-send-campaign']['meta']['annotations']['destructive'] && ! $registered['datamachine/sendy-send-campaign']['meta']['annotations']['idempotent'], 'send annotated destructive and non-idempotent' );
+	$http_mode = 'create';
 
 	// Stock Sendy: create.php replies "Campaign created" with no ID; the ID is
 	// read back from the Sendy DB.

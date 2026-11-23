@@ -14,6 +14,7 @@
  * Abilities:
  *  - datamachine/sendy-subscribe       Subscribe an email to a list (API).
  *  - datamachine/sendy-push-campaign   Create/update a campaign (API).
+ *  - datamachine/sendy-send-campaign   Send or schedule a new campaign (API).
  *  - datamachine/sendy-list-campaigns  List campaigns (read-only DB).
  *  - datamachine/sendy-get-campaign    Get a campaign (read-only DB).
  *  - datamachine/sendy-delete-campaign Delete a draft campaign (DB).
@@ -232,6 +233,53 @@ class SendyAbilities {
 				'execute_callback'    => array( $this, 'execute_push_campaign' ),
 				'permission_callback' => array( $this, 'check_permission' ),
 				'meta'                => array( 'show_in_rest' => false ),
+			)
+		);
+
+		// ── Send Campaign (separate from the non-sending draft path) ──
+		$send_properties = array();
+		foreach ( array( 'from_name', 'from_email', 'reply_to', 'subject', 'html_text', 'plain_text', 'brand_id', 'title', 'query_string', 'schedule_date_time', 'schedule_timezone' ) as $field ) {
+			$send_properties[ $field ] = array( 'type' => 'string' );
+		}
+		foreach ( array( 'list_ids', 'segment_ids', 'exclude_list_ids', 'exclude_segment_ids' ) as $field ) {
+			$send_properties[ $field ] = array(
+				'type'  => 'array',
+				'items' => array( 'type' => 'string', 'minLength' => 1 ),
+			);
+		}
+		wp_register_ability(
+			'datamachine/sendy-send-campaign',
+			array(
+				'label'               => __( 'Sendy: Send Campaign', 'data-machine-business' ),
+				'description'         => __( 'Create a new campaign and send it to lists or segments, or schedule it for a future time. Never sends an existing draft.', 'data-machine-business' ),
+				'category'            => 'datamachine-publishing',
+				'input_schema'        => array(
+					'type'                 => 'object',
+					'required'             => array( 'from_name', 'from_email', 'reply_to', 'subject', 'html_text', 'brand_id' ),
+					'properties'           => $send_properties,
+					'additionalProperties' => false,
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'required'   => array( 'success', 'campaign_id', 'message', 'scheduled', 'raw' ),
+					'properties' => array(
+						'success'     => array( 'type' => 'boolean' ),
+						'campaign_id' => array( 'type' => array( 'string', 'null' ) ),
+						'message'     => array( 'type' => 'string' ),
+						'scheduled'   => array( 'type' => 'boolean' ),
+						'raw'         => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'execute_send_campaign' ),
+				'permission_callback' => array( $this, 'check_permission' ),
+				'meta'                => array(
+					'show_in_rest' => false,
+					'annotations'  => array(
+						'readonly'    => false,
+						'idempotent'  => false,
+						'destructive' => true,
+					),
+				),
 			)
 		);
 
@@ -565,6 +613,17 @@ class SendyAbilities {
 		// Raw provider responses are internal diagnostics and may contain secrets.
 		unset( $result['raw'] );
 		return $result;
+	}
+
+	/**
+	 * Execute datamachine/sendy-send-campaign using the same config as push.
+	 *
+	 * @param array $input Content, sender, targets and optional schedule.
+	 * @return array|\WP_Error
+	 */
+	public function execute_send_campaign( array $input ) {
+		$client = $this->campaign_client( 'api' );
+		return is_wp_error( $client ) ? $client : $client->send_campaign( $input );
 	}
 
 	/**
