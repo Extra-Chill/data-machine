@@ -15,7 +15,6 @@ namespace DataMachine\Abilities\Handler;
 use DataMachine\Abilities\HandlerAbilities;
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Database\Flows\Flows;
-use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachine\Core\Steps\FlowStepConfig;
 use DataMachine\Core\Steps\StepTypeMetadata;
 
@@ -332,7 +331,7 @@ class TestHandlerAbility {
 
 		try {
 			$handler = new $handler_class();
-			if ( ! $handler instanceof FetchHandler ) {
+			if ( ! method_exists( $handler, 'get_fetch_data' ) ) {
 				throw new \UnexpectedValueException( 'Handler is not a fetch handler.' );
 			}
 			$packets = $handler->get_fetch_data( 'direct', $config, null );
@@ -365,10 +364,6 @@ class TestHandlerAbility {
 					'execution_time_ms' => $elapsed_ms,
 				)
 			);
-		}
-
-		if ( ! is_array( $packets ) ) {
-			$packets = array();
 		}
 
 		$total_count = count( $packets );

@@ -251,11 +251,13 @@ class FetchHandlerDataPacketTest extends TestCase {
 		$this->assertTrue( $method->isPublic() );
 	}
 
-	public function test_get_fetch_data_return_type_is_array(): void {
+	public function test_get_fetch_data_return_type_is_array_or_wp_error(): void {
 		$method      = new ReflectionMethod( FetchHandler::class, 'get_fetch_data' );
 		$return_type = $method->getReturnType();
-		$this->assertNotNull( $return_type );
-		$this->assertSame( 'array', $return_type->getName() );
+		$this->assertInstanceOf( \ReflectionUnionType::class, $return_type );
+		$names = array_map( static fn( $t ) => ltrim( $t->getName(), '\\' ), $return_type->getTypes() );
+		sort( $names );
+		$this->assertSame( array( 'WP_Error', 'array' ), $names );
 	}
 
 	public function test_to_data_packets_is_private(): void {

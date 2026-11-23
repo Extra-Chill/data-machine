@@ -39,12 +39,12 @@ assert_fetch_handler_failure_status(
 
 assert_fetch_handler_failure_status(
 	'FetchStep returns explicit failed result shape for handler failures',
-	str_contains( $file, "'status'  => 'failed'," ) && str_contains( $file, "'reason'  => 'handler_failed'," )
+	str_contains( $file, "'status'     => 'failed'," ) && str_contains( $file, "'reason'     => 'handler_failed'," ) && str_contains( $file, "'error_code' => (string) \$packets->get_error_code()," )
 );
 
 assert_fetch_handler_failure_status(
 	'FetchStep preserves handler failure messages in explicit results',
-	str_contains( $file, "'error'   => \$packets->get_error_message()," )
+	str_contains( $file, "'error'      => \$packets->get_error_message()," )
 );
 
 assert_fetch_handler_failure_status(
