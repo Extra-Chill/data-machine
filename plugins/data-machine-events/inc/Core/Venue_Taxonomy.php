@@ -1811,33 +1811,75 @@ class Venue_Taxonomy {
 		$lat_delta = rad2deg( $angle );
 		$min_lat   = max( -90, $point[0] - $lat_delta );
 		$max_lat   = min( 90, $point[0] + $lat_delta );
-		$latitude  = '(SUBSTRING_INDEX(tm.meta_value, \',\', 1) + 0)';
-		$longitude = '(SUBSTRING_INDEX(tm.meta_value, \',\', -1) + 0)';
-		$where     = $wpdb->prepare( "$latitude BETWEEN %f AND %f", $min_lat, $max_lat );
+		$taxonomy  = 'venue';
+		$meta_key  = self::$meta_fields['coordinates'];
 
 		// A circle touching a pole can include every longitude.
-		if ( $min_lat > -90 && $max_lat < 90 ) {
-			$lng_delta = rad2deg( asin( min( 1, sin( $angle ) / cos( deg2rad( $point[0] ) ) ) ) );
-			$min_lng   = $point[1] - $lng_delta;
-			$max_lng   = $point[1] + $lng_delta;
-			if ( $min_lng < -180 ) {
-				$where .= $wpdb->prepare( " AND ($longitude >= %f OR $longitude <= %f)", $min_lng + 360, $max_lng );
-			} elseif ( $max_lng > 180 ) {
-				$where .= $wpdb->prepare( " AND ($longitude >= %f OR $longitude <= %f)", $min_lng, $max_lng - 360 );
-			} else {
-				$where .= $wpdb->prepare( " AND $longitude BETWEEN %f AND %f", $min_lng, $max_lng );
-			}
+		if ( $min_lat <= -90 || $max_lat >= 90 ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
+					 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
+					 WHERE tt.taxonomy = %s AND tm.meta_key = %s
+					 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f",
+					$taxonomy,
+					$meta_key,
+					$min_lat,
+					$max_lat
+				)
+			);
+
+			return array_map( 'intval', $ids );
 		}
 
-		// Only the fixed SQL expressions above are interpolated; values are prepared.
-		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery
-		return array_map( 'intval', $wpdb->get_col( $wpdb->prepare(
-			"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
-			 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
-			 WHERE tt.taxonomy = %s AND tm.meta_key = %s AND $where",
-			'venue',
-			self::$meta_fields['coordinates']
-		) ) );
+		$lng_delta = rad2deg( asin( min( 1, sin( $angle ) / cos( deg2rad( $point[0] ) ) ) ) );
+		$min_lng   = $point[1] - $lng_delta;
+		$max_lng   = $point[1] + $lng_delta;
+
+		if ( $min_lng < -180 || $max_lng > 180 ) {
+			// The box crosses the antimeridian: match either side of it.
+			$low  = $min_lng < -180 ? $min_lng + 360 : $min_lng;
+			$high = $max_lng > 180 ? $max_lng - 360 : $max_lng;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$ids = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
+					 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
+					 WHERE tt.taxonomy = %s AND tm.meta_key = %s
+					 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f
+					 AND ( (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) >= %f
+					    OR (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) <= %f )",
+					$taxonomy,
+					$meta_key,
+					$min_lat,
+					$max_lat,
+					$low,
+					$high
+				)
+			);
+
+			return array_map( 'intval', $ids );
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$ids = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT DISTINCT tm.term_id FROM {$wpdb->termmeta} tm
+				 INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_id = tm.term_id
+				 WHERE tt.taxonomy = %s AND tm.meta_key = %s
+				 AND (SUBSTRING_INDEX(tm.meta_value, ',', 1) + 0) BETWEEN %f AND %f
+				 AND (SUBSTRING_INDEX(tm.meta_value, ',', -1) + 0) BETWEEN %f AND %f",
+				$taxonomy,
+				$meta_key,
+				$min_lat,
+				$max_lat,
+				$min_lng,
+				$max_lng
+			)
+		);
+
+		return array_map( 'intval', $ids );
 	}
 
 	/** Reuse only a unique venue within 25m, with no conflicting geography. */
