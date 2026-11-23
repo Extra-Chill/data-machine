@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.91.2] - 2026-11-23
+
+### Fixed
+- rank same-name venue candidates by location evidence
+
 ## [0.91.1] - 2026-11-22
 
 ### Changed
