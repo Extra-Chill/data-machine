@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.8] - 2026-11-24
+
+### Fixed
+- honor WP-CLI global --user for USER.md and principal memory
+
 ## [0.205.7] - 2026-11-24
 
 ### Fixed
