@@ -77,8 +77,8 @@ class MemoryCommand extends BaseCommand {
 	 *     # Read USER.md for a specific agent
 	 *     wp datamachine memory read USER.md --agent=studio
 	 *
-	 *     # Read for a specific user
-	 *     wp datamachine memory read --user=2
+	 *     # Read USER.md for a specific user (WP-CLI global --user)
+	 *     wp --user=2 datamachine memory read USER.md
 	 *
 	 * @subcommand read
 	 */
@@ -1054,20 +1054,40 @@ class MemoryCommand extends BaseCommand {
 	/**
 	 * Resolve memory scoping from CLI flags.
 	 *
-	 * Returns an input array with agent_id (preferred) or user_id for
-	 * memory ability calls. Agent scoping takes precedence over user scoping.
+	 * Returns an input array with the effective agent_id (when one resolves)
+	 * and the user_id that owns the user/principal memory layers.
+	 *
+	 * The user honors WP-CLI's global `--user` (which never reaches
+	 * `$assoc_args`) via the current user, including when `--agent` is
+	 * passed. The agent owner is only the fallback when no user is set.
 	 *
 	 * @param array $assoc_args Command arguments.
 	 * @return array Input parameters with user_id and/or agent_id.
 	 */
 	private function resolveMemoryScoping( array $assoc_args ): array {
-		$context = AgentResolver::resolveEffectiveContext( $assoc_args );
-
-		if ( null !== $context['agent_id'] ) {
-			return array( 'agent_id' => (int) $context['agent_id'] );
+		$requested_user_id = UserResolver::resolveActingUser( $assoc_args );
+		$context_args      = $assoc_args;
+		if ( $requested_user_id > 0 ) {
+			$context_args['user'] = (string) $requested_user_id;
 		}
 
-		return array( 'user_id' => (int) $context['user_id'] );
+		$context = AgentResolver::resolveEffectiveContext( $context_args );
+		$scoping = array();
+
+		if ( null !== $context['agent_id'] ) {
+			$scoping['agent_id'] = (int) $context['agent_id'];
+		}
+
+		$user_id = $requested_user_id > 0 ? $requested_user_id : (int) ( $context['user_id'] ?? 0 );
+		if ( $user_id > 0 ) {
+			$scoping['user_id'] = $user_id;
+		}
+
+		if ( empty( $scoping ) ) {
+			$scoping['user_id'] = 0;
+		}
+
+		return $scoping;
 	}
 
 	private function get_agent_dir( int $user_id = 0, ?int $agent_id = null ): string {
@@ -1639,6 +1659,7 @@ class MemoryCommand extends BaseCommand {
 	public function paths( array $args, array $assoc_args ): void {
 		$directory_manager = new DirectoryManager();
 		$explicit_slug     = \WP_CLI\Utils\get_flag_value( $assoc_args, 'agent', null );
+		$requested_user_id = UserResolver::resolveActingUser( $assoc_args );
 
 		if ( null !== $explicit_slug ) {
 			// Direct slug resolution — multi-agent safe.
@@ -1659,13 +1680,23 @@ class MemoryCommand extends BaseCommand {
 				$effective_user_id = DirectoryManager::get_default_agent_user_id();
 			}
 		} else {
-			$context           = AgentResolver::resolveEffectiveContext( $assoc_args );
+			$context_args = $assoc_args;
+			if ( $requested_user_id > 0 ) {
+				$context_args['user'] = (string) $requested_user_id;
+			}
+			$context           = AgentResolver::resolveEffectiveContext( $context_args );
 			$effective_user_id = (int) $context['user_id'];
 			$agent_slug        = (string) $context['agent_slug'];
 			if ( '' === $agent_slug ) {
 				$agent_slug = $directory_manager->get_agent_slug_for_user( $effective_user_id );
 			}
 			$agent_dir = $directory_manager->get_agent_identity_directory( $agent_slug );
+		}
+
+		// WP-CLI's global --user (or an explicit user) owns the user layer;
+		// the agent owner is only the fallback when no user is set.
+		if ( $requested_user_id > 0 ) {
+			$effective_user_id = $requested_user_id;
 		}
 
 		$shared_dir  = $directory_manager->get_shared_directory();

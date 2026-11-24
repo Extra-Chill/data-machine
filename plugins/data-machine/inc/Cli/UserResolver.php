@@ -63,4 +63,30 @@ class UserResolver {
 		}
 		return $user->ID;
 	}
+
+	/**
+	 * Resolve the user a command is acting for, honoring WP-CLI's global --user.
+	 *
+	 * WP-CLI consumes `--user=<id|login|email>` as a global parameter and sets
+	 * the current user before the command runs, so the flag never reaches
+	 * `$assoc_args`. Commands that address per-user state (USER.md, principal
+	 * memory) must therefore fall back to `get_current_user_id()`. An explicit
+	 * `user` key in `$assoc_args` still wins.
+	 *
+	 * @since next
+	 * @param array $assoc_args Command arguments.
+	 * @return int WordPress user ID, or 0 when no user was requested.
+	 */
+	public static function resolveActingUser( array $assoc_args ): int {
+		$explicit = self::resolve( $assoc_args );
+		if ( $explicit > 0 ) {
+			return $explicit;
+		}
+
+		if ( function_exists( 'get_current_user_id' ) ) {
+			return max( 0, (int) get_current_user_id() );
+		}
+
+		return 0;
+	}
 }
