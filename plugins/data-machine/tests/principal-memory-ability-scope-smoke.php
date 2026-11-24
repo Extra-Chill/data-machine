@@ -23,8 +23,8 @@ function sanitize_title( string $value ): string {
 
 eval( 'namespace DataMachine\\Abilities; class PermissionHelper { public static ?object $principal = null; public static ?int $agent = null; public static function get_execution_principal(): ?object { return self::$principal; } public static function get_acting_agent_id(): ?int { return self::$agent; } }' );
 eval( 'namespace DataMachine\\Core\\Database\\Agents; class Agents { public function get_by_slug( string $slug ): ?array { return "north" === $slug ? [ "agent_id" => 42 ] : null; } }' );
-eval( 'namespace DataMachine\\Engine\\AI; class MemoryFileRegistry { public const LAYER_PRINCIPAL = "principal"; }' );
-eval( 'namespace DataMachine\\Core\\FilesRepository; class AgentMemory { public function __construct( public int $user_id, public int $agent_id, public string $filename ) {} public static function resolve_layer_for( string $filename ): string { return "USER_MEMORY.md" === $filename ? "principal" : "agent"; } public function get_all(): array { return [ "success" => true, "user_id" => $this->user_id, "agent_id" => $this->agent_id, "filename" => $this->filename ]; } }' );
+eval( 'namespace DataMachine\\Engine\\AI; class MemoryFileRegistry { public const LAYER_USER = "user"; public const LAYER_PRINCIPAL = "principal"; }' );
+eval( 'namespace DataMachine\\Core\\FilesRepository; class AgentMemory { public function __construct( public int $user_id, public int $agent_id, public string $filename ) {} public static function resolve_layer_for( string $filename ): string { return "USER_MEMORY.md" === $filename ? "principal" : ( "USER.md" === $filename ? "user" : "agent" ); } public function get_all(): array { return [ "success" => true, "user_id" => $this->user_id, "agent_id" => $this->agent_id, "filename" => $this->filename ]; } }' );
 
 require_once __DIR__ . '/../inc/Abilities/AgentMemoryAbilities.php';
 
@@ -67,6 +67,38 @@ DataMachine\Abilities\PermissionHelper::$principal = (object) array(
 );
 $denied = DataMachine\Abilities\AgentMemoryAbilities::getMemory( array( 'file' => 'USER_MEMORY.md' ) );
 $assert( is_wp_error( $denied ) && 'principal_memory_scope_unavailable' === $denied->code, 'principal memory fails closed without an authenticated user' );
+
+DataMachine\Abilities\PermissionHelper::$principal = (object) array(
+	'acting_user_id'     => 1,
+	'effective_agent_id' => 'north',
+);
+foreach ( array( 'USER.md', 'USER_MEMORY.md' ) as $user_scoped_file ) {
+	$redirected = DataMachine\Abilities\AgentMemoryAbilities::updateMemory(
+		array(
+			'user_id' => 38,
+			'file'    => $user_scoped_file,
+			'section' => 'Preferences',
+			'content' => 'x',
+			'mode'    => 'set',
+		)
+	);
+	$assert(
+		is_wp_error( $redirected ) && 'memory_user_scope_mismatch' === $redirected->code,
+		"{$user_scoped_file} write for another user is refused instead of redirected"
+	);
+
+	$redirected_delete = DataMachine\Abilities\AgentMemoryAbilities::deleteMemorySection(
+		array(
+			'user_id' => 38,
+			'file'    => $user_scoped_file,
+			'section' => 'Preferences',
+		)
+	);
+	$assert(
+		is_wp_error( $redirected_delete ) && 'memory_user_scope_mismatch' === $redirected_delete->code,
+		"{$user_scoped_file} delete for another user is refused instead of redirected"
+	);
+}
 
 if ( $failures ) {
 	exit( 1 );

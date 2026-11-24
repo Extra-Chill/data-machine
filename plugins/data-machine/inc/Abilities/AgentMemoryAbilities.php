@@ -337,7 +337,7 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function updateMemory( array $input ): array|\WP_Error {
-		$memory = self::resolveMemory( $input );
+		$memory = self::resolveMemory( $input, true );
 		if ( is_wp_error( $memory ) ) {
 			return $memory;
 		}
@@ -415,7 +415,7 @@ class AgentMemoryAbilities {
 	 * @return array Result.
 	 */
 	public static function deleteMemorySection( array $input ): array|\WP_Error {
-		$memory = self::resolveMemory( $input );
+		$memory = self::resolveMemory( $input, true );
 		if ( is_wp_error( $memory ) ) {
 			return $memory;
 		}
@@ -529,22 +529,50 @@ class AgentMemoryAbilities {
 	/**
 	 * Resolve an AgentMemory instance from input parameters.
 	 *
+	 * Writes to user-scoped layers (user, principal) refuse rather than
+	 * redirect when the requested user differs from the resolved one, so a
+	 * caller can never silently clobber another person's private memory.
+	 *
 	 * @since 0.45.0
-	 * @param array $input Input parameters with optional user_id, agent_id, file.
+	 * @param array $input    Input parameters with optional user_id, agent_id, file.
+	 * @param bool  $is_write Whether the caller intends to mutate the file.
 	 * @return AgentMemory|\WP_Error
 	 */
-	private static function resolveMemory( array $input ): AgentMemory|\WP_Error {
-		$user_id   = (int) ( $input['user_id'] ?? 0 );
-		$agent_id  = (int) ( $input['agent_id'] ?? 0 );
-		$filename  = $input['file'] ?? 'MEMORY.md';
-		$principal = PermissionHelper::get_execution_principal();
+	private static function resolveMemory( array $input, bool $is_write = false ): AgentMemory|\WP_Error {
+		$requested_user_id = (int) ( $input['user_id'] ?? 0 );
+		$user_id           = $requested_user_id;
+		$agent_id          = (int) ( $input['agent_id'] ?? 0 );
+		$filename          = $input['file'] ?? 'MEMORY.md';
+		$principal         = PermissionHelper::get_execution_principal();
+		$layer             = AgentMemory::resolve_layer_for( $filename );
+		$user_scoped       = in_array(
+			$layer,
+			array(
+				\DataMachine\Engine\AI\MemoryFileRegistry::LAYER_USER,
+				\DataMachine\Engine\AI\MemoryFileRegistry::LAYER_PRINCIPAL,
+			),
+			true
+		);
 
 		if ( null !== $principal ) {
+			if ( $is_write && $user_scoped && $requested_user_id > 0 && (int) $principal->acting_user_id !== $requested_user_id ) {
+				return new \WP_Error(
+					'memory_user_scope_mismatch',
+					sprintf(
+						'Refusing to write %s for user %d: the resolved acting user is %d.',
+						$filename,
+						$requested_user_id,
+						(int) $principal->acting_user_id
+					),
+					array( 'status' => 403 )
+				);
+			}
+
 			$user_id  = $principal->acting_user_id;
 			$agent_id = self::resolvePrincipalAgentId( $principal->effective_agent_id );
 		}
 
-		if ( \DataMachine\Engine\AI\MemoryFileRegistry::LAYER_PRINCIPAL === AgentMemory::resolve_layer_for( $filename ) && ( $user_id <= 0 || $agent_id <= 0 ) ) {
+		if ( \DataMachine\Engine\AI\MemoryFileRegistry::LAYER_PRINCIPAL === $layer && ( $user_id <= 0 || $agent_id <= 0 ) ) {
 			return new \WP_Error(
 				'principal_memory_scope_unavailable',
 				'Principal memory requires an authenticated user and effective agent.',
