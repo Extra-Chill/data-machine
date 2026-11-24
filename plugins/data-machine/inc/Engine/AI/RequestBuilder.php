@@ -18,7 +18,9 @@ use DataMachine\Engine\AI\Directives\DirectivePolicyResolver;
 
 defined( 'ABSPATH' ) || exit;
 
-require_once __DIR__ . '/WpAiClientCache.php';
+if ( ! class_exists( WpAiClientCache::class, false ) ) {
+	require_once __DIR__ . '/WpAiClientCache.php';
+}
 require_once __DIR__ . '/DefaultOptionsHttpTransporter.php';
 
 class RequestBuilder {

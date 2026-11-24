@@ -9,8 +9,6 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
-require_once __DIR__ . '/WpAiClientTransientCacheBase.php';
-
 /**
  * Installs a WordPress-backed PSR-16 cache for wp-ai-client.
  */
@@ -49,15 +47,26 @@ class WpAiClientCache {
 		}
 	}
 
-	/** Return the cache implementation matching wp-ai-client's PSR namespace. */
+	/**
+	 * Return the cache implementation matching wp-ai-client's PSR namespace.
+	 *
+	 * Cache classes are resolved through the Composer autoloader (PSR-4
+	 * `DataMachine\Engine\` => `inc/Engine/`). They are intentionally never
+	 * hand-included: `require_once` dedupes by real path, so during a
+	 * symlink-swap deploy the same class file can be reachable through two
+	 * real paths in one request and a manual include fatals with
+	 * "Cannot redeclare class".
+	 */
 	private static function cache_class(): ?string {
-		if ( interface_exists( '\WordPress\AiClientDependencies\Psr\SimpleCache\CacheInterface' ) ) {
-			require_once __DIR__ . '/ScopedWpAiClientTransientCache.php';
+		if ( interface_exists( '\WordPress\AiClientDependencies\Psr\SimpleCache\CacheInterface' )
+			&& class_exists( ScopedWpAiClientTransientCache::class )
+		) {
 			return ScopedWpAiClientTransientCache::class;
 		}
 
-		if ( interface_exists( '\Psr\SimpleCache\CacheInterface' ) ) {
-			require_once __DIR__ . '/PsrWpAiClientTransientCache.php';
+		if ( interface_exists( '\Psr\SimpleCache\CacheInterface' )
+			&& class_exists( PsrWpAiClientTransientCache::class )
+		) {
 			return PsrWpAiClientTransientCache::class;
 		}
 
