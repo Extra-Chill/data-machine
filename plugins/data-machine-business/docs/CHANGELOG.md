@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.29.0] - 2026-11-24
+
+### Added
+- offset pagination for datamachine/revenue-query rows
+
 ## [0.28.0] - 2026-11-24
 
 ### Added
