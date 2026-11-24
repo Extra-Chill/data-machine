@@ -190,6 +190,12 @@ class RevenueLedgerAbilities {
 					'default'     => 100,
 					'description' => 'Maximum rows returned when include_rows is true; clamped to 1–1000. Totals always cover every matching row.',
 				),
+				'offset'       => array(
+					'type'        => 'integer',
+					'default'     => 0,
+					'minimum'     => 0,
+					'description' => 'Number of contained rows to skip before returning rows (ordered by period_start, source, account, kind, id). Applies only when include_rows is true; totals, coverage and provenance are unaffected.',
+				),
 			),
 		);
 	}
@@ -252,6 +258,7 @@ class RevenueLedgerAbilities {
 						'matched_rows'         => array( 'type' => 'integer' ),
 						'partial_overlap_rows' => array( 'type' => 'integer' ),
 						'returned_rows'        => array( 'type' => 'integer' ),
+						'offset'               => array( 'type' => 'integer' ),
 					),
 				),
 				'provenance'      => array( 'type' => 'object' ),
@@ -438,6 +445,7 @@ class RevenueLedgerAbilities {
 		}
 		$include_rows = ! empty( $input['include_rows'] );
 		$limit        = max( 1, min( 1000, (int) ( $input['limit'] ?? 100 ) ) );
+		$offset       = max( 0, (int) ( $input['offset'] ?? 0 ) );
 
 		RevenueLedger::maybe_upgrade();
 		$ledger      = new RevenueLedger();
@@ -491,7 +499,8 @@ class RevenueLedgerAbilities {
 			'counts'          => array(
 				'matched_rows'         => count( $contained ),
 				'partial_overlap_rows' => $partial,
-				'returned_rows'        => $include_rows ? min( $limit, count( $contained ) ) : 0,
+				'returned_rows'        => $include_rows ? min( $limit, max( 0, count( $contained ) - $offset ) ) : 0,
+				'offset'               => $offset,
 			),
 			'provenance'      => array(
 				'ability'            => self::QUERY_ABILITY,
@@ -503,7 +512,7 @@ class RevenueLedgerAbilities {
 			),
 		);
 		if ( $include_rows ) {
-			$result['rows'] = array_slice( $contained, 0, $limit );
+			$result['rows'] = array_slice( $contained, $offset, $limit );
 		}
 		return $result;
 	}

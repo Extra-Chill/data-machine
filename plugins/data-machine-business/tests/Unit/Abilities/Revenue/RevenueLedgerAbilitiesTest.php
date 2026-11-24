@@ -168,6 +168,50 @@ class RevenueLedgerAbilitiesTest extends WP_UnitTestCase {
 		$this->assertSame( '80.00', $eur['currency_totals'][0]['amount'] );
 	}
 
+	public function test_query_offset_pages_rows_without_changing_totals(): void {
+		$rows = array();
+		for ( $day = 1; $day <= 5; $day++ ) {
+			$date   = sprintf( '2026-06-%02d', $day );
+			$rows[] = array( 'kind' => 'ad_revenue', 'amount' => (string) $day, 'currency' => 'USD', 'period_start' => $date, 'period_end' => $date );
+		}
+		$this->ingest( $this->window( $rows ) );
+
+		$base  = array( 'start_date' => '2026-06-01', 'end_date' => '2026-06-30', 'include_rows' => true, 'limit' => 2 );
+		$first = RevenueLedgerAbilities::query( $base );
+		$this->assertSame( 0, $first['counts']['offset'] );
+		$this->assertSame( 2, $first['counts']['returned_rows'] );
+
+		$pages = array();
+		foreach ( array( 0, 2, 4 ) as $offset ) {
+			$page = RevenueLedgerAbilities::query( array_merge( $base, array( 'offset' => $offset ) ) );
+			$this->assertSame( $offset, $page['counts']['offset'] );
+			$this->assertSame( 5, $page['counts']['matched_rows'] );
+			$this->assertSame( min( 2, 5 - $offset ), $page['counts']['returned_rows'] );
+			$this->assertCount( $page['counts']['returned_rows'], $page['rows'] );
+			$this->assertSame( $first['totals'], $page['totals'] );
+			$this->assertSame( $first['currency_totals'], $page['currency_totals'] );
+			$this->assertSame( $first['coverage'], $page['coverage'] );
+			$this->assertSame( $first['provenance'], $page['provenance'] );
+			foreach ( $page['rows'] as $row ) {
+				$pages[] = $row['period_start'];
+			}
+		}
+		$this->assertSame( array( '2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04', '2026-06-05' ), $pages );
+
+		$beyond = RevenueLedgerAbilities::query( array_merge( $base, array( 'offset' => 10 ) ) );
+		$this->assertSame( 0, $beyond['counts']['returned_rows'] );
+		$this->assertSame( array(), $beyond['rows'] );
+		$this->assertSame( '15.00', $beyond['currency_totals'][0]['amount'] );
+
+		$negative = RevenueLedgerAbilities::query( array_merge( $base, array( 'offset' => -3 ) ) );
+		$this->assertSame( 0, $negative['counts']['offset'] );
+		$this->assertSame( '2026-06-01', $negative['rows'][0]['period_start'] );
+
+		$no_rows = RevenueLedgerAbilities::query( array( 'start_date' => '2026-06-01', 'end_date' => '2026-06-30', 'offset' => 2 ) );
+		$this->assertSame( 0, $no_rows['counts']['returned_rows'] );
+		$this->assertArrayNotHasKey( 'rows', $no_rows );
+	}
+
 	public function test_query_excludes_partially_overlapping_periods_from_totals(): void {
 		$this->ingest( $this->window( array( array( 'kind' => 'ad_revenue', 'amount' => '30', 'currency' => 'USD' ) ) ) );
 
