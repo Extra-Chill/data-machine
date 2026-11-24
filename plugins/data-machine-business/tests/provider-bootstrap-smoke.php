@@ -99,6 +99,7 @@ $expected_ids   = array(
 	'google-analytics',
 	'mediavine',
 	'stripe',
+	'revenue-ledger',
 	'stripe-payment-links',
 	'content-insights',
 	'google-sheets',

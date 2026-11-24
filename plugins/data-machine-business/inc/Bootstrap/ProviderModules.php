@@ -59,6 +59,17 @@ final class ProviderModules {
 				static fn() => new \DataMachineBusiness\Abilities\Analytics\StripeReportsAbilities()
 			),
 			new ProviderModule(
+				'revenue-ledger',
+				array_merge(
+					$abilities,
+					array(
+						'DataMachine\\Core\\Database\\BaseRepository' => static fn(): bool => class_exists( 'DataMachine\\Core\\Database\\BaseRepository' ),
+					)
+				),
+				array( 'datamachine/revenue-ingest', 'datamachine/revenue-query' ),
+				static fn() => new \DataMachineBusiness\Abilities\Revenue\RevenueLedgerAbilities()
+			),
+			new ProviderModule(
 				'stripe-payment-links',
 				$abilities,
 				array( 'datamachine/stripe-stage-payment-link' ),

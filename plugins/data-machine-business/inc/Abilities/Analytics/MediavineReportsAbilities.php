@@ -38,6 +38,7 @@ namespace DataMachineBusiness\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineBusiness\Abilities\Revenue\RevenueLedgerAbilities;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -111,6 +112,20 @@ class MediavineReportsAbilities {
 	 */
 	const DIMENSIONAL_HOST_ATTRIBUTION_REASON = 'Mediavine dimensional reports return source-native aggregate buckets without row-level URL or host attribution.';
 
+	/**
+	 * Actions whose rows can be stored in the revenue ledger (opt-in `store`).
+	 *
+	 * @var string[]
+	 */
+	const STORE_ACTIONS = array( 'pages', 'backfill' );
+
+	/**
+	 * Currency Mediavine reports earnings in unless configured otherwise.
+	 *
+	 * @var string
+	 */
+	const DEFAULT_CURRENCY = 'USD';
+
 	private static bool $registered = false;
 
 	public function __construct() {
@@ -166,6 +181,16 @@ class MediavineReportsAbilities {
 								'type'        => 'string',
 								'description' => 'Mediavine GraphQL global InternalSite ID. A numeric internal site id is also accepted and encoded. Legacy site slugs are not accepted by the reporting API.',
 							),
+							'store'      => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => 'Opt-in (pages and backfill only): also ingest the fetched page rows into the revenue ledger via datamachine/revenue-ingest, one window per date range. The live result is returned unchanged plus a ledger block.',
+							),
+							'dry_run'    => array(
+								'type'        => 'boolean',
+								'default'     => false,
+								'description' => 'With store: report what the ledger would replace and insert without writing.',
+							),
 						),
 					),
 					'output_schema'       => self::outputSchema(),
@@ -184,48 +209,51 @@ class MediavineReportsAbilities {
 	 */
 	public static function outputSchema(): array {
 		$result_properties = array(
-			'slug'                   => array( 'type' => 'string' ),
-			'views'                  => array( 'type' => 'integer' ),
-			'revenue'                => array( 'type' => 'number' ),
-			'rpm'                    => array( 'type' => 'number' ),
-			'cpm'                    => array( 'type' => 'number' ),
-			'viewability'            => array( 'type' => 'number' ),
-			'fillRate'               => array( 'type' => 'number' ),
-			'period'                 => array( 'type' => 'string' ),
-			'earnings'               => array( 'type' => 'number' ),
-			'pageviews'              => array( 'type' => 'integer' ),
-			'sessions'               => array( 'type' => 'integer' ),
-			'sessionRpm'             => array( 'type' => 'number' ),
-			'pageRpm'                => array( 'type' => 'number' ),
-			'paidImpressions'        => array( 'type' => 'integer' ),
-			'label'                  => array( 'type' => array( 'string', 'null' ) ),
-			'country'                => array( 'type' => array( 'string', 'null' ) ),
-			'source'                 => array(
+			'slug'                              => array( 'type' => 'string' ),
+			'views'                             => array( 'type' => 'integer' ),
+			'revenue'                           => array( 'type' => 'number' ),
+			'rpm'                               => array( 'type' => 'number' ),
+			'cpm'                               => array( 'type' => 'number' ),
+			'viewability'                       => array( 'type' => 'number' ),
+			'fillRate'                          => array( 'type' => 'number' ),
+			'period'                            => array( 'type' => 'string' ),
+			'earnings'                          => array( 'type' => 'number' ),
+			'pageviews'                         => array( 'type' => 'integer' ),
+			'sessions'                          => array( 'type' => 'integer' ),
+			'sessionRpm'                        => array( 'type' => 'number' ),
+			'pageRpm'                           => array( 'type' => 'number' ),
+			'paidImpressions'                   => array( 'type' => 'integer' ),
+			'label'                             => array( 'type' => array( 'string', 'null' ) ),
+			'country'                           => array( 'type' => array( 'string', 'null' ) ),
+			'source'                            => array(
 				'type'        => array( 'string', 'null' ),
 				'description' => 'Mediavine normalized acquisition bucket; not a raw referrer or GA source/medium.',
 			),
-			'adunit'                 => array( 'type' => array( 'string', 'null' ) ),
-			'grain'                  => array( 'type' => 'string', 'enum' => array( 'parent', 'child' ) ),
-			'deviceType'             => array( 'type' => array( 'string', 'null' ) ),
-			'pageviewRpm'            => array( 'type' => 'number' ),
-			'monetizablePageviews'   => array( 'type' => 'integer' ),
-			'monetizableSessions'    => array( 'type' => 'integer' ),
-			'monetizablePageviewRpm' => array( 'type' => 'number' ),
-			'monetizableSessionRpm'  => array( 'type' => 'number' ),
-			'pageviewsPercentage'    => array( 'type' => 'number' ),
-			'sessionsPercentage'     => array( 'type' => 'number' ),
-			'netRevenue'             => array( 'type' => 'number' ),
-			'pageRevenue'            => array( 'type' => 'number' ),
-			'impressions'            => array( 'type' => 'integer' ),
-			'fillrate'               => array( 'type' => 'number' ),
-			'pageviewsRpm'           => array( 'type' => 'number' ),
-			'sessionsRpm'            => array( 'type' => 'number' ),
-			'monetizablePageviewsPercentage' => array( 'type' => 'number' ),
-			'monetizableSessionsPercentage'  => array( 'type' => 'number' ),
-			'monetizablePageviewsRpm'        => array( 'type' => 'number' ),
-			'monetizableSessionsRpm'         => array( 'type' => 'number' ),
-			'impressionsPerPageview'         => array( 'type' => 'number' ),
-			'impressionsPerSession'          => array( 'type' => 'number' ),
+			'adunit'                            => array( 'type' => array( 'string', 'null' ) ),
+			'grain'                             => array(
+				'type' => 'string',
+				'enum' => array( 'parent', 'child' ),
+			),
+			'deviceType'                        => array( 'type' => array( 'string', 'null' ) ),
+			'pageviewRpm'                       => array( 'type' => 'number' ),
+			'monetizablePageviews'              => array( 'type' => 'integer' ),
+			'monetizableSessions'               => array( 'type' => 'integer' ),
+			'monetizablePageviewRpm'            => array( 'type' => 'number' ),
+			'monetizableSessionRpm'             => array( 'type' => 'number' ),
+			'pageviewsPercentage'               => array( 'type' => 'number' ),
+			'sessionsPercentage'                => array( 'type' => 'number' ),
+			'netRevenue'                        => array( 'type' => 'number' ),
+			'pageRevenue'                       => array( 'type' => 'number' ),
+			'impressions'                       => array( 'type' => 'integer' ),
+			'fillrate'                          => array( 'type' => 'number' ),
+			'pageviewsRpm'                      => array( 'type' => 'number' ),
+			'sessionsRpm'                       => array( 'type' => 'number' ),
+			'monetizablePageviewsPercentage'    => array( 'type' => 'number' ),
+			'monetizableSessionsPercentage'     => array( 'type' => 'number' ),
+			'monetizablePageviewsRpm'           => array( 'type' => 'number' ),
+			'monetizableSessionsRpm'            => array( 'type' => 'number' ),
+			'impressionsPerPageview'            => array( 'type' => 'number' ),
+			'impressionsPerSession'             => array( 'type' => 'number' ),
 			'impressionsPerMonetizablePageview' => array( 'type' => 'number' ),
 			'impressionsPerMonetizableSession'  => array( 'type' => 'number' ),
 		);
@@ -280,7 +308,10 @@ class MediavineReportsAbilities {
 					'description' => 'Integrity diagnostics for source-native dimensional rows. Raw result rows are never changed by these checks.',
 					'required'    => array( 'status', 'warning_count', 'warnings' ),
 					'properties'  => array(
-						'status'        => array( 'type' => 'string', 'enum' => array( 'ok', 'warning' ) ),
+						'status'        => array(
+							'type' => 'string',
+							'enum' => array( 'ok', 'warning' ),
+						),
 						'warning_count' => array( 'type' => 'integer' ),
 						'warnings'      => array(
 							'type'  => 'array',
@@ -289,7 +320,10 @@ class MediavineReportsAbilities {
 								'required'   => array( 'code', 'severity', 'row', 'invariant', 'observed', 'source_semantics', 'message' ),
 								'properties' => array(
 									'code'             => array( 'type' => 'string' ),
-									'severity'         => array( 'type' => 'string', 'enum' => array( 'warning' ) ),
+									'severity'         => array(
+										'type' => 'string',
+										'enum' => array( 'warning' ),
+									),
 									'row'              => array(
 										'type'       => 'object',
 										'required'   => array( 'index', 'dimension', 'value' ),
@@ -299,8 +333,8 @@ class MediavineReportsAbilities {
 											'value'     => array( 'type' => array( 'string', 'null' ) ),
 										),
 									),
-									'invariant'         => array( 'type' => 'string' ),
-									'observed'          => array(
+									'invariant'        => array( 'type' => 'string' ),
+									'observed'         => array(
 										'type'       => 'object',
 										'required'   => array( 'subset_field', 'subset_value', 'total_field', 'total_value' ),
 										'properties' => array(
@@ -310,14 +344,21 @@ class MediavineReportsAbilities {
 											'total_value'  => array( 'type' => 'integer' ),
 										),
 									),
-									'source_semantics' => array( 'type' => 'string', 'enum' => array( 'unknown_upstream' ) ),
-									'message'           => array( 'type' => 'string' ),
+									'source_semantics' => array(
+										'type' => 'string',
+										'enum' => array( 'unknown_upstream' ),
+									),
+									'message'          => array( 'type' => 'string' ),
 								),
 							),
 						),
 					),
 				),
 				'provenance'    => self::provenanceSchema(),
+				'ledger'        => array(
+					'type'        => 'object',
+					'description' => 'Present only for store=true: datamachine/revenue-ingest result(s).',
+				),
 				'error'         => array( 'type' => 'string' ),
 			),
 		);
@@ -401,6 +442,14 @@ class MediavineReportsAbilities {
 			);
 		}
 
+		$store = ! empty( $input['store'] );
+		if ( $store && ! in_array( $action, self::STORE_ACTIONS, true ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'store is supported for: ' . implode( ', ', self::STORE_ACTIONS ) . '.',
+			);
+		}
+
 		$config = self::get_config();
 
 		if ( empty( $config['email'] ) || empty( $config['password'] ) ) {
@@ -441,14 +490,106 @@ class MediavineReportsAbilities {
 		}
 
 		if ( 'backfill' === $action ) {
-			return self::fetchBackfill( $input, $access_token, $requested_site_id, $site_id );
+			if ( ! $store ) {
+				return self::fetchBackfill( $input, $access_token, $requested_site_id, $site_id );
+			}
+			$ledger_periods = array();
+			$result         = self::fetchBackfill(
+				$input,
+				$access_token,
+				$requested_site_id,
+				$site_id,
+				static function ( string $start_date, string $end_date, array $rows ) use ( &$ledger_periods, $site_id, $config, $input ): void {
+					$ingested         = self::storePages( $site_id, $start_date, $end_date, $rows, $config, ! empty( $input['dry_run'] ) );
+					$ledger_periods[] = is_wp_error( $ingested )
+						? array(
+							'success'    => false,
+							'start_date' => $start_date,
+							'end_date'   => $end_date,
+							'error'      => $ingested->get_error_message(),
+						)
+						: $ingested;
+				}
+			);
+			if ( ! empty( $result['success'] ) ) {
+				$result['ledger'] = array( 'periods' => $ledger_periods );
+			}
+			return $result;
 		}
 
 		if ( in_array( $action, array( 'devices', 'countries', 'sources', 'ad_units' ), true ) ) {
 			return self::fetchDimensionalReport( $action, $input, $access_token, $requested_site_id, $site_id );
 		}
 
-		return self::fetchPages( $input, $access_token, $requested_site_id, $site_id );
+		$result = self::fetchPages( $input, $access_token, $requested_site_id, $site_id );
+		if ( ! $store || empty( $result['success'] ) ) {
+			return $result;
+		}
+
+		$ingested = self::storePages( $site_id, $result['date_range']['start_date'], $result['date_range']['end_date'], $result['results'], $config, ! empty( $input['dry_run'] ) );
+		if ( is_wp_error( $ingested ) ) {
+			return array(
+				'success' => false,
+				'error'   => 'Mediavine rows fetched but not stored: ' . $ingested->get_error_message(),
+			);
+		}
+		$result['ledger'] = $ingested;
+		return $result;
+	}
+
+	/**
+	 * Normalize pages rows into revenue ledger rows.
+	 *
+	 * One `ad_revenue` row per page path for the whole window. The path is the
+	 * row URL; every other Mediavine number is kept source-native in metrics.
+	 *
+	 * @param array  $rows     Rows from parsePagesPayload().
+	 * @param string $currency ISO currency code of Mediavine earnings.
+	 * @return array[]
+	 */
+	public static function ledgerRowsFromPages( array $rows, string $currency = self::DEFAULT_CURRENCY ): array {
+		$ledger_rows = array();
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) || empty( $row['slug'] ) ) {
+				continue;
+			}
+			$metrics = $row;
+			unset( $metrics['slug'], $metrics['revenue'], $metrics['period'] );
+			$ledger_rows[] = array(
+				'kind'     => 'ad_revenue',
+				'amount'   => number_format( (float) ( $row['revenue'] ?? 0 ), 6, '.', '' ),
+				'currency' => $currency,
+				'url'      => (string) $row['slug'],
+				'metrics'  => $metrics,
+			);
+		}
+		return $ledger_rows;
+	}
+
+	/**
+	 * Ingest one window of pages rows into the revenue ledger.
+	 *
+	 * @param string $site_id    Relay global site id; the ledger account is the numeric internal id when derivable.
+	 * @param string $start_date Window start.
+	 * @param string $end_date   Window end.
+	 * @param array  $rows       Pages rows.
+	 * @param array  $config     Mediavine config (optional `currency`).
+	 * @param bool   $dry_run    Report without writing.
+	 * @return array|\WP_Error
+	 */
+	private static function storePages( string $site_id, string $start_date, string $end_date, array $rows, array $config, bool $dry_run ) {
+		$currency = ! empty( $config['currency'] ) ? strtoupper( (string) $config['currency'] ) : self::DEFAULT_CURRENCY;
+		return RevenueLedgerAbilities::ingest(
+			array(
+				'source'     => 'mediavine',
+				'account'    => self::decodeInternalSiteId( $site_id ) ?? $site_id,
+				'start_date' => $start_date,
+				'end_date'   => $end_date,
+				'kinds'      => array( 'ad_revenue' ),
+				'rows'       => self::ledgerRowsFromPages( $rows, $currency ),
+				'dry_run'    => $dry_run,
+			)
+		);
 	}
 
 	/**
@@ -522,9 +663,10 @@ class MediavineReportsAbilities {
 	 * @param string $access_token Bearer token.
 	 * @param string $requested_site_id Original site id supplied by the caller or configuration.
 	 * @param string $site_id      Normalized Relay global Mediavine site id.
+	 * @param callable|null $on_period Optional callback( start_date, end_date, rows ) for each fetched period (ledger store path).
 	 * @return array
 	 */
-	private static function fetchBackfill( array $input, string $access_token, string $requested_site_id, string $site_id ): array {
+	private static function fetchBackfill( array $input, string $access_token, string $requested_site_id, string $site_id, ?callable $on_period = null ): array {
 		$periods = $input['periods'] ?? array();
 
 		if ( ! is_array( $periods ) || empty( $periods ) ) {
@@ -553,7 +695,10 @@ class MediavineReportsAbilities {
 				continue;
 			}
 
-			$rows               = $parsed['rows'] ?? array();
+			$rows = $parsed['rows'] ?? array();
+			if ( null !== $on_period ) {
+				$on_period( $start_date, $end_date, $rows );
+			}
 			$all_rows           = array_merge( $all_rows, $rows );
 			$period_summaries[] = self::buildBackfillPeriodSummary( $requested_site_id, $site_id, $period, $start_date, $end_date, count( $rows ), $parsed['meta'] ?? array() );
 		}
@@ -1085,7 +1230,10 @@ class MediavineReportsAbilities {
 
 		$rows = array();
 		if ( 'ad_units' === $action ) {
-			foreach ( array( 'parentAdunits' => 'parent', 'childAdunits' => 'child' ) as $collection => $grain ) {
+			foreach ( array(
+				'parentAdunits' => 'parent',
+				'childAdunits'  => 'child',
+			) as $collection => $grain ) {
 				if ( ! isset( $payload[ $collection ] ) || ! is_array( $payload[ $collection ] ) ) {
 					return new \WP_Error( 'mediavine_ad_units_contract', 'Mediavine ad_units report response is missing parentAdunits or childAdunits.' );
 				}
@@ -1171,7 +1319,7 @@ class MediavineReportsAbilities {
 			);
 		}
 
-		$dimension = array(
+		$dimension  = array(
 			'devices'   => 'label',
 			'countries' => 'country',
 			'sources'   => 'source',
@@ -1205,15 +1353,15 @@ class MediavineReportsAbilities {
 						'dimension' => $dimension,
 						'value'     => null === ( $row[ $dimension ] ?? null ) ? null : (string) $row[ $dimension ],
 					),
-					'invariant'         => $subset_field . ' <= ' . $total_field,
-					'observed'          => array(
+					'invariant'        => $subset_field . ' <= ' . $total_field,
+					'observed'         => array(
 						'subset_field' => $subset_field,
 						'subset_value' => $subset_value,
 						'total_field'  => $total_field,
 						'total_value'  => $total_value,
 					),
 					'source_semantics' => 'unknown_upstream',
-					'message'           => 'The source row violates documented subset-count semantics. Upstream bucket semantics are unknown; raw values are preserved unchanged and should not support causal conclusions.',
+					'message'          => 'The source row violates documented subset-count semantics. Upstream bucket semantics are unknown; raw values are preserved unchanged and should not support causal conclusions.',
 				);
 			}
 		}
@@ -1273,30 +1421,70 @@ class MediavineReportsAbilities {
 	 */
 	private static function dimensionalFieldTypes( string $action ): array {
 		$fields = array(
-			'devices' => array(
-				'label' => 'string', 'pageviewRpm' => 'number', 'pageviews' => 'integer', 'revenue' => 'number',
-				'sessionRpm' => 'number', 'sessions' => 'integer', 'monetizablePageviews' => 'integer',
-				'monetizableSessions' => 'integer', 'monetizablePageviewRpm' => 'number', 'monetizableSessionRpm' => 'number',
+			'devices'   => array(
+				'label'                  => 'string',
+				'pageviewRpm'            => 'number',
+				'pageviews'              => 'integer',
+				'revenue'                => 'number',
+				'sessionRpm'             => 'number',
+				'sessions'               => 'integer',
+				'monetizablePageviews'   => 'integer',
+				'monetizableSessions'    => 'integer',
+				'monetizablePageviewRpm' => 'number',
+				'monetizableSessionRpm'  => 'number',
 			),
 			'countries' => array(
-				'country' => 'string', 'pageviews' => 'integer', 'pageviewsPercentage' => 'number', 'sessions' => 'integer',
-				'sessionsPercentage' => 'number', 'netRevenue' => 'number', 'pageRevenue' => 'number', 'impressions' => 'integer',
-				'paidImpressions' => 'integer', 'cpm' => 'number', 'fillrate' => 'number', 'viewability' => 'number',
-				'pageviewsRpm' => 'number', 'sessionsRpm' => 'number', 'monetizablePageviews' => 'integer',
-				'monetizablePageviewsPercentage' => 'number', 'monetizablePageviewsRpm' => 'number', 'monetizableSessions' => 'integer',
-				'monetizableSessionsPercentage' => 'number', 'monetizableSessionsRpm' => 'number',
+				'country'                        => 'string',
+				'pageviews'                      => 'integer',
+				'pageviewsPercentage'            => 'number',
+				'sessions'                       => 'integer',
+				'sessionsPercentage'             => 'number',
+				'netRevenue'                     => 'number',
+				'pageRevenue'                    => 'number',
+				'impressions'                    => 'integer',
+				'paidImpressions'                => 'integer',
+				'cpm'                            => 'number',
+				'fillrate'                       => 'number',
+				'viewability'                    => 'number',
+				'pageviewsRpm'                   => 'number',
+				'sessionsRpm'                    => 'number',
+				'monetizablePageviews'           => 'integer',
+				'monetizablePageviewsPercentage' => 'number',
+				'monetizablePageviewsRpm'        => 'number',
+				'monetizableSessions'            => 'integer',
+				'monetizableSessionsPercentage'  => 'number',
+				'monetizableSessionsRpm'         => 'number',
 			),
-			'sources' => array(
-				'source' => 'string', 'revenue' => 'number', 'netRevenue' => 'number', 'pageviews' => 'integer', 'sessions' => 'integer',
-				'impressions' => 'integer', 'pageviewsRpm' => 'number', 'sessionsRpm' => 'number', 'monetizablePageviews' => 'integer',
-				'monetizablePageviewsRpm' => 'number', 'monetizableSessions' => 'integer', 'monetizableSessionsRpm' => 'number',
-				'impressionsPerPageview' => 'number', 'impressionsPerSession' => 'number',
-				'impressionsPerMonetizablePageview' => 'number', 'impressionsPerMonetizableSession' => 'number',
+			'sources'   => array(
+				'source'                            => 'string',
+				'revenue'                           => 'number',
+				'netRevenue'                        => 'number',
+				'pageviews'                         => 'integer',
+				'sessions'                          => 'integer',
+				'impressions'                       => 'integer',
+				'pageviewsRpm'                      => 'number',
+				'sessionsRpm'                       => 'number',
+				'monetizablePageviews'              => 'integer',
+				'monetizablePageviewsRpm'           => 'number',
+				'monetizableSessions'               => 'integer',
+				'monetizableSessionsRpm'            => 'number',
+				'impressionsPerPageview'            => 'number',
+				'impressionsPerSession'             => 'number',
+				'impressionsPerMonetizablePageview' => 'number',
+				'impressionsPerMonetizableSession'  => 'number',
 			),
-			'ad_units' => array(
-				'adunit' => 'string', 'deviceType' => 'string', 'revenue' => 'number', 'paidImpressions' => 'integer',
-				'viewability' => 'number', 'fillrate' => 'number', 'sessionRpm' => 'number', 'pageviewRpm' => 'number',
-				'monetizableSessionRpm' => 'number', 'monetizablePageviewRpm' => 'number', 'cpm' => 'number',
+			'ad_units'  => array(
+				'adunit'                 => 'string',
+				'deviceType'             => 'string',
+				'revenue'                => 'number',
+				'paidImpressions'        => 'integer',
+				'viewability'            => 'number',
+				'fillrate'               => 'number',
+				'sessionRpm'             => 'number',
+				'pageviewRpm'            => 'number',
+				'monetizableSessionRpm'  => 'number',
+				'monetizablePageviewRpm' => 'number',
+				'cpm'                    => 'number',
 			),
 		);
 
@@ -1315,7 +1503,7 @@ class MediavineReportsAbilities {
 	 */
 	private static function dimensionalContract( string $action ): array {
 		$contracts = array(
-			'devices' => array(
+			'devices'   => array(
 				'operation'  => 'DevicesMetricsSummaryQuery',
 				'root'       => 'devicesMetricsSummary',
 				'collection' => 'devices',
@@ -1327,13 +1515,13 @@ class MediavineReportsAbilities {
 				'collection' => 'countries',
 				'query'      => 'query CountriesReportQuery($data: GetCountriesReportInput!){ countriesReport(data:$data){ meta{ totalCount reportStart reportEnd } countries{ country pageviews pageviewsPercentage sessions sessionsPercentage netRevenue pageRevenue impressions paidImpressions cpm fillrate viewability pageviewsRpm sessionsRpm monetizablePageviews monetizablePageviewsPercentage monetizablePageviewsRpm monetizableSessions monetizableSessionsPercentage monetizableSessionsRpm } } }',
 			),
-			'sources' => array(
+			'sources'   => array(
 				'operation'  => 'SourceReportsQuery',
 				'root'       => 'sourceReports',
 				'collection' => 'reports',
 				'query'      => 'query SourceReportsQuery($data: GetSourceReportsInput!){ sourceReports(data:$data){ meta{ totalCount reportStart reportEnd } reports{ source revenue netRevenue pageviews sessions impressions pageviewsRpm sessionsRpm monetizablePageviews monetizablePageviewsRpm monetizableSessions monetizableSessionsRpm impressionsPerPageview impressionsPerSession impressionsPerMonetizablePageview impressionsPerMonetizableSession } } }',
 			),
-			'ad_units' => array(
+			'ad_units'  => array(
 				'operation'  => 'AdunitsMetricsQuery',
 				'root'       => 'adunitsMetrics',
 				'collection' => '',

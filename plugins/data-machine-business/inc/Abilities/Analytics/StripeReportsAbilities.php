@@ -9,6 +9,8 @@ namespace DataMachineBusiness\Abilities\Analytics;
 
 use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\HttpClient;
+use DataMachineBusiness\Abilities\Revenue\RevenueLedgerAbilities;
+use DataMachineBusiness\Abilities\Stripe\StripeMoney;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,6 +24,8 @@ class StripeReportsAbilities {
 	const SCAN_ACTIONS              = array( 'mrr', 'renewals', 'past_due' );
 	const ACTIONS                   = array( 'subscriptions', 'mrr', 'renewals', 'past_due', 'charges', 'payouts' );
 	private static bool $registered = false;
+	/** Actions whose records are revenue movements that can be stored in the ledger. */
+	const STORE_ACTIONS = array( 'charges', 'payouts' );
 
 	public function __construct() {
 		if ( self::$registered ) {
@@ -36,19 +40,41 @@ class StripeReportsAbilities {
 					'type'       => 'object',
 					'required'   => array( 'action' ),
 					'properties' => array(
-						'action' => array(
+						'action'     => array(
 							'type' => 'string',
 							'enum' => self::ACTIONS,
 						),
-						'limit'  => array(
+						'limit'      => array(
 							'type'        => 'integer',
 							'default'     => 25,
 							'description' => 'Maximum source records per collection; clamped to 1–100.',
 						),
-						'days'   => array(
+						'days'       => array(
 							'type'        => 'integer',
 							'default'     => 7,
 							'description' => 'Renewal window; clamped to 1–365.',
+						),
+						'store'      => array(
+							'type'        => 'boolean',
+							'default'     => false,
+							'description' => 'Opt-in: read the whole start_date..end_date window (charges or payouts) and ingest it into the revenue ledger via datamachine/revenue-ingest. Live reads are unchanged when false.',
+						),
+						'dry_run'    => array(
+							'type'        => 'boolean',
+							'default'     => false,
+							'description' => 'With store: report what the ledger would replace and insert without writing.',
+						),
+						'start_date' => array(
+							'type'        => 'string',
+							'description' => 'With store: window start (YYYY-MM-DD, UTC).',
+						),
+						'end_date'   => array(
+							'type'        => 'string',
+							'description' => 'With store: window end (YYYY-MM-DD, UTC, inclusive).',
+						),
+						'account'    => array(
+							'type'        => 'string',
+							'description' => 'With store: ledger account label. Defaults to the configured account, else live/test from the key mode.',
 						),
 					),
 				),
@@ -78,6 +104,10 @@ class StripeReportsAbilities {
 				'results_count' => array( 'type' => 'integer' ),
 				'counts'        => array( 'type' => 'object' ),
 				'provenance'    => array( 'type' => 'object' ),
+				'ledger'        => array(
+					'type'        => 'object',
+					'description' => 'Present only for store=true: the datamachine/revenue-ingest result.',
+				),
 			),
 		);
 	}
@@ -105,6 +135,9 @@ class StripeReportsAbilities {
 		$valid = self::validateKey( $key );
 		if ( is_wp_error( $valid ) ) {
 			return $valid;
+		}
+		if ( ! empty( $input['store'] ) ) {
+			return self::redact( self::storeWindow( $action, $input, $key ), $key );
 		}
 		$limit       = max( 1, min( 100, (int) ( $input['limit'] ?? 25 ) ) );
 		$days        = max( 1, min( 365, (int) ( $input['days'] ?? 7 ) ) );
@@ -246,6 +279,174 @@ class StripeReportsAbilities {
 		);
 		// Defense in depth: even source strings reflecting credentials are redacted.
 		return self::redact( $result, $key );
+	}
+
+	/**
+	 * Opt-in ledger path: read one complete window and ingest it.
+	 *
+	 * Refuses to store a truncated window, since replacing a window with a
+	 * partial read would silently drop revenue.
+	 *
+	 * @return array|\WP_Error
+	 */
+	private static function storeWindow( string $action, array $input, string $key ) {
+		if ( ! in_array( $action, self::STORE_ACTIONS, true ) ) {
+			return new \WP_Error( 'stripe_store_unsupported', 'Only charges and payouts can be stored in the revenue ledger.' );
+		}
+		$start = (string) ( $input['start_date'] ?? '' );
+		$end   = (string) ( $input['end_date'] ?? '' );
+		$from  = preg_match( '/^\d{4}-\d{2}-\d{2}$/D', $start ) ? strtotime( $start . ' 00:00:00 UTC' ) : false;
+		$to    = preg_match( '/^\d{4}-\d{2}-\d{2}$/D', $end ) ? strtotime( $end . ' 23:59:59 UTC' ) : false;
+		if ( false === $from || false === $to || $from > $to ) {
+			return new \WP_Error( 'stripe_store_window', 'store requires start_date and end_date (YYYY-MM-DD) with start_date <= end_date.' );
+		}
+		$field = 'charges' === $action ? 'created' : 'arrival_date';
+		$query = array(
+			$field => array(
+				'gte' => $from,
+				'lte' => $to,
+			),
+		);
+		$list  = self::listRecords( '/' . $action, $query, $key, self::PAGE_SIZE * self::MAX_PAGES );
+		if ( is_wp_error( $list ) ) {
+			return $list;
+		}
+		if ( $list['truncated'] ) {
+			return new \WP_Error( 'stripe_store_incomplete', 'The Stripe window exceeds the bounded scan; ingest a shorter window so the ledger is not replaced with a partial read.' );
+		}
+		$rows   = 'charges' === $action ? self::ledgerRowsFromCharges( $list['data'] ) : self::ledgerRowsFromPayouts( $list['data'] );
+		$config = self::get_config();
+		$ledger = RevenueLedgerAbilities::ingest( array(
+			'source'     => 'stripe',
+			'account'    => (string) ( $input['account'] ?? $config['account'] ?? ( str_starts_with( $key, 'rk_live_' ) ? 'live' : 'test' ) ),
+			'start_date' => $start,
+			'end_date'   => $end,
+			'kinds'      => 'charges' === $action ? array( 'charge', 'refund' ) : array( 'payout' ),
+			'rows'       => $rows,
+			'dry_run'    => ! empty( $input['dry_run'] ),
+		) );
+		if ( is_wp_error( $ledger ) ) {
+			return $ledger;
+		}
+		return array(
+			'success'       => true,
+			'action'        => $action,
+			'results'       => $rows,
+			'results_count' => count( $rows ),
+			'counts'        => array(
+				'source_records' => count( $list['data'] ),
+				'matched'        => count( $rows ),
+				'rows'           => count( $rows ),
+			),
+			'provenance'    => array(
+				'source'       => array(
+					'ability' => 'datamachine/stripe-reports',
+					'action'  => $action,
+					'api'     => self::API_BASE,
+					'method'  => 'GET',
+				),
+				'collections'  => array(
+					array(
+						'endpoint'  => '/' . $action,
+						'filter'    => $field,
+						'pages'     => $list['pages'],
+						'records'   => count( $list['data'] ),
+						'truncated' => false,
+					),
+				),
+				'window'       => array(
+					'start_date' => $start,
+					'end_date'   => $end,
+				),
+				'amount_units' => 'major',
+				'complete'     => true,
+				'store'        => true,
+			),
+			'ledger'        => $ledger,
+		);
+	}
+
+	/**
+	 * Normalize Stripe charges into day-grain ledger rows.
+	 *
+	 * Succeeded charges become `charge` rows (captured amount). Any refunded
+	 * amount becomes a negative `refund` row attributed to the charge's day,
+	 * since the charge object does not carry refund dates.
+	 *
+	 * @param array[] $charges Stripe charge objects.
+	 */
+	public static function ledgerRowsFromCharges( array $charges ): array {
+		$rows = array();
+		foreach ( $charges as $charge ) {
+			if ( 'succeeded' !== ( $charge['status'] ?? '' ) || empty( $charge['currency'] ) || empty( $charge['created'] ) ) {
+				continue;
+			}
+			$currency = (string) $charge['currency'];
+			$day      = gmdate( 'Y-m-d', (int) $charge['created'] );
+			$captured = (int) ( $charge['amount_captured'] ?? $charge['amount'] ?? 0 );
+			$rows[]   = array(
+				'kind'         => 'charge',
+				'amount'       => StripeMoney::decimal( $captured, $currency ),
+				'currency'     => strtoupper( $currency ),
+				'period_start' => $day,
+				'period_end'   => $day,
+				'grain'        => 'day',
+				'object_ref'   => (string) $charge['id'],
+				'metrics'      => array(
+					'amount_minor' => $captured,
+					'paid'         => (bool) ( $charge['paid'] ?? true ),
+				),
+			);
+			$refunded = (int) ( $charge['amount_refunded'] ?? 0 );
+			if ( $refunded > 0 ) {
+				$rows[] = array(
+					'kind'         => 'refund',
+					'amount'       => StripeMoney::decimal( -$refunded, $currency ),
+					'currency'     => strtoupper( $currency ),
+					'period_start' => $day,
+					'period_end'   => $day,
+					'grain'        => 'day',
+					'object_ref'   => (string) $charge['id'],
+					'metrics'      => array(
+						'amount_minor'   => -$refunded,
+						'fully_refunded' => (bool) ( $charge['refunded'] ?? false ),
+						'attributed_to'  => 'charge_created',
+					),
+				);
+			}
+		}
+		return $rows;
+	}
+
+	/**
+	 * Normalize Stripe payouts into day-grain `payout` rows by arrival date.
+	 * Failed and canceled payouts never moved money and are skipped.
+	 *
+	 * @param array[] $payouts Stripe payout objects.
+	 */
+	public static function ledgerRowsFromPayouts( array $payouts ): array {
+		$rows = array();
+		foreach ( $payouts as $payout ) {
+			$status = (string) ( $payout['status'] ?? '' );
+			if ( in_array( $status, array( 'failed', 'canceled' ), true ) || empty( $payout['currency'] ) || empty( $payout['arrival_date'] ) ) {
+				continue;
+			}
+			$day    = gmdate( 'Y-m-d', (int) $payout['arrival_date'] );
+			$rows[] = array(
+				'kind'         => 'payout',
+				'amount'       => StripeMoney::decimal( (int) ( $payout['amount'] ?? 0 ), (string) $payout['currency'] ),
+				'currency'     => strtoupper( (string) $payout['currency'] ),
+				'period_start' => $day,
+				'period_end'   => $day,
+				'grain'        => 'day',
+				'object_ref'   => (string) $payout['id'],
+				'metrics'      => array(
+					'amount_minor' => (int) ( $payout['amount'] ?? 0 ),
+					'status'       => $status,
+				),
+			);
+		}
+		return $rows;
 	}
 
 	/** GET only. Never propagate raw transport messages, response bodies or credentials. */

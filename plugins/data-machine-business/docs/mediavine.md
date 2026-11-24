@@ -1,6 +1,6 @@
 # Mediavine Reports
 
-Data Machine Business exposes bounded, read-only publisher reports through the `datamachine/mediavine-reports` ability. It calls Mediavine's source GraphQL operations directly and does not persist responses, join them to GA4, or model revenue attribution.
+Data Machine Business exposes bounded, read-only publisher reports through the `datamachine/mediavine-reports` ability. It calls Mediavine's source GraphQL operations directly and does not join responses to GA4 or model revenue attribution. Responses are not persisted unless `store: true` is passed for the `pages` or `backfill` actions. In that case, page rows (kind `ad_revenue`, `url` = page slug, other report fields in `metrics`) go through `datamachine/revenue-ingest` into the generic revenue ledger. `dry_run: true` previews the write. Currency defaults to USD unless the config sets `currency`.
 
 ## Report Matrix
 
