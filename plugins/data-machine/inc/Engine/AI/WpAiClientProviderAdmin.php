@@ -9,7 +9,9 @@ namespace DataMachine\Engine\AI;
 
 defined( 'ABSPATH' ) || exit;
 
-require_once __DIR__ . '/WpAiClientCache.php';
+if ( ! class_exists( WpAiClientCache::class, false ) ) {
+	require_once __DIR__ . '/WpAiClientCache.php';
+}
 
 /**
  * Reads provider metadata and API-key settings through wp-ai-client / Connectors.

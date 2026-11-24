@@ -89,7 +89,20 @@ namespace {
 		}
 	}
 
-	require_once __DIR__ . '/../inc/Engine/AI/WpAiClientCache.php';
+	// Mirror the Composer PSR-4 mapping (DataMachine\Engine\ => inc/Engine/):
+	// cache classes are autoloaded, never hand-included.
+	spl_autoload_register(
+		static function ( string $class_name ): void {
+			$prefix = 'DataMachine\\Engine\\';
+			if ( 0 !== strpos( $class_name, $prefix ) ) {
+				return;
+			}
+			$file = __DIR__ . '/../inc/Engine/' . str_replace( '\\', '/', substr( $class_name, strlen( $prefix ) ) ) . '.php';
+			if ( is_file( $file ) ) {
+				require $file;
+			}
+		}
+	);
 
 	use DataMachine\Engine\AI\WpAiClientCache;
 
