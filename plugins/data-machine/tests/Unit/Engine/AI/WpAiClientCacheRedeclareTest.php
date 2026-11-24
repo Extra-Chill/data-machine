@@ -3,7 +3,7 @@
  * Regression coverage for #4043: WpAiClientCache must never redeclare its
  * cache classes.
  *
- * During a Homeboy symlink-swap deploy the same plugin file can be reachable
+ * During an atomic symlink-swap deploy the same plugin file can be reachable
  * through two real paths in a single request (old plugin dir vs. new release
  * dir). `require_once` dedupes by real path, so hand-including autoloaded
  * cache classes re-included them and fataled with "Cannot redeclare class
