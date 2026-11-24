@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.205.7] - 2026-11-24
+
+### Fixed
+- rely on autoloader for wp-ai-client cache classes to avoid redeclare fatals during deploy swaps
+
 ## [0.205.6] - 2026-11-23
 
 ### Fixed
