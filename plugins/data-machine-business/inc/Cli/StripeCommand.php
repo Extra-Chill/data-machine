@@ -27,6 +27,21 @@ class StripeCommand extends BaseCommand {
 	 * [--days=<days>]
 	 * : Renewal window (default 7, clamped to 1–365).
 	 *
+	 * [--store]
+	 * : charges or payouts only: read the whole --start-date..--end-date window and ingest it into the revenue ledger.
+	 *
+	 * [--dry-run]
+	 * : With --store: report what the ledger would replace and insert without writing.
+	 *
+	 * [--start-date=<date>]
+	 * : With --store: window start (YYYY-MM-DD, UTC).
+	 *
+	 * [--end-date=<date>]
+	 * : With --store: window end (YYYY-MM-DD, UTC).
+	 *
+	 * [--account=<account>]
+	 * : With --store: ledger account label (default: configured account, else live/test).
+	 *
 	 * [--api-key=<key>]
 	 * : For config only: read-only restricted rk_live_ or rk_test_ key.
 	 *
@@ -69,9 +84,31 @@ class StripeCommand extends BaseCommand {
 				$input[ $flag ] = (int) $assoc_args[ $flag ];
 			}
 		}
+		foreach ( array(
+			'start-date' => 'start_date',
+			'end-date'   => 'end_date',
+			'account'    => 'account',
+		) as $flag => $key ) {
+			if ( isset( $assoc_args[ $flag ] ) ) {
+				$input[ $key ] = (string) $assoc_args[ $flag ];
+			}
+		}
+		foreach ( array(
+			'store'   => 'store',
+			'dry-run' => 'dry_run',
+		) as $flag => $key ) {
+			if ( ! empty( $assoc_args[ $flag ] ) ) {
+				$input[ $key ] = true;
+			}
+		}
 		$result = $ability->execute( $input );
 		if ( is_wp_error( $result ) ) {
 			WP_CLI::error( $result->get_error_message() );
+			return;
+		}
+		if ( isset( $result['ledger'] ) && 'json' !== $format ) {
+			$ledger = $result['ledger'];
+			WP_CLI::success( sprintf( '%sStored %s %s..%s: replaced %d, inserted %d ledger rows.', $ledger['dry_run'] ? '[dry run] ' : '', $action, $ledger['window']['start_date'], $ledger['window']['end_date'], $ledger['replaced'], $ledger['inserted'] ) );
 			return;
 		}
 		if ( 'json' === $format ) {

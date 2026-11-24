@@ -53,3 +53,12 @@ No Stripe writes, invoice creation/changes, payment collection, or phase 2/3 beh
 ```bash
 php tests/stripe-reports-smoke.php
 ```
+
+## Storing in the revenue ledger (opt-in)
+
+Live reads are unchanged by default. Passing `store: true` with `action: charges` or `action: payouts`, plus `start_date` and `end_date` (YYYY-MM-DD, UTC), reads that whole window. It then ingests the result through `datamachine/revenue-ingest`. Add `dry_run: true` to preview. `account` optionally labels the ledger account.
+
+- Each succeeded charge becomes a `charge` row on its created day. Any refunded amount becomes a negative `refund` row on the same day.
+- Payouts become `payout` rows on their arrival day.
+
+A truncated scan is refused instead of stored, so a partial window never replaces complete data. CLI: `wp datamachine analytics stripe charges --store --start-date=... --end-date=... [--dry-run]`.

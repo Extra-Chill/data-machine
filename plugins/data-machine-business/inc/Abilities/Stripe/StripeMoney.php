@@ -42,6 +42,22 @@ final class StripeMoney {
 	}
 
 	/**
+	 * Stripe smallest units to an exact major-unit decimal string.
+	 *
+	 * @param int|string $amount   Integer amount in smallest units.
+	 * @param string     $currency ISO currency code.
+	 */
+	public static function decimal( $amount, string $currency ): string {
+		$minor    = (int) $amount;
+		$factor   = self::factor( $currency );
+		$sign     = $minor < 0 ? '-' : '';
+		$abs      = abs( $minor );
+		$places   = strlen( (string) $factor ) - 1;
+		$fraction = $places > 0 ? '.' . str_pad( (string) ( $abs % $factor ), $places, '0', STR_PAD_LEFT ) : '';
+		return $sign . intdiv( $abs, $factor ) . $fraction;
+	}
+
+	/**
 	 * Major units to Stripe smallest units, rounded half up.
 	 *
 	 * @param float  $amount   Amount in major units.
