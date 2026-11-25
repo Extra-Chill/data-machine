@@ -59,6 +59,51 @@ class TextNormalization {
 	}
 
 	/**
+	 * Reduce a possibly structured value to a plain string.
+	 *
+	 * Schema.org allows most text properties to hold a Thing instead of text
+	 * (`"addressCountry": {"@type": "Country", "name": "US"}`) or a list of
+	 * values. Casting such a value with (string) raises "Array to string
+	 * conversion" and yields "Array". This takes the Thing's name (or
+	 * `@value` / `value` / `text`), the first non-empty list entry, or ''.
+	 *
+	 * @param mixed $value Scalar, Thing array, or list.
+	 * @param int   $depth Recursion guard.
+	 * @return string
+	 */
+	public static function scalar_text( $value, int $depth = 0 ): string {
+		if ( null === $value || is_bool( $value ) ) {
+			return '';
+		}
+		if ( is_scalar( $value ) ) {
+			return (string) $value;
+		}
+		if ( ! is_array( $value ) || $depth > 4 ) {
+			return '';
+		}
+
+		foreach ( array( 'name', '@value', 'value', 'text' ) as $key ) {
+			if ( array_key_exists( $key, $value ) ) {
+				$text = self::scalar_text( $value[ $key ], $depth + 1 );
+				if ( '' !== $text ) {
+					return $text;
+				}
+			}
+		}
+
+		if ( array_is_list( $value ) ) {
+			foreach ( $value as $item ) {
+				$text = self::scalar_text( $item, $depth + 1 );
+				if ( '' !== $text ) {
+					return $text;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Whether the value still contains HTML entity references.
 	 *
 	 * @param string $value Text to inspect.

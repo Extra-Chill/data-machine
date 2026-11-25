@@ -40,11 +40,11 @@ class EventTimeLocalizer {
 		$zone = DateTimeParser::isValidTimezone( $venue_timezone ) ? new DateTimeZone( $venue_timezone ) : null;
 
 		foreach ( array( 'start', 'end' ) as $prefix ) {
-			$offset = trim( (string) ( $event[ $prefix . 'Offset' ] ?? '' ) );
+			$offset = trim( TextNormalization::scalar_text( $event[ $prefix . 'Offset' ] ?? '' ) );
 			unset( $event[ $prefix . 'Offset' ] );
 
-			$date = (string) ( $event[ $prefix . 'Date' ] ?? '' );
-			$time = (string) ( $event[ $prefix . 'Time' ] ?? '' );
+			$date = TextNormalization::scalar_text( $event[ $prefix . 'Date' ] ?? '' );
+			$time = TextNormalization::scalar_text( $event[ $prefix . 'Time' ] ?? '' );
 
 			if ( '' === $offset || '' === $time || ! DateTimeParser::isValidYmd( $date ) ) {
 				continue;
@@ -88,16 +88,16 @@ class EventTimeLocalizer {
 			}
 		}
 
-		$country     = (string) ( $event['venueCountry'] ?? '' );
-		$state       = (string) ( $event['venueState'] ?? '' );
-		$coordinates = (string) ( $event['venueCoordinates'] ?? '' );
+		$country     = TextNormalization::scalar_text( $event['venueCountry'] ?? '' );
+		$state       = TextNormalization::scalar_text( $event['venueState'] ?? '' );
+		$coordinates = TextNormalization::scalar_text( $event['venueCoordinates'] ?? '' );
 
 		$exact = VenueTimezoneResolver::resolveFromRegion( $country, $state );
 		if ( $exact ) {
 			return $exact['timezone'];
 		}
 
-		$hint = (string) ( $event['venueTimezone'] ?? '' );
+		$hint = TextNormalization::scalar_text( $event['venueTimezone'] ?? '' );
 		if ( DateTimeParser::isValidTimezone( $hint ) ) {
 			return $hint;
 		}

@@ -167,4 +167,17 @@ class EventTimeLocalizerTest extends WP_UnitTestCase {
 		$this->assertSame( 'Europe/Berlin', EventTimeLocalizer::venueTimezone( array( 'venueTimezone' => 'Europe/Berlin' ), array() ) );
 		$this->assertSame( '', EventTimeLocalizer::venueTimezone( array( 'venueTimezone' => '-07:00' ), array() ) );
 	}
+
+	public function test_thing_valued_location_fields_do_not_warn(): void {
+		// Ticketscandy JSON-LD sends addressCountry as a Country Thing (#4059).
+		$zone = EventTimeLocalizer::venueTimezone(
+			array(
+				'venueState'   => array( '@type' => 'State', 'name' => 'SC' ),
+				'venueCountry' => array( '@type' => 'Country', 'name' => 'US' ),
+			),
+			array()
+		);
+
+		$this->assertSame( 'America/New_York', $zone );
+	}
 }

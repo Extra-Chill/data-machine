@@ -117,4 +117,14 @@ class TextNormalizationTest extends WP_UnitTestCase {
 
 		remove_filter( 'title_save_pre', 'wp_filter_kses' );
 	}
+
+	public function test_scalar_text_flattens_schema_things_and_lists(): void {
+		$this->assertSame( 'US', TextNormalization::scalar_text( array( '@type' => 'Country', 'name' => 'US' ) ) );
+		$this->assertSame( 'SC', TextNormalization::scalar_text( array( '', array( 'name' => 'SC' ) ) ) );
+		$this->assertSame( 'x', TextNormalization::scalar_text( array( '@value' => 'x' ) ) );
+		$this->assertSame( '15', TextNormalization::scalar_text( 15 ) );
+		$this->assertSame( 'plain', TextNormalization::scalar_text( 'plain' ) );
+		$this->assertSame( '', TextNormalization::scalar_text( array( 'geo' => array( 'lat' => 1 ) ) ) );
+		$this->assertSame( '', TextNormalization::scalar_text( null ) );
+	}
 }
