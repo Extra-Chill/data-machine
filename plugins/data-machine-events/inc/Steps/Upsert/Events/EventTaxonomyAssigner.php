@@ -476,11 +476,11 @@ class EventTaxonomyAssigner {
 
 		$unverified = array();
 		foreach ( $fields as $field => $engine_key ) {
-			$value = trim( html_entity_decode( (string) ( $venue_metadata[ $field ] ?? '' ), ENT_QUOTES ) );
+			$value = trim( html_entity_decode( TextNormalization::scalar_text( $venue_metadata[ $field ] ?? '' ), ENT_QUOTES ) );
 			if ( '' === $value ) {
 				continue;
 			}
-			$source_value = trim( html_entity_decode( (string) ( $engine->get( $engine_key ) ?? '' ), ENT_QUOTES ) );
+			$source_value = trim( html_entity_decode( TextNormalization::scalar_text( $engine->get( $engine_key ) ?? '' ), ENT_QUOTES ) );
 			if ( $value !== $source_value ) {
 				$unverified[] = $field;
 			}

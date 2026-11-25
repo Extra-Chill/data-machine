@@ -258,4 +258,46 @@ class JsonLdExtractorTest extends WP_UnitTestCase {
 		$this->assertCount( 1, $events );
 		$this->assertEquals( 'Synthetic Valid After Malformed', $events[0]['title'] );
 	}
+
+	/**
+	 * Ticketscandy publishes addressCountry as a Country Thing; it used to
+	 * reach EventTimeLocalizer and EventTaxonomyAssigner as an array and
+	 * raise "Array to string conversion" (#4059).
+	 */
+	public function test_extract_ticketscandy_thing_valued_fields_become_strings() {
+		$html   = file_get_contents( $this->fixtures_dir . '/ticketscandy-organizer-thing-values.html' );
+		$events = $this->extractor->extract( $html, 'https://ticketscandy.com/ec/nameless-numberhead-492' );
+
+		$this->assertCount( 2, $events );
+
+		foreach ( $events as $event ) {
+			foreach ( $event as $field => $value ) {
+				$this->assertIsNotArray( $value, "Field {$field} must be scalar" );
+			}
+		}
+
+		$this->assertSame( 'Rip City CHS - November 28th', $events[0]['title'] );
+		$this->assertSame( '2026-11-28', $events[0]['startDate'] );
+		$this->assertSame( 'Silver Hill Studio', $events[0]['venue'] );
+		$this->assertSame( 'US', $events[0]['venueCountry'] );
+		$this->assertSame( 'South Carolina', $events[0]['venueState'] );
+		$this->assertSame( '32.8728486,-79.9800649', $events[0]['venueCoordinates'] );
+		$this->assertSame( 'Nameless Numberhead', $events[0]['organizer'] );
+
+		$this->assertSame( 'South Carolina', $events[1]['venueState'] );
+		$this->assertSame( '15', $events[1]['price'] );
+		$this->assertSame( 'https://ticketscandy.com/e/the-dec-improv-to-rem-improv-sales-event-dec-4th-22623', $events[1]['ticketUrl'] );
+	}
+
+	public function test_extract_location_list_uses_first_physical_place() {
+		$html   = '<script type="application/ld+json">{"@type":"Event","name":"Hybrid Show","startDate":"2026-05-01T19:00:00-04:00",'
+			. '"location":[{"@type":"VirtualLocation","url":"https://stream.example.com"},'
+			. '{"@type":"Place","name":"Theatre 99","address":{"@type":"PostalAddress","addressLocality":"Charleston","addressRegion":"SC","addressCountry":{"@type":"Country","name":"US"}}}]}</script>';
+		$events = $this->extractor->extract( $html, 'https://example.com' );
+
+		$this->assertCount( 1, $events );
+		$this->assertSame( 'Theatre 99', $events[0]['venue'] );
+		$this->assertSame( 'Charleston', $events[0]['venueCity'] );
+		$this->assertSame( 'US', $events[0]['venueCountry'] );
+	}
 }

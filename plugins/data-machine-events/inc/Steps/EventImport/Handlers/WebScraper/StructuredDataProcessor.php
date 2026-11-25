@@ -12,6 +12,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper;
 
 use DataMachine\Core\ExecutionContext;
 use DataMachineEvents\Core\EventTimeLocalizer;
+use DataMachineEvents\Core\TextNormalization;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventSourceIdentity;
@@ -26,6 +27,53 @@ class StructuredDataProcessor {
 
 	public function __construct( EventImportHandler $handler ) {
 		$this->handler = $handler;
+	}
+
+	/**
+	 * Event fields downstream code treats as plain strings.
+	 *
+	 * @var string[]
+	 */
+	private const SCALAR_FIELDS = array(
+		'title',
+		'description',
+		'startDate',
+		'startTime',
+		'startOffset',
+		'endDate',
+		'endTime',
+		'endOffset',
+		'venue',
+		'venueAddress',
+		'venueCity',
+		'venueState',
+		'venueZip',
+		'venueCountry',
+		'venuePhone',
+		'venueWebsite',
+		'venueCoordinates',
+		'venueTimezone',
+		'price',
+		'ticketUrl',
+		'imageUrl',
+		'performer',
+		'organizer',
+	);
+
+	/**
+	 * Reduce array-valued scalar fields to text so no extractor can hand an
+	 * array to code that casts to string (#4059).
+	 *
+	 * @param array $event Extracted event.
+	 * @return array
+	 */
+	public static function flattenScalarFields( array $event ): array {
+		foreach ( self::SCALAR_FIELDS as $field ) {
+			if ( isset( $event[ $field ] ) && is_array( $event[ $field ] ) ) {
+				$event[ $field ] = TextNormalization::scalar_text( $event[ $field ] );
+			}
+		}
+		return $event;
 	}
 
 	/**
@@ -71,6 +119,7 @@ class StructuredDataProcessor {
 					$raw_event['source_item_id'] = $url;
 				}
 			}
+			$raw_event    = self::flattenScalarFields( $raw_event );
 			$event_config = $config;
 			$event        = TitleVenuePrefixNormalizer::normalize( $raw_event, $event_config );
 			// The AI also sees raw_source: do not reintroduce room names there.

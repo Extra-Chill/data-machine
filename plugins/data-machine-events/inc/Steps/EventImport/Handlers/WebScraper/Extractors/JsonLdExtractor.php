@@ -34,6 +34,8 @@
 
 namespace DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors;
 
+use DataMachineEvents\Core\TextNormalization;
+
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -253,8 +255,8 @@ class JsonLdExtractor extends BaseExtractor {
 	 */
 	private function parseEvent( array $event_data ): ?array {
 		$event = array(
-			'title'       => html_entity_decode( (string) ( $event_data['name'] ?? '' ) ),
-			'description' => $event_data['description'] ?? '',
+			'title'       => html_entity_decode( TextNormalization::scalar_text( $event_data['name'] ?? '' ) ),
+			'description' => TextNormalization::scalar_text( $event_data['description'] ?? '' ),
 		);
 
 		// Keep event-level identity separate from offers and venue URLs.
@@ -306,18 +308,18 @@ class JsonLdExtractor extends BaseExtractor {
 		if ( ! empty( $event_data['performer'] ) ) {
 			$performer = $event_data['performer'];
 			if ( is_array( $performer ) ) {
-				$event['performer'] = $performer['name'] ?? $performer[0]['name'] ?? '';
+				$event['performer'] = TextNormalization::scalar_text( $performer['name'] ?? $performer[0]['name'] ?? '' );
 			} else {
-				$event['performer'] = $performer;
+				$event['performer'] = (string) $performer;
 			}
 		}
 
 		if ( ! empty( $event_data['organizer'] ) ) {
 			$organizer = $event_data['organizer'];
 			if ( is_array( $organizer ) ) {
-				$event['organizer'] = $organizer['name'] ?? $organizer[0]['name'] ?? '';
+				$event['organizer'] = TextNormalization::scalar_text( $organizer['name'] ?? $organizer[0]['name'] ?? '' );
 			} else {
-				$event['organizer'] = $organizer;
+				$event['organizer'] = (string) $organizer;
 			}
 		}
 	}
@@ -330,39 +332,71 @@ class JsonLdExtractor extends BaseExtractor {
 			return;
 		}
 
-		$location       = $event_data['location'];
-		$event['venue'] = html_entity_decode( (string) ( $location['name'] ?? '' ) );
-
-		if ( ! empty( $location['address'] ) && is_array( $location['address'] ) ) {
-			$address               = $location['address'];
-			$event['venueAddress'] = $address['streetAddress'] ?? '';
-			$event['venueCity']    = $address['addressLocality'] ?? '';
-			$event['venueState']   = $address['addressRegion'] ?? '';
-			$event['venueZip']     = $address['postalCode'] ?? '';
-			$event['venueCountry'] = $address['addressCountry'] ?? '';
+		$location = $event_data['location'];
+		// `location` may be a list of Places (or a VirtualLocation first).
+		if ( array_is_list( $location ) ) {
+			$location = $this->firstPlace( $location );
+		}
+		if ( empty( $location ) ) {
+			return;
 		}
 
-		if ( ! empty( $event['venueAddress'] ) && is_string( $event['venueAddress'] ) ) {
-			$event['venueAddress'] = html_entity_decode( $event['venueAddress'] );
+		$event['venue'] = html_entity_decode( TextNormalization::scalar_text( $location['name'] ?? '' ) );
+
+		$address = $location['address'] ?? null;
+		if ( is_array( $address ) && array_is_list( $address ) ) {
+			$address = $address[0] ?? null;
 		}
-		if ( ! empty( $event['venueCity'] ) && is_string( $event['venueCity'] ) ) {
-			$event['venueCity'] = html_entity_decode( $event['venueCity'] );
-		}
-		if ( ! empty( $event['venueState'] ) && is_string( $event['venueState'] ) ) {
-			$event['venueState'] = html_entity_decode( $event['venueState'] );
+		if ( is_array( $address ) ) {
+			// Schema.org lets addressCountry / addressRegion hold a Thing
+			// (`{"@type":"Country","name":"US"}`), which must not reach code
+			// that casts to string (#4059).
+			$event['venueAddress'] = TextNormalization::scalar_text( $address['streetAddress'] ?? '' );
+			$event['venueCity']    = TextNormalization::scalar_text( $address['addressLocality'] ?? '' );
+			$event['venueState']   = TextNormalization::scalar_text( $address['addressRegion'] ?? '' );
+			$event['venueZip']     = TextNormalization::scalar_text( $address['postalCode'] ?? '' );
+			$event['venueCountry'] = TextNormalization::scalar_text( $address['addressCountry'] ?? '' );
+		} elseif ( is_string( $address ) ) {
+			$event['venueAddress'] = $address;
 		}
 
-		$event['venuePhone']   = $location['telephone'] ?? '';
-		$event['venueWebsite'] = $location['url'] ?? '';
-
-		if ( ! empty( $location['geo'] ) && is_array( $location['geo'] ) ) {
-			$geo = $location['geo'];
-			$lat = $geo['latitude'] ?? '';
-			$lng = $geo['longitude'] ?? '';
-			if ( $lat && $lng ) {
-				$event['venueCoordinates'] = $lat . ',' . $lng;
+		foreach ( array( 'venueAddress', 'venueCity', 'venueState' ) as $field ) {
+			if ( ! empty( $event[ $field ] ) ) {
+				$event[ $field ] = html_entity_decode( $event[ $field ] );
 			}
 		}
+
+		$event['venuePhone']   = TextNormalization::scalar_text( $location['telephone'] ?? '' );
+		$event['venueWebsite'] = TextNormalization::scalar_text( $location['url'] ?? '' );
+
+		$geo = is_array( $location['geo'] ?? null ) ? $location['geo'] : $location;
+		$lat = TextNormalization::scalar_text( $geo['latitude'] ?? '' );
+		$lng = TextNormalization::scalar_text( $geo['longitude'] ?? '' );
+		if ( '' !== $lat && '' !== $lng ) {
+			$event['venueCoordinates'] = $lat . ',' . $lng;
+		}
+	}
+
+	/**
+	 * First physical Place in a list of locations.
+	 *
+	 * @param array $locations Location nodes.
+	 * @return array Place node, or [] when none.
+	 */
+	private function firstPlace( array $locations ): array {
+		$fallback = array();
+		foreach ( $locations as $candidate ) {
+			if ( ! is_array( $candidate ) ) {
+				continue;
+			}
+			if ( 'VirtualLocation' !== ( $candidate['@type'] ?? '' ) ) {
+				return $candidate;
+			}
+			if ( empty( $fallback ) ) {
+				$fallback = $candidate;
+			}
+		}
+		return $fallback;
 	}
 
 	/**
@@ -382,10 +416,10 @@ class JsonLdExtractor extends BaseExtractor {
 			$offers = array();
 		}
 
-		$event['price'] = $offers['price'] ?? '';
+		$event['price'] = TextNormalization::scalar_text( $offers['price'] ?? '' );
 
 		// Ticket URL: check offers.url first, then fall back to event-level url (Eventbrite pattern).
-		$event['ticketUrl'] = $offers['url'] ?? $event_data['url'] ?? '';
+		$event['ticketUrl'] = TextNormalization::scalar_text( $offers['url'] ?? $event_data['url'] ?? '' );
 	}
 
 	/**
@@ -400,13 +434,16 @@ class JsonLdExtractor extends BaseExtractor {
 		if ( is_array( $image ) ) {
 			// Image can be a list of URL strings OR a list of ImageObject nodes.
 			$first = $image[0] ?? '';
+			if ( ! array_is_list( $image ) ) {
+				$first = $image;
+			}
 			if ( is_array( $first ) ) {
-				$event['imageUrl'] = $first['url'] ?? $first['contentUrl'] ?? '';
+				$event['imageUrl'] = TextNormalization::scalar_text( $first['url'] ?? $first['contentUrl'] ?? '' );
 			} else {
-				$event['imageUrl'] = $first;
+				$event['imageUrl'] = TextNormalization::scalar_text( $first );
 			}
 		} else {
-			$event['imageUrl'] = $image;
+			$event['imageUrl'] = TextNormalization::scalar_text( $image );
 		}
 	}
 }
