@@ -162,6 +162,7 @@ function datamachine_register_default_memory_files(): void {
 
 require_once __DIR__ . '/Engine/AI/Directives/AgentDailyMemoryDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php';
+require_once __DIR__ . '/Core/Steps/AI/Directives/HandlerGuidanceDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php';
 require_once __DIR__ . '/Core/ActionScheduler/QueueTuning.php';
