@@ -184,7 +184,7 @@ class ImpactReportsAbilities {
 			if ( is_wp_error( $ledger ) ) {
 				return self::redact( $ledger, $sid, $token );
 			}
-			$result['ledger']                = $ledger;
+			$result['ledger']              = $ledger;
 			$result['provenance']['store'] = true;
 		}
 
@@ -232,11 +232,14 @@ class ImpactReportsAbilities {
 	 * campaign and currency. The amount is the APPROVED + PENDING payout;
 	 * REVERSED actions are counted in metrics only.
 	 *
-	 * @param array[] $actions Impact Action objects.
+	 * @param array<int, mixed> $actions Impact Action objects (non-arrays are counted as invalid).
 	 * @return array{rows: array[], totals: array[], aggregated: int, outside_window: int, invalid: int}
 	 */
 	public static function aggregateActions( array $actions, string $start, string $end ): array {
-		$buckets        = array();
+		/** @var array<string, array{day: string, campaign: string, campaign_id: string, currency: string, earning: int, actions: int, sale_amount: int}> $buckets */
+		$buckets = array();
+		/** @var array<string, array<string, array{actions: int, micros: int}>> $state_totals */
+		$state_totals   = array();
 		$seen           = array();
 		$outside_window = 0;
 		$invalid        = 0;
@@ -276,37 +279,39 @@ class ImpactReportsAbilities {
 					'campaign_id' => (string) ( $action['CampaignId'] ?? '' ),
 					'currency'    => $currency,
 					'earning'     => 0,
-					'states'      => array(),
 					'actions'     => 0,
 					'sale_amount' => 0,
 				);
 			}
-			$bucket                     = &$buckets[ $key ];
-			$bucket['actions']         += 1;
-			$bucket['states'][ $state ] = array(
-				'actions' => ( $bucket['states'][ $state ]['actions'] ?? 0 ) + 1,
-				'micros'  => ( $bucket['states'][ $state ]['micros'] ?? 0 ) + $micros,
+			$previous                       = $state_totals[ $key ][ $state ] ?? array(
+				'actions' => 0,
+				'micros'  => 0,
 			);
+			$state_totals[ $key ][ $state ] = array(
+				'actions' => $previous['actions'] + 1,
+				'micros'  => $previous['micros'] + $micros,
+			);
+			++$buckets[ $key ]['actions'];
 			if ( in_array( $state, self::EARNING_STATES, true ) ) {
-				$bucket['earning']     += $micros;
-				$bucket['sale_amount'] += RevenueDecimal::to_micros( (string) ( $action['Amount'] ?? '0' ) ) ?? 0;
+				$buckets[ $key ]['earning']     += $micros;
+				$buckets[ $key ]['sale_amount'] += RevenueDecimal::to_micros( (string) ( $action['Amount'] ?? '0' ) ) ?? 0;
 			}
-			unset( $bucket );
 		}
 
 		ksort( $buckets );
 		$rows   = array();
 		$totals = array();
-		foreach ( $buckets as $bucket ) {
-			$states = array();
-			ksort( $bucket['states'] );
-			foreach ( $bucket['states'] as $state => $values ) {
+		foreach ( $buckets as $key => $bucket ) {
+			$states        = array();
+			$bucket_states = $state_totals[ $key ] ?? array();
+			ksort( $bucket_states );
+			foreach ( $bucket_states as $state => $values ) {
 				$states[ strtolower( $state ) ] = array(
 					'actions' => $values['actions'],
 					'payout'  => RevenueDecimal::from_micros( $values['micros'] ),
 				);
 			}
-			$rows[]                          = array(
+			$rows[] = array(
 				'kind'         => self::LEDGER_KIND,
 				'amount'       => RevenueDecimal::from_micros( $bucket['earning'] ),
 				'currency'     => $bucket['currency'],
@@ -321,6 +326,7 @@ class ImpactReportsAbilities {
 					'states'      => $states,
 				),
 			);
+
 			$totals[ $bucket['currency'] ] = ( $totals[ $bucket['currency'] ] ?? 0 ) + $bucket['earning'];
 		}
 		ksort( $totals );
@@ -348,7 +354,7 @@ class ImpactReportsAbilities {
 	 * @return array{actions: array[], pages: int}|\WP_Error
 	 */
 	private static function readActions( string $sid, string $token, string $start, string $end ) {
-		$query = http_build_query( array(
+		$query   = http_build_query( array(
 			'ActionDateStart' => $start . 'T00:00:00Z',
 			'ActionDateEnd'   => gmdate( 'Y-m-d', (int) self::day( $end ) + 86400 ) . 'T00:00:00Z',
 			'PageSize'        => self::PAGE_SIZE,
