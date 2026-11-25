@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.206.0] - 2026-11-25
+
+### Added
+- handler-contributed AI guidance via meta['ai_guidance']
+
 ## [0.205.8] - 2026-11-24
 
 ### Fixed
