@@ -258,7 +258,7 @@ class Ticketmaster extends EventImportHandler {
 						continue;
 					}
 
-					$standardized_event = $this->map_ticketmaster_event( $raw_event );
+					$standardized_event = $this->map_ticketmaster_event( $raw_event, (string) ( $config['classification_type'] ?? 'music' ) );
 
 					if ( empty( $standardized_event['title'] ) ) {
 						continue;
@@ -968,7 +968,7 @@ class Ticketmaster extends EventImportHandler {
 		return true;
 	}
 
-	private function map_ticketmaster_event( array $tm_event ): array {
+	private function map_ticketmaster_event( array $tm_event, string $classification = 'music' ): array {
 		$title       = $tm_event['name'] ?? '';
 		$description = $tm_event['info'] ?? $tm_event['pleaseNote'] ?? '';
 
@@ -1027,7 +1027,7 @@ class Ticketmaster extends EventImportHandler {
 			}
 		}
 
-		$lineup = self::lineupFromEvent( $tm_event );
+		$lineup = self::lineupFromEvent( $tm_event, $classification );
 		$artist = $lineup[0] ?? ( $tm_event['_embedded']['attractions'][0]['name'] ?? '' );
 
 		$organizer = '';
@@ -1141,25 +1141,34 @@ class Ticketmaster extends EventImportHandler {
 	}
 
 	/**
-	 * Every music act on a Ticketmaster event, headliner first.
+	 * Every performer on a Ticketmaster event, headliner first.
 	 *
 	 * The Discovery API lists the full bill in `_embedded.attractions`;
-	 * support acts are not repeated in the event name. Attractions whose
-	 * segment is not Music (parking passes, packages, tours) are skipped;
-	 * unclassified attractions are kept.
+	 * support acts are not repeated in the event name. Attractions are kept
+	 * when their segment is Music or matches the flow's configured
+	 * classification (e.g. Arts & Theatre for comedy flows). Other classified
+	 * attractions (parking passes, packages, tours) are skipped; unclassified
+	 * attractions are kept.
 	 *
-	 * @param array $tm_event Raw Discovery API event.
+	 * @param array  $tm_event       Raw Discovery API event.
+	 * @param string $classification Flow classification slug or segment name. Defaults to music.
 	 * @return array<int, string> Unique act names in billing order.
 	 */
-	public static function lineupFromEvent( array $tm_event ): array {
+	public static function lineupFromEvent( array $tm_event, string $classification = 'music' ): array {
+		$allowed_segments = array( 'music' => true );
+		$configured       = self::normalize_segment( $classification );
+		if ( '' !== $configured ) {
+			$allowed_segments[ $configured ] = true;
+		}
+
 		$lineup = array();
 		foreach ( (array) ( $tm_event['_embedded']['attractions'] ?? array() ) as $attraction ) {
 			if ( ! is_array( $attraction ) ) {
 				continue;
 			}
 			$name    = trim( (string) ( $attraction['name'] ?? '' ) );
-			$segment = (string) ( $attraction['classifications'][0]['segment']['name'] ?? '' );
-			if ( '' === $name || ( '' !== $segment && 'music' !== strtolower( $segment ) ) ) {
+			$segment = self::normalize_segment( (string) ( $attraction['classifications'][0]['segment']['name'] ?? '' ) );
+			if ( '' === $name || ( '' !== $segment && ! isset( $allowed_segments[ $segment ] ) ) ) {
 				continue;
 			}
 			$key = strtolower( $name );
@@ -1168,5 +1177,18 @@ class Ticketmaster extends EventImportHandler {
 			}
 		}
 		return array_values( $lineup );
+	}
+
+	/**
+	 * Normalize a segment name or classification slug for comparison.
+	 *
+	 * "Arts & Theatre", "arts-theatre" and "artstheatre" all normalize to
+	 * "artstheatre".
+	 *
+	 * @param string $segment Segment name or slug.
+	 * @return string Lowercase alphanumeric key.
+	 */
+	private static function normalize_segment( string $segment ): string {
+		return (string) preg_replace( '/[^a-z0-9]/', '', strtolower( $segment ) );
 	}
 }
