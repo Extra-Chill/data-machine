@@ -124,6 +124,13 @@ class UniversalWebScraper extends EventImportHandler {
 
 	const MAX_PAGES = 20;
 
+	/**
+	 * URL claim priority. Lower wins in Data Machine's HandlerUrlResolver, so
+	 * this catch-all loses to any handler that claims a specific URL shape
+	 * (e.g. an Instagram account handler at the default priority of 10).
+	 */
+	const URL_CLAIM_PRIORITY = 1000;
+
 	private StructuredDataProcessor $processor;
 
 	/** @var ExtractorInterface[] */
@@ -158,8 +165,42 @@ class UniversalWebScraper extends EventImportHandler {
 			false,
 			null,
 			UniversalWebScraperSettings::class,
-			null
+			null,
+			null,
+			// Read by Data Machine's HandlerUrlResolver; older Data Machine
+			// versions ignore unknown meta keys, so this is safe without it.
+			array(
+				'url_claim'          => array( self::class, 'claimUrl' ),
+				'url_claim_priority' => self::URL_CLAIM_PRIORITY,
+			)
 		);
+	}
+
+	/**
+	 * Catch-all URL claim: any http(s) web page can be scraped.
+	 *
+	 * Parses the URL only; never performs network I/O.
+	 *
+	 * @param string $url Source URL.
+	 * @return array|null Handler config in the shape UniversalWebScraperSettings expects, or null.
+	 */
+	public static function claimUrl( string $url ): ?array {
+		$url = trim( $url );
+		if ( '' === $url || preg_match( '/\s/', $url ) ) {
+			return null;
+		}
+
+		$parts = wp_parse_url( $url );
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) ) {
+			return null;
+		}
+
+		$scheme = strtolower( (string) ( $parts['scheme'] ?? '' ) );
+		if ( 'http' !== $scheme && 'https' !== $scheme ) {
+			return null;
+		}
+
+		return array( 'source_url' => $url );
 	}
 
 	protected function getSourceInventoryCapabilities(): array {
