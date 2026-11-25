@@ -173,6 +173,36 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		$this->assertEquals( '19:30', $result['startTime'] );
 	}
 
+	public function test_lineup_keeps_attractions_matching_configured_classification(): void {
+		$attraction = static fn( string $name, string $segment ): array => array(
+			'name'            => $name,
+			'classifications' => array( array( 'segment' => array( 'name' => $segment ) ) ),
+		);
+		$tm_event   = array(
+			'name'      => 'Stand-Up Night',
+			'dates'     => array( 'start' => array( 'localDate' => '2099-03-05' ) ),
+			'_embedded' => array(
+				'attractions' => array(
+					$attraction( 'Jane Comic', 'Arts & Theatre' ),
+					$attraction( 'House Band', 'Music' ),
+					$attraction( 'Premium Parking', 'Miscellaneous' ),
+				),
+			),
+		);
+
+		// Music flows keep current behavior: non-music attractions are dropped.
+		$this->assertSame( array( 'House Band' ), Ticketmaster::lineupFromEvent( $tm_event ) );
+		$this->assertSame( array( 'House Band' ), Ticketmaster::lineupFromEvent( $tm_event, 'music' ) );
+
+		// Arts & Theatre (comedy) flows keep the comedian.
+		$this->assertSame( array( 'Jane Comic', 'House Band' ), Ticketmaster::lineupFromEvent( $tm_event, 'arts-theatre' ) );
+		$this->assertSame( array( 'Jane Comic', 'House Band' ), Ticketmaster::lineupFromEvent( $tm_event, 'artstheatre' ) );
+
+		$result = $this->getProtectedMethod( 'map_ticketmaster_event' )->invoke( $this->handler, $tm_event, 'arts-theatre' );
+		$this->assertSame( 'Jane Comic', $result['artist'] );
+		$this->assertSame( array( 'Jane Comic', 'House Band' ), $result['lineup'] );
+	}
+
 	public function test_lineup_keeps_support_acts_and_skips_non_music_attractions(): void {
 		$attraction = static fn( string $name, string $segment ): array => array(
 			'name'            => $name,
