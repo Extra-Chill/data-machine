@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.92.0] - 2026-11-25
+
+### Added
+- universal_web_scraper is the catch-all URL claim
+
 ## [0.91.5] - 2026-11-23
 
 ### Changed
