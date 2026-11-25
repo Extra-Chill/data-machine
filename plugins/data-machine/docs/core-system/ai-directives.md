@@ -41,6 +41,7 @@ Directives are applied in ascending priority order (lowest number = highest prio
 | **40** | `PipelineMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineMemoryFilesDirective.php` | Per-pipeline selectable memory files |
 | **45** | `FlowMemoryFilesDirective` | pipeline | `inc/Core/Steps/AI/Directives/FlowMemoryFilesDirective.php` | Per-flow selectable memory files (additive to pipeline memory) |
 | **50** | `PipelineSystemPromptDirective` | pipeline | `inc/Core/Steps/AI/Directives/PipelineSystemPromptDirective.php` | User-configured task instructions + workflow visualization |
+| **55** | `HandlerGuidanceDirective` | pipeline | `inc/Core/Steps/AI/Directives/HandlerGuidanceDirective.php` | Source-handler-contributed guidance (`meta['ai_guidance']`) for reading input items |
 
 Tools are injected by `RequestBuilder` through `PromptBuilder::setTools()`. `AgentModeDirective` and agent memory files provide runtime and identity guidance.
 
@@ -166,6 +167,19 @@ Two parts:
 - Provides spatial awareness (where in the pipeline the AI currently sits).
 - Multi-handler steps shown as `"LABEL1+LABEL2 STEPTYPE"`.
 
+### HandlerGuidanceDirective (Priority 55)
+
+**Source**: `inc/Core/Steps/AI/Directives/HandlerGuidanceDirective.php`
+**Modes**: Pipeline only
+
+Injects guidance declared by the handler(s) that produced the AI step's input packets. Handlers declare it on registration via `meta['ai_guidance']`, either a string or a callable `fn( array $handler_config ): string` that receives the handler's flow-step config.
+
+**Features**:
+- Resolves the producing handler from the nearest preceding flow step whose step type declares the `source` handler category (core `fetch` and any extension source step type).
+- Emits one `SOURCE HANDLER GUIDANCE (<handler label>):` block per handler per request — never per item.
+- Emits nothing when no producing handler declares guidance.
+- Ordering: pipeline system prompt (P50) → handler guidance (P55) → per-flow prompt (user message). Per-flow prompts remain optional per-flow deltas.
+
 ## Directive Injection Process
 
 ### Request Flow
@@ -189,7 +203,8 @@ Two parts:
 4. P40 — PipelineMemoryFilesDirective
 5. P45 — FlowMemoryFilesDirective
 6. P50 — PipelineSystemPromptDirective
-7. (Tools are injected separately by RequestBuilder)
+7. P55 — HandlerGuidanceDirective
+8. (Tools are injected separately by RequestBuilder)
 
 **System agents** receive (in order):
 

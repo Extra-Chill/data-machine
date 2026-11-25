@@ -50,6 +50,9 @@ trait HandlerRegistrationTrait {
 	 *                                      `datamachine_tools` registry at pipeline execution time.
 	 * @param string|null $authProviderKey Optional custom auth provider key for shared authentication
 	 * @param array $meta Optional arbitrary metadata (e.g. charLimit, maxImages). Passed through to /handlers API.
+	 *                    Source handlers may declare `ai_guidance` (string or
+	 *                    `callable( array $handler_config ): string`) describing how
+	 *                    the AI should read their items; see HandlerGuidanceDirective.
 	 * @param callable|null $validationCallback Optional runtime config validator. Receives
 	 *                                          `(array $handler_config, array $context)` and returns
 	 *                                          true/null, false, WP_Error, or a validation array.
