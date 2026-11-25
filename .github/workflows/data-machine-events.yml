@@ -35,13 +35,13 @@ jobs:
       matrix:
         command: [review lint, review test]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Generate app token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         continue-on-error: true
         with:
           app-id: ${{ secrets.HOMEBOY_APP_ID }}
