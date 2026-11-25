@@ -13,9 +13,58 @@ defined( 'ABSPATH' ) || exit;
 class InstagramAccount extends FetchHandler {
 	use HandlerRegistrationTrait;
 
+	/**
+	 * Item-shape guidance for AI steps reading this handler's packets
+	 * (`meta['ai_guidance']`, data-machine#4053). Domain rules (what counts as
+	 * an event, titles, reject criteria) belong to the consuming flow.
+	 */
+	public const AI_GUIDANCE = 'Each item is one public Instagram post from this account, with its caption and a stored image (often a flyer). Other recent posts from the same account may follow the caption as context only: use them to fill in details this post leaves out, such as a date, time, or lineup, but never create an item from a context post itself. Read the image carefully: flyers usually carry the date, time, venue, lineup, and ticket info. Relative dates such as "TONIGHT" or "TOMORROW" are relative to the post timestamp, which also gives the year when the image omits it. Use the post permalink as the source link.';
+
+	/**
+	 * Top-level instagram.com paths that are not profiles.
+	 */
+	private const RESERVED_PATHS = array( 'p', 'reel', 'reels', 'tv', 'explore', 'stories', 'accounts', 'direct', 'about', 'legal', 'developer', 'web', 'challenge', 'privacy', 'emails', 'session', 'oauth', 'graphql', 'api', 'static' );
+
 	public function __construct() {
 		parent::__construct( 'instagram_account' );
-		self::registerHandler( 'instagram_account', 'fetch', self::class, 'Instagram account (public)', 'Fetch public Business/Creator posts by username', true, InstagramAuth::class, InstagramAccountSettings::class, null, 'instagram' );
+		// Unknown meta is ignored by Data Machine versions without URL claims
+		// (data-machine#4052) or handler AI guidance (data-machine#4053).
+		$meta = array(
+			'url_claim'          => array( self::class, 'claimUrl' ),
+			'url_claim_priority' => 10,
+			'ai_guidance'        => self::AI_GUIDANCE,
+		);
+		self::registerHandler( 'instagram_account', 'fetch', self::class, 'Instagram account (public)', 'Fetch public Business/Creator posts by username', true, InstagramAuth::class, InstagramAccountSettings::class, null, 'instagram', $meta );
+	}
+
+	/**
+	 * Claim an Instagram profile URL or bare `@handle`. Parses only; no network I/O.
+	 *
+	 * @param string $input Source URL or handle.
+	 * @return array{username: string}|null Handler config, or null when not a profile.
+	 */
+	public static function claimUrl( string $input ): ?array {
+		$input = trim( $input );
+		if ( '' === $input ) {
+			return null;
+		}
+		if ( '@' === $input[0] ) {
+			$username = InstagramAccountSettings::normalizeUsername( $input );
+			return ( $username && strtolower( $input ) === '@' . $username ) ? array( 'username' => $username ) : null;
+		}
+		$parts = wp_parse_url( $input );
+		if ( ! is_array( $parts ) || ! in_array( strtolower( $parts['scheme'] ?? '' ), array( 'http', 'https' ), true ) ) {
+			return null;
+		}
+		if ( ! in_array( strtolower( $parts['host'] ?? '' ), array( 'instagram.com', 'www.instagram.com' ), true ) ) {
+			return null;
+		}
+		$segments = array_values( array_filter( explode( '/', (string) ( $parts['path'] ?? '' ) ), static fn( string $segment ): bool => '' !== $segment ) );
+		if ( 1 !== count( $segments ) || in_array( strtolower( $segments[0] ), self::RESERVED_PATHS, true ) ) {
+			return null;
+		}
+		$username = InstagramAccountSettings::normalizeUsername( $segments[0] );
+		return $username ? array( 'username' => $username ) : null;
 	}
 
 	protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error {

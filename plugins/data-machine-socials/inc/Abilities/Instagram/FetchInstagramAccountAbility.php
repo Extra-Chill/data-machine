@@ -102,8 +102,9 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 		$seen           = array();
 		$cursors        = array();
 		$after          = '';
+		$page_size      = self::pageSize( $limit, $recent_context, null !== $collector || $cutoff || $keywords );
 		do {
-			$media    = 'media.limit(50)' . ( $after ? '.after(' . $after . ')' : '' );
+			$media    = 'media.limit(' . $page_size . ')' . ( $after ? '.after(' . $after . ')' : '' );
 			$fields   = "business_discovery.username({$username}){username,name,followers_count,media_count,{$media}{id,timestamp,media_type,caption,media_url,thumbnail_url,permalink,children{media_url,media_type}}}";
 			$url      = 'https://graph.facebook.com/' . FacebookAuth::GRAPH_API_VERSION . '/' . rawurlencode( $user_id );
 			$response = wp_remote_get( add_query_arg( array( 'fields' => $fields ), $url ), array(
@@ -168,6 +169,16 @@ class FetchInstagramAccountAbility extends AbstractSocialAbility {
 			'success' => true,
 			'items'   => $collector ? $collector->getAccepted() : $items,
 		);
+	}
+
+	/**
+	 * Graph media page size. Unfiltered direct reads only need max_items posts
+	 * (plus the context window), so a `max_items: 1` pre-flight readability
+	 * check requests a single post. Filtered or deduplicated reads keep the
+	 * full page so one request can skip past rejected posts.
+	 */
+	private static function pageSize( int $limit, int $recent_context, bool $filtered ): int {
+		return $filtered ? 50 : min( 50, max( $limit, $recent_context + 1 ) );
 	}
 
 	/** Sort the already-fetched page independently of candidate filters and collector state. */
