@@ -60,7 +60,7 @@ class ImpactCommand extends BaseCommand {
 			WP_CLI::error( 'Ability datamachine/impact-reports is not registered. Ensure Data Machine Business is active.' );
 			return;
 		}
-		$input = array(
+		$input  = array(
 			'start_date' => (string) ( $assoc_args['start'] ?? gmdate( 'Y-m-d', time() - 30 * DAY_IN_SECONDS ) ),
 			'end_date'   => (string) ( $assoc_args['end'] ?? gmdate( 'Y-m-d' ) ),
 			'store'      => ! empty( $assoc_args['store'] ),
