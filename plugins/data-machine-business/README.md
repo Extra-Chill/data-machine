@@ -56,6 +56,7 @@ The plugin registers the following WordPress abilities. Management-oriented abil
 | `datamachine/pagespeed` | Run full, performance-focused, or opportunity-focused PageSpeed audits |
 | `datamachine/mediavine-reports` | Fetch page reports, aggregate summaries, multi-period backfills, and bounded device/country/source/ad-unit reports with source provenance |
 | `datamachine/stripe-reports` | Bounded read-only Stripe billing and revenue reports with restricted-key authentication and source provenance |
+| `datamachine/impact-reports` | Read-only Impact (impact.com) affiliate commissions aggregated by UTC day and campaign; opt-in ingest into the revenue ledger |
 | `datamachine/revenue-ingest` | The only write path into the generic revenue ledger. It idempotently replaces rows by source/account/kind/window and supports dry_run |
 | `datamachine/revenue-query` | Ledger totals by source/kind/currency, never converted, with coverage and gaps derived from stored periods |
 | `datamachine/stripe-stage-payment-link` | Stage a capped, one-time or recurring Stripe Payment Link for human approval; nothing is created in Stripe until approved |

@@ -59,6 +59,12 @@ final class ProviderModules {
 				static fn() => new \DataMachineBusiness\Abilities\Analytics\StripeReportsAbilities()
 			),
 			new ProviderModule(
+				'impact',
+				$abilities,
+				array( 'datamachine/impact-reports' ),
+				static fn() => new \DataMachineBusiness\Abilities\Analytics\ImpactReportsAbilities()
+			),
+			new ProviderModule(
 				'revenue-ledger',
 				array_merge(
 					$abilities,
