@@ -100,6 +100,8 @@ class AllAbilitiesRegisteredTest extends WP_UnitTestCase {
 			'datamachine/get-handler-site-defaults',
 			// HandlerDetailAbility (1)
 			'datamachine/get-handler-detail',
+			// ResolveSourceUrlAbility (1)
+			'datamachine/resolve-source-url',
 			// StepTypeAbilities (2)
 			'datamachine/get-step-types',
 			'datamachine/validate-step-type',

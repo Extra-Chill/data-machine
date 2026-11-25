@@ -148,6 +148,7 @@ final class AbilityServiceProvider {
 		new \DataMachine\Abilities\Update\UpdateWordPressAbility();
 		new \DataMachine\Abilities\Handler\TestHandlerAbility();
 		new \DataMachine\Abilities\Handler\HandlerDetailAbility();
+		new \DataMachine\Abilities\Handler\ResolveSourceUrlAbility();
 
 		// Task registry initialization can resolve abilities, so register it last.
 		new \DataMachine\Engine\AI\System\SystemAgentServiceProvider();

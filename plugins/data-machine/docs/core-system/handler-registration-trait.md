@@ -236,6 +236,25 @@ function datamachine_register_wordpress_update_filters() {
 datamachine_register_wordpress_update_filters();
 ```
 
+## URL Claims
+
+A handler can say which source URLs it reads by adding a claim to `$meta`:
+
+```php
+array(
+    // Return this handler's normalized handler_config for the URL, or null if the URL isn't ours.
+    'url_claim'          => static fn( string $url ): ?array => /* parse $url only */ null,
+    // Optional. Lower wins. Defaults to 10. Catch-all handlers should use a high number.
+    'url_claim_priority' => 10,
+)
+```
+
+`DataMachine\Core\Steps\HandlerUrlResolver::resolve( $url, $step_type )` returns `{ handler_slug, handler_config, priority }` for the best claim, ordered by priority and then registration order. `::candidates()` returns every claim. Only handlers visible to `$step_type` through the `datamachine_handlers` filter are considered. URLs without a scheme and host resolve to nothing, and a claim that throws is skipped.
+
+The same lookup is exposed as the read-only `datamachine/resolve-source-url` ability (input `url`, optional `step_type`; output adds `matched` and `candidates`). It requires a logged-in user.
+
+Claims must not make remote requests. Checking that an account or page exists belongs to the consumer or the handler's config validation.
+
 ## Migration Guide
 
 Custom handlers should adopt this pattern by:
