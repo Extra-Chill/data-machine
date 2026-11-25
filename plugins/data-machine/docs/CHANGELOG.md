@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.207.0] - 2026-11-25
+
+### Added
+- resolve source URLs to the fetch handler that claims them
+
 ## [0.206.0] - 2026-11-25
 
 ### Added
