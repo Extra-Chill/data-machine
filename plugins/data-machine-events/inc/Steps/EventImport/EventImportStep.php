@@ -146,6 +146,10 @@ class EventImportStep extends Step {
 
 			$result = $handler->get_fetch_data( $pipeline_id, $handler_config, (string) $this->job_id );
 
+			if ( is_wp_error( $result ) ) {
+				return $this->handlerFailure( $result, $handler_slug );
+			}
+
 			// Handle both processed_items format and direct DataPacket arrays.
 			// Upstream get_fetch_data() can deliver either shape; its phpdoc does
 			// not capture the union, so the payload is validated as mixed.
@@ -189,6 +193,10 @@ class EventImportStep extends Step {
 
 			$result = $handler->execute( $legacy_payload );
 
+			if ( is_wp_error( $result ) ) {
+				return $this->handlerFailure( $result, $handler_slug );
+			}
+
 			return is_array( $result ) ? $result : $this->dataPackets;
 		}
 
@@ -200,5 +208,32 @@ class EventImportStep extends Step {
 		);
 
 		return $this->dataPackets;
+	}
+
+	/**
+	 * Preserve provider failures using the core step failure contract.
+	 *
+	 * @param \WP_Error $error Handler error.
+	 * @param string    $handler_slug Handler identifier.
+	 * @return array Failed step result.
+	 */
+	private function handlerFailure( \WP_Error $error, string $handler_slug ): array {
+		$this->log(
+			'error',
+			'Event import handler failed: ' . $error->get_error_message(),
+			array(
+				'handler_slug' => $handler_slug,
+				'error_code'   => (string) $error->get_error_code(),
+				'error'        => $error->get_error_message(),
+			)
+		);
+
+		return array(
+			'status'     => 'failed',
+			'packets'    => $this->dataPackets,
+			'reason'     => 'handler_failed',
+			'error'      => $error->get_error_message(),
+			'error_code' => (string) $error->get_error_code(),
+		);
 	}
 }
