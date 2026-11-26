@@ -60,9 +60,12 @@ final class ProviderModules {
 			),
 			new ProviderModule(
 				'impact',
-				$abilities,
-				array( 'datamachine/impact-reports' ),
-				static fn() => new \DataMachineBusiness\Abilities\Analytics\ImpactReportsAbilities()
+				array_merge( $abilities, $system_tasks ),
+				array( 'datamachine/impact-reports', 'task:impact_revenue_refresh' ),
+				static function (): void {
+					new \DataMachineBusiness\Abilities\Analytics\ImpactReportsAbilities();
+					\DataMachineBusiness\Engine\AI\System\Tasks\ImpactRevenueRefreshTask::register();
+				}
 			),
 			new ProviderModule(
 				'revenue-ledger',
