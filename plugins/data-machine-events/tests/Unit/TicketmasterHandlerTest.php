@@ -127,6 +127,53 @@ class TicketmasterHandlerTest extends WP_UnitTestCase {
 		}
 	}
 
+	public function test_maps_public_sale_start_and_changes_revision_once(): void {
+		$method   = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		$raw      = $this->ticketmasterEvent( 'sale-start', 'On-sale Test Concert' );
+		$original = $method->invoke( $this->handler, $raw );
+		$this->assertArrayNotHasKey( 'validFrom', $original );
+
+		$raw['sales']['public'] = array(
+			'startDateTime' => '2026-11-25T15:00:00Z',
+			'startDateTBD'  => false,
+			'startTBA'      => false,
+		);
+		$mapped = $method->invoke( $this->handler, $raw );
+		$this->assertSame( '2026-11-25T15:00:00Z', $mapped['validFrom'] );
+		$this->assertNotSame( TicketmasterSourceIdentity::revision( $original ), TicketmasterSourceIdentity::revision( $mapped ) );
+		$this->assertSame( TicketmasterSourceIdentity::revision( $mapped ), TicketmasterSourceIdentity::revision( $method->invoke( $this->handler, $raw ) ) );
+
+		unset( $mapped['validFrom'] );
+		$this->assertSame( $original, $mapped );
+	}
+
+	public function test_omits_absent_uncertain_or_invalid_public_sale_starts_without_changing_revision(): void {
+		$method   = $this->getProtectedMethod( 'map_ticketmaster_event' );
+		$raw      = $this->ticketmasterEvent( 'sale-start', 'On-sale Test Concert' );
+		$original = $method->invoke( $this->handler, $raw );
+		$cases    = array(
+			'no sales'           => null,
+			'no public sale'     => array(),
+			'no start'           => array( 'public' => array( 'endDateTime' => '2026-12-25T15:00:00Z' ) ),
+			'empty start'        => array( 'public' => array( 'startDateTime' => '' ) ),
+			'invalid start'      => array( 'public' => array( 'startDateTime' => 'TBD' ) ),
+			'impossible date'    => array( 'public' => array( 'startDateTime' => '2026-02-30T15:00:00Z' ) ),
+			'non-string start'   => array( 'public' => array( 'startDateTime' => array() ) ),
+			'TBD with timestamp' => array( 'public' => array( 'startDateTime' => '2026-11-25T15:00:00Z', 'startDateTBD' => true ) ),
+			'TBA with timestamp' => array( 'public' => array( 'startDateTime' => '2026-11-25T15:00:00Z', 'startTBA' => true ) ),
+			'TBD without start'  => array( 'public' => array( 'startDateTBD' => true ) ),
+			'TBA without start'  => array( 'public' => array( 'startTBA' => true ) ),
+			'presale only'       => array( 'presales' => array( array( 'startDateTime' => '2026-11-25T15:00:00Z' ) ) ),
+		);
+		foreach ( $cases as $label => $sales ) {
+			$raw['sales'] = $sales;
+			$mapped       = $method->invoke( $this->handler, $raw );
+			$this->assertArrayNotHasKey( 'validFrom', $mapped, $label );
+			$this->assertSame( $original, $mapped, $label );
+			$this->assertSame( TicketmasterSourceIdentity::revision( $original ), TicketmasterSourceIdentity::revision( $mapped ), $label );
+		}
+	}
+
 	public function test_map_event_returns_array() {
 		$method = $this->getProtectedMethod( 'map_ticketmaster_event' );
 

@@ -10,6 +10,7 @@ namespace DataMachineEvents\Steps\EventImport\Handlers\Ticketmaster;
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Core\EventSchemaProvider;
 use DataMachineEvents\Core\VenueSourceAliases;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Steps\EventImport\JunkPayloadFilter;
@@ -1127,6 +1128,15 @@ class Ticketmaster extends EventImportHandler {
 		$status     = $tm_event['dates']['status']['code'] ?? '';
 		if ( isset( $status_map[ $status ] ) ) {
 			$event['eventStatus'] = $status_map[ $status ];
+		}
+
+		$public_sale = $tm_event['sales']['public'] ?? array();
+		$valid_from  = $public_sale['startDateTime'] ?? null;
+		if ( empty( $public_sale['startDateTBD'] ) && empty( $public_sale['startTBA'] )
+			&& is_string( $valid_from ) && EventSchemaProvider::isValidValidFrom( $valid_from ) ) {
+			// Adding a confirmed on-sale time changes the source revision once;
+			// missing or uncertain times leave existing payloads unchanged.
+			$event['validFrom'] = $valid_from;
 		}
 
 		// Only multi-act bills carry a lineup. Single-act events keep their
