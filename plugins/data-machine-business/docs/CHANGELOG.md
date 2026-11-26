@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.31.0] - 2026-11-26
+
+### Added
+- add daily impact_revenue_refresh system task
+
 ## [0.30.0] - 2026-11-25
 
 ### Added
