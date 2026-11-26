@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.92.1] - 2026-11-26
+
+### Fixed
+- preserve event import handler errors
+
 ## [0.92.0] - 2026-11-25
 
 ### Added
