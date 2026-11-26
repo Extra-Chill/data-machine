@@ -226,6 +226,33 @@ class FetchInstagramAccountAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 1, $requests );
 	}
 
+	public function test_max_items_one_preflight_requests_a_single_post(): void {
+		$fields = array();
+		add_filter( 'pre_http_request', static function ( $pre, $args, $url ) use ( &$fields ) {
+			parse_str( wp_parse_url( $url, PHP_URL_QUERY ), $query );
+			$fields[] = $query['fields'];
+			return array(
+				'response' => array( 'code' => 200 ),
+				'body'     => wp_json_encode( array(
+					'business_discovery' => array(
+						'username' => 'venue',
+						'media'    => array(
+							'data'   => array( array( 'id' => '1', 'permalink' => 'https://instagram.com/p/1' ) ),
+							'paging' => array( 'cursors' => array( 'after' => 'next' ) ),
+						),
+					),
+				) ),
+			);
+		}, 10, 3 );
+		$result = ( new FetchInstagramAccountAbility() )->execute( array(
+			'username'  => 'venue',
+			'max_items' => 1,
+		) );
+		$this->assertTrue( $result['success'] );
+		$this->assertCount( 1, $fields );
+		$this->assertStringContainsString( 'media.limit(1)', $fields[0] );
+	}
+
 	public function test_graph_errors(): void {
 		foreach ( array(
 			4   => 'instagram_rate_limit',

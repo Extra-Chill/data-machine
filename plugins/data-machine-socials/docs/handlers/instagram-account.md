@@ -19,3 +19,29 @@ wp datamachine-socials instagram account grooving.violation --limit=10
 ```
 
 The `datamachine-socials/fetch-instagram-account` ability accepts the same settings and returns mapped candidates with image URLs. Pipeline execution adds local file storage. Rate limits advise retrying later; missing/expired authentication requires reconnecting Instagram.
+
+## Creating flows from a URL
+
+`instagram_account` declares a URL claim (`meta['url_claim']`, priority 10) for Data Machine's handler URL resolver. It claims `https://instagram.com/<username>` and `https://www.instagram.com/<username>/` profile URLs (query strings and fragments are ignored), plus a bare `@handle`, and returns `{ "username": "<normalized username>" }` as the handler config. Post, reel, explore, stories, and other non-profile paths are not claimed. The claim only parses the input and never makes a network request, so a claimed username may still be a personal or nonexistent account.
+
+### Pre-flight readability check
+
+Before creating a flow, consumers can confirm the account is readable with one cheap call to the fetch ability:
+
+```php
+$result = wp_get_ability( 'datamachine-socials/fetch-instagram-account' )->execute(
+	array(
+		'username'  => $claim['handler_config']['username'],
+		'max_items' => 1,
+	)
+);
+if ( is_wp_error( $result ) && 'instagram_account_unavailable' === $result->get_error_code() ) {
+	// Personal or unknown account: Business Discovery cannot read it.
+}
+```
+
+With `max_items: 1` and no `days_back`/`search` filters, this makes a single Graph request for one post, and does not download images or mark posts processed. `instagram_account_unavailable` means the account is personal or does not exist; `instagram_auth` and `instagram_rate_limit` mean the site's Instagram connection needs attention or a retry, not that the account is unreadable.
+
+## AI guidance
+
+The handler ships item-shape guidance in `meta['ai_guidance']`, which Data Machine injects into AI steps reading its packets: one post per item, recent posts as context only (never their own items), read the image carefully, resolve relative dates such as "TONIGHT" against the post timestamp, and use the permalink as the source link. Domain rules, such as what counts as an event, how to title it, and what to reject, belong in the consuming flow's prompt.

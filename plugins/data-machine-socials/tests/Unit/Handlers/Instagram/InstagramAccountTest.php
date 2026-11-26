@@ -32,6 +32,59 @@ class InstagramAccountTest extends WP_UnitTestCase {
 		$this->assertStoredItem( true, 0 );
 	}
 
+	public function test_url_claim_matrix(): void {
+		$claims = array(
+			'https://www.instagram.com/Venue/'             => 'venue',
+			'https://instagram.com/venue'                  => 'venue',
+			'http://instagram.com/venue/'                  => 'venue',
+			'https://www.instagram.com/the.venue_1/?hl=en' => 'the.venue_1',
+			'https://instagram.com/venue#posts'            => 'venue',
+			'@Venue'                                       => 'venue',
+		);
+		foreach ( $claims as $input => $username ) {
+			$this->assertSame( array( 'username' => $username ), InstagramAccount::claimUrl( $input ), $input );
+		}
+		foreach ( array(
+			'https://www.instagram.com/p/ABC123/',
+			'https://www.instagram.com/reel/ABC123/',
+			'https://www.instagram.com/reels/',
+			'https://www.instagram.com/explore/',
+			'https://www.instagram.com/explore/tags/music/',
+			'https://www.instagram.com/stories/venue/123/',
+			'https://www.instagram.com/venue/p/ABC123/',
+			'https://www.instagram.com/',
+			'https://instagram.com/bad-name!/',
+			'https://notinstagram.com/venue',
+			'https://instagram.com.evil.test/venue',
+			'https://facebook.com/venue',
+			'ftp://instagram.com/venue',
+			'venue',
+			'@venue/extra',
+			'',
+		) as $input ) {
+			$this->assertNull( InstagramAccount::claimUrl( $input ), $input );
+		}
+	}
+
+	public function test_registration_declares_url_claim_and_ai_guidance(): void {
+		// Earlier tests may have registered the handler under hooks that were since restored.
+		$registered = new \ReflectionProperty( InstagramAccount::class, 'registered_handlers' );
+		$registered->setValue( null, array() );
+		new InstagramAccount();
+		$handlers = apply_filters( 'datamachine_handlers', array(), 'fetch' );
+		$meta     = $handlers['instagram_account']['meta'] ?? array();
+		$this->assertSame( 10, $meta['url_claim_priority'] );
+		$this->assertTrue( is_callable( $meta['url_claim'] ) );
+		$this->assertSame( array( 'username' => 'venue' ), call_user_func( $meta['url_claim'], 'https://instagram.com/venue/' ) );
+		$this->assertSame( InstagramAccount::AI_GUIDANCE, $meta['ai_guidance'] );
+		foreach ( array( 'context only', 'never create an item from a context post', 'Read the image carefully', 'post timestamp', 'permalink' ) as $needle ) {
+			$this->assertStringContainsString( $needle, $meta['ai_guidance'] );
+		}
+		// Domain rules belong to the consuming flow, not the handler.
+		$this->assertStringNotContainsString( 'reject_source', $meta['ai_guidance'] );
+		$this->assertStringNotContainsString( 'live music', $meta['ai_guidance'] );
+	}
+
 	private function assertStoredItem( bool $download_succeeds, ?int $recent_context = null ): void {
 		$auth = new InstagramAuth();
 		$auth->save_account( array(
