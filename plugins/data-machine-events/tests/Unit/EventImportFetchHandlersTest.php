@@ -35,6 +35,10 @@ class EventImportFetchHandlersTest extends WP_UnitTestCase {
 		if ( null === $type || 'fetch' === $type ) {
 			$handlers['test_generic_source'] = array( 'class' => GenericEventSource::class, 'type' => 'fetch' );
 		}
+		if ( 'event_import' === $type ) {
+			$handlers['test_failing_fetch']  = array( 'class' => FailingEventSource::class, 'type' => 'event_import' );
+			$handlers['test_failing_legacy'] = array( 'class' => FailingLegacyEventSource::class, 'type' => 'event_import' );
+		}
 		if ( $this->collision && ( null === $type || 'event_import' === $type ) ) {
 			$handlers['test_generic_source'] = array( 'class' => NativeEventSource::class, 'type' => 'event_import' );
 		}
@@ -49,6 +53,24 @@ class EventImportFetchHandlersTest extends WP_UnitTestCase {
 		$this->assertSame( 'test_generic_source', $packets[0]['metadata']['handler'] );
 		$this->assertSame( 17, $packets[0]['metadata']['pipeline_id'] );
 		$this->assertSame( 23, $packets[0]['metadata']['flow_id'] );
+	}
+
+	public function test_fetch_handler_error_is_preserved_as_step_failure(): void {
+		$this->assertHandlerFailure( 'test_failing_fetch' );
+	}
+
+	public function test_legacy_handler_error_is_preserved_as_step_failure(): void {
+		$this->assertHandlerFailure( 'test_failing_legacy' );
+	}
+
+	private function assertHandlerFailure( string $handler_slug ): void {
+		$result = ( new ExecutableEventImportStep() )->runHandler( array(), $handler_slug );
+
+		$this->assertSame( 'failed', $result['status'] );
+		$this->assertSame( 'handler_failed', $result['reason'] );
+		$this->assertSame( 'instagram_account_unavailable', $result['error_code'] );
+		$this->assertSame( 'Account purplebuffalo843 is unavailable.', $result['error'] );
+		$this->assertSame( array(), $result['packets'] );
 	}
 
 	public function test_processed_fetch_item_is_deduplicated_in_event_import(): void {
@@ -90,7 +112,7 @@ class EventImportFetchHandlersTest extends WP_UnitTestCase {
 
 /** Expose the protected step entry point without requiring a persisted job. */
 class ExecutableEventImportStep extends EventImportStep {
-	public function runHandler( array $config = array() ): array {
+	public function runHandler( array $config = array(), string $handler_slug = 'test_generic_source' ): array {
 		$this->job_id           = 1;
 		$this->flow_step_id     = 'test-event-import';
 		$this->dataPackets      = array();
@@ -98,8 +120,8 @@ class ExecutableEventImportStep extends EventImportStep {
 		$this->flow_step_config = array(
 			'pipeline_id'     => 17,
 			'flow_id'         => 23,
-			'handler_slugs'   => array( 'test_generic_source' ),
-			'handler_configs' => array( 'test_generic_source' => $config ),
+			'handler_slugs'   => array( $handler_slug ),
+			'handler_configs' => array( $handler_slug => $config ),
 		);
 		return $this->executeStep();
 	}
@@ -116,6 +138,22 @@ class GenericEventSource extends FetchHandler {
 			'content'  => 'Fetched content',
 			'metadata' => isset( $config['item_identifier'] ) ? array( 'item_identifier' => $config['item_identifier'] ) : array(),
 		);
+	}
+}
+
+class FailingEventSource extends FetchHandler {
+	public function __construct() {
+		parent::__construct( 'test_failing_fetch' );
+	}
+
+	protected function executeFetch( array $config, ExecutionContext $context ): array|\WP_Error {
+		return new \WP_Error( 'instagram_account_unavailable', 'Account purplebuffalo843 is unavailable.' );
+	}
+}
+
+class FailingLegacyEventSource {
+	public function execute( array $payload ): \WP_Error {
+		return new \WP_Error( 'instagram_account_unavailable', 'Account purplebuffalo843 is unavailable.' );
 	}
 }
 
