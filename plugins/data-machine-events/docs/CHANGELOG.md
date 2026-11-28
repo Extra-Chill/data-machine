@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.93.0] - 2026-11-28
+
+### Added
+- report applied query changes and initial results
+
 ## [0.92.2] - 2026-11-28
 
 ### Fixed
