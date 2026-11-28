@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.94.0] - 2026-11-28
+
+### Added
+- expose original listings in calendar data
+
 ## [0.93.0] - 2026-11-28
 
 ### Added
