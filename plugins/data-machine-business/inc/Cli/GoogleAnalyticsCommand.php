@@ -61,9 +61,11 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *
 	 * [--start-date=<date>]
 	 * : Start date in YYYY-MM-DD format (default: 28 days ago). Not used for realtime.
+	 * For aggregate_report, --start-date plus --end-date is shorthand for --date-range.
 	 *
 	 * [--end-date=<date>]
 	 * : End date in YYYY-MM-DD format (default: yesterday). Not used for realtime.
+	 * For aggregate_report, requires --start-date.
 	 *
 	 * [--limit=<number>]
 	 * : Row limit (default: 25). aggregate_report max: 100; legacy actions max: 10000.
@@ -72,10 +74,12 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * : GA4 property ID. Defaults to the configured property; aggregate_report requires a numeric ID.
 	 *
 	 * [--page-filter=<string>]
-	 * : Filter results to pages with paths containing this string.
+	 * : Filter results to pages with paths containing this string. Fixed actions
+	 * only; for aggregate_report use a pagePath filter in --filters.
 	 *
 	 * [--hostname=<string>]
-	 * : Filter to pages on this hostname (for multisite GA4 properties).
+	 * : Filter to pages on this hostname (for multisite GA4 properties). For
+	 * aggregate_report this adds an EXACT hostName filter to --filters.
 	 *
 	 * [--country=<codes>]
 	 * : Scope to a country cohort by ISO-3166-1 alpha-2 code(s), comma-separated
@@ -84,13 +88,16 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 * default cohort (see datamachine_ga_config's default_country_cohort).
 	 *
 	 * [--sort-by=<field>]
-	 * : Sort results by this metric or dimension field name.
+	 * : Sort results by this metric or dimension field name. Fixed actions only;
+	 * for aggregate_report use --order-by.
 	 *
 	 * [--order=<direction>]
-	 * : Sort direction: asc or desc (default: desc).
+	 * : Sort direction: asc or desc (default: desc). Fixed actions only; for
+	 * aggregate_report use --order-by.
 	 *
 	 * [--compare]
 	 * : Compare against the previous period of equal length. Adds delta columns.
+	 * Fixed actions only; for aggregate_report use --comparison-date-range.
 	 *
 	 * [--date-range=<json>]
 	 * : aggregate_report primary range JSON: {"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}.
@@ -166,6 +173,9 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *     # Bounded aggregate report (use --format=json for nested output)
 	 *     wp datamachine analytics ga aggregate_report --date-range='{"start_date":"2026-01-01","end_date":"2026-01-31"}' --dimensions='["country"]' --metrics='["sessions"]' --format=json
 	 *
+	 *     # Aggregate report scoped to one host, using the shared date flags
+	 *     wp datamachine analytics ga aggregate_report --hostname=docs.example.com --start-date=2026-08-30 --end-date=2026-11-27 --dimensions='["country"]' --metrics='["sessions"]'
+	 *
 	 *     # Filter by hostname for multisite
 	 *     wp datamachine analytics ga page_stats --hostname=events.example.com
 	 *
@@ -185,25 +195,40 @@ class GoogleAnalyticsCommand extends BaseCommand {
 	 *     wp datamachine analytics ga page_stats --sort-by=bounceRate --order=asc --limit=10
 	 */
 	public function __invoke( array $args, array $assoc_args ): void {
-		$input = array(
-			'action' => $args[0] ?? '',
-		);
+		$input = self::buildInput( $args, $assoc_args );
 
-		$this->map_optional(
-			$input,
-			$assoc_args,
-			array(
-				'property-id' => 'property_id',
-				'start-date'  => 'start_date',
-				'end-date'    => 'end_date',
-				'limit'       => 'limit',
-				'page-filter' => 'page_filter',
-				'hostname'    => 'hostname',
-				'country'     => 'country',
-				'sort-by'     => 'sort_by',
-				'order'       => 'order',
-			)
-		);
+		if ( is_string( $input ) ) {
+			WP_CLI::error( $input );
+			return;
+		}
+
+		$this->execute_ability( 'datamachine/google-analytics', $input, $assoc_args );
+	}
+
+	/** Flags that only legacy (fixed preset) actions honor, with their aggregate_report equivalent. */
+	private const AGGREGATE_UNSUPPORTED_FLAGS = array(
+		'page-filter' => '--filters=\'[{"field_name":"pagePath","match_type":"CONTAINS","value":"..."}]\'',
+		'sort-by'     => '--order-by=\'[{"type":"metric","name":"sessions","descending":true}]\'',
+		'order'       => '--order-by=\'[{"type":"metric","name":"sessions","descending":true}]\'',
+		'compare'     => '--comparison-date-range=\'{"start_date":"YYYY-MM-DD","end_date":"YYYY-MM-DD"}\'',
+	);
+
+	/**
+	 * Build ability input from CLI arguments.
+	 *
+	 * Legacy actions pass flags through unchanged. aggregate_report has a closed
+	 * input schema, so generic flags are translated (--start-date/--end-date to
+	 * date_range, --hostname to a hostName filter) or rejected with the
+	 * aggregate equivalent instead of producing a misleading schema error.
+	 *
+	 * @param array $args       Positional arguments.
+	 * @param array $assoc_args Associative arguments.
+	 * @return array|string Ability input, or an error message.
+	 */
+	public static function buildInput( array $args, array $assoc_args ) {
+		$action = (string) ( $args[0] ?? '' );
+		$input  = array( 'action' => $action );
+
 		foreach (
 			array(
 				'date-range'            => 'date_range',
@@ -215,8 +240,34 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			)
 			as $flag => $key
 		) {
+			if ( ! isset( $assoc_args[ $flag ] ) ) {
+				continue;
+			}
+			$decoded = json_decode( (string) $assoc_args[ $flag ], true );
+			if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
+				return sprintf( '--%s must be valid JSON (object or array).', $flag );
+			}
+			$input[ $key ] = $decoded;
+		}
+
+		if ( 'aggregate_report' === $action ) {
+			return self::buildAggregateInput( $input, $assoc_args );
+		}
+
+		$mapping = array(
+			'property-id' => 'property_id',
+			'start-date'  => 'start_date',
+			'end-date'    => 'end_date',
+			'limit'       => 'limit',
+			'page-filter' => 'page_filter',
+			'hostname'    => 'hostname',
+			'country'     => 'country',
+			'sort-by'     => 'sort_by',
+			'order'       => 'order',
+		);
+		foreach ( $mapping as $flag => $key ) {
 			if ( isset( $assoc_args[ $flag ] ) ) {
-				$input[ $key ] = json_decode( $assoc_args[ $flag ], true );
+				$input[ $key ] = $assoc_args[ $flag ];
 			}
 		}
 
@@ -225,22 +276,62 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			$input['compare'] = true;
 		}
 
-		$this->execute_ability( 'datamachine/google-analytics', $input, $assoc_args );
+		return $input;
 	}
 
 	/**
-	 * Map CLI flags to ability input keys.
+	 * Translate or reject generic flags for aggregate_report.
 	 *
-	 * @param array $input      Ability input (modified by reference).
-	 * @param array $assoc_args CLI associative arguments.
-	 * @param array $mapping    Flag-to-key mapping (cli-flag => ability_key).
+	 * @param array $input      Input with action and decoded JSON flags.
+	 * @param array $assoc_args Associative arguments.
+	 * @return array|string Ability input, or an error message.
 	 */
-	private function map_optional( array &$input, array $assoc_args, array $mapping ): void {
-		foreach ( $mapping as $flag => $key ) {
+	private static function buildAggregateInput( array $input, array $assoc_args ) {
+		foreach ( self::AGGREGATE_UNSUPPORTED_FLAGS as $flag => $equivalent ) {
 			if ( isset( $assoc_args[ $flag ] ) ) {
-				$input[ $key ] = $assoc_args[ $flag ];
+				return sprintf( '--%s is not supported by aggregate_report. Use %s instead.', $flag, $equivalent );
 			}
 		}
+
+		$has_start = isset( $assoc_args['start-date'] );
+		$has_end   = isset( $assoc_args['end-date'] );
+		if ( $has_start || $has_end ) {
+			if ( isset( $input['date_range'] ) ) {
+				return 'Pass either --date-range or --start-date/--end-date for aggregate_report, not both.';
+			}
+			if ( ! $has_start || ! $has_end ) {
+				return 'aggregate_report needs both --start-date and --end-date (or --date-range).';
+			}
+			$input['date_range'] = array(
+				'start_date' => (string) $assoc_args['start-date'],
+				'end_date'   => (string) $assoc_args['end-date'],
+			);
+		}
+
+		if ( isset( $assoc_args['hostname'] ) ) {
+			$filters          = isset( $input['filters'] ) && is_array( $input['filters'] ) ? $input['filters'] : array();
+			$filters[]        = array(
+				'field_name' => 'hostName',
+				'match_type' => 'EXACT',
+				'value'      => (string) $assoc_args['hostname'],
+			);
+			$input['filters'] = $filters;
+		}
+
+		$passthrough = array(
+			'property-id' => 'property_id',
+			'country'     => 'country',
+		);
+		foreach ( $passthrough as $flag => $key ) {
+			if ( isset( $assoc_args[ $flag ] ) ) {
+				$input[ $key ] = (string) $assoc_args[ $flag ];
+			}
+		}
+		if ( isset( $assoc_args['limit'] ) ) {
+			$input['limit'] = (int) $assoc_args['limit'];
+		}
+
+		return $input;
 	}
 
 	/**

@@ -1208,12 +1208,10 @@ class GoogleAnalyticsAbilitiesTest extends WP_UnitTestCase {
 	}
 
 	public function test_cli_maps_explicit_property_id_and_fixed_action_builder_remains_compatible(): void {
-		$command = ( new \ReflectionClass( GoogleAnalyticsCommand::class ) )->newInstanceWithoutConstructor();
-		$method = new \ReflectionMethod( GoogleAnalyticsCommand::class, 'map_optional' );
-		$method->setAccessible( true );
-		$input = array();
-		$method->invokeArgs( $command, array( &$input, array( 'property-id' => '123456789' ), array( 'property-id' => 'property_id' ) ) );
+		$input = GoogleAnalyticsCommand::buildInput( array( 'traffic_sources' ), array( 'property-id' => '123456789' ) );
 		$this->assertSame( '123456789', $input['property_id'] );
+		$aggregate = GoogleAnalyticsCommand::buildInput( array( 'aggregate_report' ), array( 'property-id' => '123456789', 'metrics' => '["sessions"]' ) );
+		$this->assertSame( '123456789', $aggregate['property_id'] );
 		$this->assertSame( array( 'sessions', 'activeUsers', 'screenPageViews', 'bounceRate' ), wp_list_pluck( GoogleAnalyticsAbilities::buildReportRequestBody( array(), 'traffic_sources' )['metrics'], 'name' ) );
 	}
 
