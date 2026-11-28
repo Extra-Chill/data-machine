@@ -1,4 +1,11 @@
+/**
+ * External dependencies
+ */
 const path = require( 'node:path' );
+
+/**
+ * WordPress dependencies
+ */
 const defaultConfig = require( '@wordpress/scripts/config/webpack.config' );
 
 const blocks = {
