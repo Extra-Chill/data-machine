@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.207.1] - 2026-11-28
+
+### Fixed
+- honor shared keyword, timeframe and OR filters in email fetch
+
 ## [0.207.0] - 2026-11-25
 
 ### Added
