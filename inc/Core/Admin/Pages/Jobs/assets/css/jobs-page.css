@@ -1,0 +1,319 @@
+/**
+ * Jobs Admin Page Styles
+ *
+ * Styling for the React-based jobs interface.
+ */
+
+/* App Container */
+.datamachine-jobs-app {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 20px 0;
+}
+
+/* Header */
+.datamachine-jobs-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 20px;
+	padding-bottom: 15px;
+	border-bottom: 1px solid #ddd;
+}
+
+.datamachine-jobs-title {
+	margin: 0;
+	font-size: 23px;
+	font-weight: 400;
+	line-height: 1.3;
+}
+
+.datamachine-jobs-header-actions {
+	display: flex;
+	gap: 10px;
+}
+
+/* Loading State */
+.datamachine-jobs-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	padding: 40px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	color: #757575;
+}
+
+/* Error State */
+.datamachine-jobs-error {
+	background: #fcf0f1;
+	border: 1px solid #d63638;
+	border-radius: 4px;
+	padding: 15px;
+	color: #d63638;
+	font-size: 14px;
+}
+
+/* Empty State */
+.datamachine-jobs-empty-state {
+	background: #f6f7f7;
+	border: 1px dashed #c3c4c7;
+	border-radius: 4px;
+	padding: 40px;
+	text-align: center;
+}
+
+.datamachine-jobs-empty-message {
+	margin: 0;
+	color: #757575;
+	font-style: italic;
+}
+
+/* Table Container */
+.datamachine-jobs-table-container {
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.datamachine-jobs-table-container .wp-list-table {
+	margin: 0;
+	border: none;
+}
+
+/* Table Column Widths */
+.datamachine-col-job-id {
+	width: 70px;
+}
+
+.datamachine-col-pipeline,
+.datamachine-col-flow {
+	width: 140px;
+}
+
+.datamachine-col-label {
+	/* Flexible — takes remaining space */
+}
+
+.datamachine-col-label-cell {
+	word-break: break-word;
+}
+
+.datamachine-col-status {
+	width: 180px;
+}
+
+.datamachine-col-created,
+.datamachine-col-completed {
+	width: 130px;
+}
+
+/* Job Status Colors - now using shared classes from root.css:
+ * .datamachine-status--success
+ * .datamachine-status--error
+ * .datamachine-status--warning
+ * .datamachine-status--neutral
+ */
+
+/* Status detail (compound status reason) */
+.datamachine-status-detail {
+	display: block;
+	font-size: 11px;
+	color: #646970;
+	margin-top: 2px;
+	line-height: 1.3;
+	word-break: break-word;
+}
+
+/* Pipeline/Flow cell styling */
+.datamachine-col-pipeline,
+.datamachine-col-flow {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+
+
+/* Modal Styles */
+.datamachine-jobs-admin-modal {
+	max-width: 600px;
+}
+
+.datamachine-jobs-admin-modal .components-modal__content {
+	padding: 20px;
+}
+
+.datamachine-jobs-modal-content {
+	padding: 0;
+}
+
+.datamachine-modal-description {
+	margin: 0 0 20px;
+	color: #646970;
+}
+
+/* Admin Section */
+.datamachine-admin-section {
+	margin-bottom: 24px;
+	padding-bottom: 24px;
+	border-bottom: 1px solid #ddd;
+}
+
+.datamachine-admin-section:last-child {
+	margin-bottom: 0;
+	padding-bottom: 0;
+	border-bottom: none;
+}
+
+.datamachine-admin-section h3 {
+	margin: 0 0 8px;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.datamachine-admin-section > .description {
+	margin: 0 0 16px;
+	color: #646970;
+	font-size: 13px;
+}
+
+/* Form Fields */
+.datamachine-form-field {
+	margin-bottom: 16px;
+}
+
+.datamachine-form-field .description {
+	margin-top: 6px;
+	color: #646970;
+	font-size: 12px;
+}
+
+.datamachine-form-field .components-base-control {
+	margin-bottom: 0;
+}
+
+/* Form Actions */
+.datamachine-form-actions {
+	margin-top: 16px;
+}
+
+/* Form Notice */
+.datamachine-form-notice {
+	margin-top: 16px;
+}
+
+.datamachine-form-notice.components-notice {
+	margin: 16px 0 0;
+}
+
+/* ========================================================================
+   BATCH HIERARCHY
+   ======================================================================== */
+
+/* Batch parent row */
+.datamachine-batch-parent {
+	background: #f9f9f9;
+}
+
+.datamachine-batch-parent:hover {
+	background: #f0f0f1;
+}
+
+.datamachine-batch-parent.is-expanded {
+	background: #eef3f8;
+	border-bottom: none;
+}
+
+/* Expand/collapse arrow */
+.datamachine-batch-arrow {
+	display: inline-block;
+	width: 16px;
+	font-size: 10px;
+	color: #646970;
+	margin-right: 4px;
+}
+
+/* Batch progress badge */
+.datamachine-batch-badge {
+	display: inline-block;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 2px 8px;
+	border-radius: 3px;
+	margin-left: 8px;
+	vertical-align: middle;
+	background: #f0f0f1;
+	color: #646970;
+}
+
+.datamachine-batch-badge--complete {
+	background: #d1f5d3;
+	color: #00a32a;
+}
+
+.datamachine-batch-badge--warning {
+	background: #fce4e4;
+	color: #d63638;
+}
+
+.datamachine-batch-badge--progress {
+	background: #e7f3ff;
+	color: #0073aa;
+}
+
+/* Child rows */
+.datamachine-child-row {
+	background: #f6f7f7 !important;
+}
+
+.datamachine-child-row td {
+	border-top: 1px solid #eee;
+}
+
+.datamachine-child-id {
+	padding-left: 24px !important;
+}
+
+.datamachine-child-indicator {
+	color: #a0a5aa;
+	margin-right: 6px;
+	font-size: 14px;
+}
+
+.datamachine-child-loading {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 0;
+	color: #646970;
+	font-size: 13px;
+}
+
+.datamachine-child-empty {
+	color: #646970;
+	font-style: italic;
+	padding: 8px 24px !important;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+	.datamachine-jobs-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 15px;
+	}
+
+	.datamachine-col-label,
+	.datamachine-col-label-cell,
+	.datamachine-col-created,
+	.datamachine-col-completed {
+		display: none;
+	}
+
+	.datamachine-batch-badge {
+		display: block;
+		margin-left: 0;
+		margin-top: 4px;
+	}
+}
