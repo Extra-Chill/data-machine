@@ -12,7 +12,9 @@ require_once __DIR__ . '/EventUpsertTestCase.php';
 use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
 use DataMachine\Core\EngineData;
 use DataMachine\Core\ExecutionContext;
+use DataMachineEvents\Api\Controllers\Calendar;
 use DataMachineEvents\Core\DuplicateDetection\EventIdentity;
+use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\JsonLdExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\Extractors\SquarespaceExtractor;
 use DataMachineEvents\Steps\EventImport\Handlers\WebScraper\StructuredDataProcessor;
@@ -55,6 +57,46 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 		$this->assertTrue( $updated['success'], wp_json_encode( $updated ) );
 		$this->assertSame( $created['data']['post_id'], $updated['data']['post_id'] );
 		$this->assertSame( $raw['name'], get_the_title( $updated['data']['post_id'] ) );
+	}
+
+	public function test_calendar_data_preserves_scraped_attribution_and_id_after_reschedule(): void {
+		$raw           = $this->rawEvent();
+		$raw['@id']    = 'https://example.com/events/weekly-session#event';
+		$raw['offers'] = array( 'url' => 'https://example.com/tickets/weekly-session' );
+		$item          = $this->process( array( $raw ) )[0];
+		$this->assertSame( self::SOURCE_URL, $item['metadata']['_engine_data']['source_url'] );
+		$created = $this->upsertItem( $item );
+		$this->assertTrue( $created['success'], wp_json_encode( $created ) );
+		$post_id = $created['data']['post_id'];
+		$this->assertSame( self::SOURCE_URL, get_post_meta( $post_id, EventUpsert::SOURCE_URL_META_KEY, true ) );
+
+		$request = new \WP_REST_Request( 'GET' );
+		$request->set_header( 'X-Requested-With', 'XMLHttpRequest' );
+		$request->set_param( 'format', 'data' );
+		$request->set_param( 'month', self::future_year() . '-11' );
+		$calendar = new Calendar();
+		$before   = $calendar->calendar( $request )->get_data();
+		$this->assertSame( 7, $before['schema']['version'] );
+		$events = array_column( $before['events'], null, 'id' );
+		$this->assertSame(
+			array(
+				'url'  => self::SOURCE_URL,
+				'name' => 'Scraper test venue',
+			),
+			$events[ $post_id ]['source']
+		);
+		$this->assertSame( $raw['offers']['url'], $events[ $post_id ]['ticket']['url'] );
+
+		$raw['startDate'] = self::future_year() . '-11-27T21:00:00';
+		$raw['url']       = 'https://example.com/events/weekly-session';
+		$updated          = $this->upsertItem( $this->process( array( $raw ) )[0] );
+		$this->assertTrue( $updated['success'], wp_json_encode( $updated ) );
+		$this->assertSame( $post_id, $updated['data']['post_id'] );
+		$after  = $calendar->calendar( $request )->get_data();
+		$events = array_column( $after['events'], null, 'id' );
+		$this->assertSame( $post_id, $events[ $post_id ]['id'] );
+		$this->assertSame( self::future_year() . '-11-27', $events[ $post_id ]['date']['start_date'] );
+		$this->assertSame( $raw['url'], $events[ $post_id ]['source']['url'] );
 	}
 
 	public function test_shared_listing_url_is_not_identity(): void {

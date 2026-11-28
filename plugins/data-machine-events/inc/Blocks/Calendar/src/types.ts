@@ -194,6 +194,8 @@ export interface CalendarEventItem {
 	date: CalendarEventDate;
 	venue: CalendarEventVenue | null;
 	organizer: CalendarEventOrganizer | null;
+	/** Original listing attribution (schema v7 and later). */
+	source?: { url: string; name: string };
 	/**
 	 * `url` is empty and `is_affiliate` is true when the ticket URL is an
 	 * affiliate/redirect wrapper (Ticketmaster compliance, issue #816) —

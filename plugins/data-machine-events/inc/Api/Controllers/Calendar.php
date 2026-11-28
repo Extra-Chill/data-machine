@@ -47,6 +47,7 @@ use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
 use DataMachineEvents\Blocks\Calendar\Template_Loader;
 use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Utilities\EventSourceUrl;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 
 /**
@@ -69,8 +70,9 @@ class Calendar {
 	 * v6 (#816): `ticket.is_affiliate` added; `ticket.url` is emptied when
 	 * the ticket URL is an affiliate/redirect wrapper (JS-gated ticket
 	 * links — the client uses `event.id` as the gated ref instead).
+	 * v7: original listing attribution in `event.source`.
 	 */
-	const DATA_SCHEMA_VERSION = 6;
+	const DATA_SCHEMA_VERSION = 7;
 
 	/**
 	 * Calendar endpoint implementation
@@ -316,6 +318,12 @@ class Calendar {
 		$display = $this->serialize_display( $event_data, $display_context, $post_id );
 		if ( ! $display['show_ticket_link'] ) {
 			// A hidden ticket link carries no URL or gated ref either.
+			if ( EventSourceUrl::sanitize( $event_data['ticketUrl'] ?? '' ) === $event['source']['url'] ) {
+				$event['source'] = array(
+					'url'  => '',
+					'name' => '',
+				);
+			}
 			$event['ticket'] = array(
 				'url'          => '',
 				'is_affiliate' => false,
@@ -395,6 +403,19 @@ class Calendar {
 		// assembled at resolve time), not just stored wrappers.
 		$ticket_url          = (string) ( $event_data['ticketUrl'] ?? '' );
 		$is_affiliate_ticket = data_machine_events_is_gated_ticket_url( $ticket_url );
+		$venue               = $this->serialize_venue( $post_id, $event_data );
+		$organizer           = $this->serialize_organizer( $event_data );
+		$source_url          = EventSourceUrl::sanitize( get_post_meta( $post_id, EventSourceUrl::META_KEY, true ) );
+		$source_name         = '';
+		if ( '' !== $source_url ) {
+			if ( ! empty( $organizer['name'] ) ) {
+				$source_name = $organizer['name'];
+			} elseif ( ! empty( $venue['name'] ) ) {
+				$source_name = $venue['name'];
+			} else {
+				$source_name = (string) wp_parse_url( $source_url, PHP_URL_HOST );
+			}
+		}
 
 		return array(
 			'id'             => $post_id,
@@ -407,8 +428,12 @@ class Calendar {
 				'end_time'       => (string) ( $event_data['endTime'] ?? '' ),
 				'venue_timezone' => (string) ( $event_data['venueTimezone'] ?? '' ),
 			),
-			'venue'          => $this->serialize_venue( $post_id, $event_data ),
-			'organizer'      => $this->serialize_organizer( $event_data ),
+			'venue'          => $venue,
+			'organizer'      => $organizer,
+			'source'         => array(
+				'url'  => $source_url,
+				'name' => $source_name,
+			),
 			'ticket'         => array(
 				'url'          => $is_affiliate_ticket ? '' : $ticket_url,
 				'is_affiliate' => $is_affiliate_ticket,

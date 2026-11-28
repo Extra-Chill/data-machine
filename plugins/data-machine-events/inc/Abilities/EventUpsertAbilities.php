@@ -317,6 +317,11 @@ class EventUpsertAbilities {
 							'type'   => 'string',
 							'format' => 'uri',
 						),
+						'source_url'        => array(
+							'type'        => 'string',
+							'format'      => 'uri',
+							'description' => 'Public original listing URL, if known.',
+						),
 						'offerAvailability' => $string,
 						'validFrom'         => array(
 							'type'   => 'string',

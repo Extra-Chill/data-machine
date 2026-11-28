@@ -15,6 +15,7 @@ use DataMachineEvents\Core\EventTimeLocalizer;
 use DataMachineEvents\Steps\EventImport\EventEngineData;
 use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
 use DataMachineEvents\Utilities\EventSourceIdentity;
+use DataMachineEvents\Utilities\EventSourceUrl;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -132,6 +133,16 @@ class StructuredDataProcessor {
 					$event['lineup'] = $lineup;
 				}
 			}
+
+			// Feed endpoints may carry private subscription tokens and are not listings.
+			$listing_url = EventSourceUrl::sanitize( $event['source_url'] ?? $event['sourceUrl'] ?? '' );
+			if ( '' === $listing_url ) {
+				$listing_url = EventSourceUrl::sanitize( $event['url'] ?? '' );
+			}
+			if ( '' === $listing_url && 'ics_feed' !== $extraction_method ) {
+				$listing_url = EventSourceUrl::sanitize( $source_url );
+			}
+			$event['source_url'] = $listing_url;
 
 			$venue_metadata = $this->handler->extractVenueMetadata( $event );
 			$engine_data    = EventEngineData::buildEngineData( $event, $venue_metadata );

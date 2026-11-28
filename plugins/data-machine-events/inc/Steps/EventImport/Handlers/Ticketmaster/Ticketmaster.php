@@ -1106,6 +1106,7 @@ class Ticketmaster extends EventImportHandler {
 			'organizer'                     => $this->sanitizeText( $organizer ),
 			'price'                         => $this->sanitizeText( $price ),
 			'ticketUrl'                     => $this->sanitizeUrl( $ticket_url ),
+			'source_url'                    => $this->sanitizeUrl( $ticket_url ),
 			'description'                   => $this->cleanHtml( $description ),
 			'venueAddress'                  => $this->sanitizeText( $venue_address ),
 			'venueCity'                     => $this->sanitizeText( $venue_city ),

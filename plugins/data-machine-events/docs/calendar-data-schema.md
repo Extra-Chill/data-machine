@@ -1,6 +1,4 @@
-# Calendar Data-Only REST Schema (phase 1 of #298)
-
-Status: **phase 1 of the refactor in [Extra-Chill/data-machine-events#298](https://github.com/Extra-Chill/data-machine-events/issues/298). Not the canonical response yet.**
+# Calendar Data-Only REST Schema
 
 The canonical calendar REST response remains the legacy HTML-string envelope
 returned by `/wp-json/datamachine/v1/events/calendar`. This document describes
@@ -10,17 +8,10 @@ empty-state recovery fragment, intended to become the canonical
 contract once the consumers in `inc/Blocks/Calendar/src/` are ported in
 subsequent phases.
 
-## Background
-
-See the umbrella refactor issue ([#298](https://github.com/Extra-Chill/data-machine-events/issues/298)) for
-the full architectural rationale. Short version: the current REST contract
-ships server-rendered HTML strings (`data.html`, `data.pagination.html`,
-`data.counter`, `data.navigation.html`) that the frontend bundle blasts into
-the DOM via `innerHTML`. That violates the site-wide headless-React rule,
-defeats client-side state, and is the root cause of the family of bugs filed
-separately ([#296](https://github.com/Extra-Chill/data-machine-events/issues/296), [#297](https://github.com/Extra-Chill/data-machine-events/issues/297)).
-
 ## Activation
+
+The route is registered only on sites where Data Machine Events is active.
+On other sites, the REST API can return `rest_no_route`.
 
 Pass `format=data` as a query param. **Any other value (including the
 absent param) returns the legacy HTML envelope unchanged.**
@@ -36,6 +27,17 @@ curl 'https://example.com/wp-json/datamachine/v1/events/calendar?paged=1&format=
 The two responses are cached independently — `format` is part of the
 full-response cache key (`CalendarCache::generate_full_response_key()`).
 
+## Taxonomy filters
+
+Use `tax_filter[<taxonomy>][]=<term_id>` with a taxonomy slug and numeric
+term IDs from the site serving the calendar. Repeat the parameter to match
+any of several terms within one taxonomy. Filters across different taxonomies
+must all match. For example, to match either event type `12` or `34`:
+
+```bash
+curl --globoff 'https://example.com/wp-json/datamachine/v1/events/calendar?format=data&tax_filter[event_type][]=12&tax_filter[event_type][]=34'
+```
+
 ## Envelope
 
 ```jsonc
@@ -43,7 +45,7 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
   "success": true,
   "schema": {
     "name": "calendar-data",
-    "version": 5,
+    "version": 7,
     "phase": 1,
     "issue": 298
   },
@@ -83,16 +85,15 @@ full-response cache key (`CalendarCache::generate_full_response_key()`).
 ### `schema`
 
 Identifies the schema for forward compatibility. Clients should check
-`schema.name === 'calendar-data'` and `schema.version === 5` before
-reading the rest. Future phases bump `phase`; backward-incompatible
-shape changes bump `version`.
+`schema.name === 'calendar-data'` and check that they support the returned
+`schema.version` before reading the rest. Version 7 adds `event.source`.
 
 `schema.version` is also folded into the full-response cache key (as
 `data_schema` — see [Caching](#caching)), so a deploy that bumps the
 version can never serve a stale older-shape envelope to the newer client
 for the cache TTL window.
 
-**v2 ([#381](https://github.com/Extra-Chill/data-machine-events/issues/381)):** each `grouping.by_date`
+**v2:** each `grouping.by_date`
 occurrence now carries a server-computed `display` block. The client-side
 event renderer consumes those values verbatim instead of re-deriving
 time / date / unicode formatting in JavaScript, making
@@ -101,29 +102,28 @@ time / date / unicode formatting in JavaScript, making
 This closed the badge- and time-format drift bugs where client-rendered
 (Load More) cards diverged from server-rendered ones.
 
-**v3 ([#465](https://github.com/Extra-Chill/data-machine-events/issues/465)):** empty
+**v3:** empty
 responses carry `empty_html`, rendered from the existing `no-events.php`
 template. Non-empty responses carry an empty string.
 
-**v5 ([#786](https://github.com/Extra-Chill/data-machine-events/issues/786)):** the `venue`
-subobject carries `tier` — the closed-vocabulary venue tier slug, or an
-empty string when the venue is unclassified (v4 was never announced in
-this document; the bump from 4 covers the same shape window as #507).
+**v5:** the `venue` subobject adds `tier`, a venue tier slug or an empty
+string when the venue is unclassified.
 
-**v6 ([#816](https://github.com/Extra-Chill/data-machine-events/issues/816)):** Ticketmaster
-compliance. `ticket.is_affiliate` was added; `ticket.url` is emptied
-(`""`) whenever the ticket URL is an affiliate/redirect wrapper, so the
-affiliate URL and affiliate ID never appear in the JSON response.
-Clients render a JS-gated ticket button using this event's own `id` as
-the ref (`/wp-json/extrachill/v1/events/tickets/<id>/go`) instead of a
-direct `href`. `is_affiliate` is optional on the client type for
-backward compatibility with envelopes cached before this bump.
+**v6:** `ticket.is_affiliate` indicates that the ticket link requires a
+redirect gate. In this case `ticket.url` is empty; clients can use `event.id`
+as the reference for a gated button instead of rendering a direct link.
+
+**v7:** `source` adds the original listing URL and attribution label.
 
 ### `events`
 
 Array of structured event objects, **deduplicated on `id`**. A multi-day
 event appears once here, regardless of how many dates it spans on this
 page — its multi-day expansion is represented in `grouping.by_date`.
+`id` is the event's WordPress post ID on this installation. It stays the
+same when an upsert updates the same event, including when a stable source
+identity matches a rescheduled event whose date or time changed. Do not
+use dates, times, or source URLs as event IDs.
 
 ```jsonc
 {
@@ -139,15 +139,15 @@ page — its multi-day expansion is represented in `grouping.by_date`.
   },
   "venue": {
     "term_id": 678,
-    "name":    "The Royal American",
-    "slug":    "the-royal-american",
-    "address": "970 Morrison Dr",
-    "formatted_address": "970 Morrison Dr, Charleston, SC 29403",
-    "city": "Charleston",
-    "state": "SC",
-    "zip": "29403",
+    "name":    "Example Hall",
+    "slug":    "example-hall",
+    "address": "100 Main Street",
+    "formatted_address": "100 Main Street, Example City",
+    "city": "Example City",
+    "state": "",
+    "zip": "",
     "country": "US",
-    "coordinates": "32.8007,-79.9362",
+    "coordinates": "",
     "timezone": "America/New_York",
     "tier": "club"
   },
@@ -156,10 +156,11 @@ page — its multi-day expansion is represented in `grouping.by_date`.
     "url":  "https://example.com",
     "type": "Organization"
   },
-  "ticket":    { "url": "https://etix.com/...", "is_affiliate": false },
+  "source":    { "url": "https://example.com/listings/some-show", "name": "Local Promoter" },
+  "ticket":    { "url": "https://example.com/tickets/some-show", "is_affiliate": false },
   "performer": { "name": "Headliner Name", "type": "MusicGroup" },
   "status": "EventScheduled",
-  "address":   "970 Morrison Dr, Charleston, SC 29403",
+  "address":   "100 Main Street, Example City",
   "taxonomies": {
     "artist": [
       { "term_id": 111, "name": "Headliner", "slug": "headliner", "link": "https://..." }
@@ -173,7 +174,12 @@ page — its multi-day expansion is represented in `grouping.by_date`.
 
 Notes:
 
-- `venue` and `organizer` are `null` when no term is attached. The legacy
+- `source` is always an object in v7. Use `source.url` to link back to the
+  original event or listing page, not to buy tickets. `source.name` prefers
+  the organizer, then the venue, then the URL hostname.
+  Both fields are `""` when no public listing URL is known. Existing events
+  are not backfilled automatically. A later upsert can populate the URL.
+- `venue` and `organizer` are `null` when their data is unavailable. The legacy
   HTML templates rendered an empty slot in that case; clients should do
   the same.
 - `ticket.url` is `""` and `ticket.is_affiliate` is `true` when the
@@ -218,7 +224,7 @@ the same `post_id` appears under every spanned date, each with its own
 }
 ```
 
-#### `display` (v2, [#381](https://github.com/Extra-Chill/data-machine-events/issues/381))
+#### `display` (v2)
 
 Each occurrence also carries a server-computed `display` block, produced
 by `DisplayVars::build( $event_data, $display_context )` — the single
@@ -233,7 +239,7 @@ continuation days.
   "formatted_time_display": "7:30 - 10:00 PM",   // ready-to-print, e.g. "Ongoing · ends Mar 22"
   "multi_day_label":        "",                  // "through Mar 22" on a multi-day start day, else ""
   "iso_start_date":         "2026-06-12T20:30:00-04:00", // timezone-aware, for the data-date attribute
-  "venue_name":             "The Royal American", // unicode-decoded, for data-venue
+  "venue_name":             "Example Hall",       // unicode-decoded, for data-venue
   "performer_name":         "Headliner Name",      // unicode-decoded, for data-performer
   "show_performer":         false,
   "show_ticket_link":       true,
@@ -275,12 +281,12 @@ the existing Today recovery control, so clients do not duplicate that copy.
 key surface as of this phase. HTML and data responses for the same
 envelope are stored in separate cache buckets.
 
-As of [#318](https://github.com/Extra-Chill/data-machine-events/issues/318) the cache key also includes the
+The cache key also includes the
 `month` envelope field, so month-grid responses scoped to a specific
 `YYYY-MM` window don't collide with list-mode responses for the same
 archive.
 
-As of [#381](https://github.com/Extra-Chill/data-machine-events/issues/381) the cache key also includes
+The cache key also includes
 `data_schema` (the data-envelope `schema.version`, set only for
 `format=data` requests). Bumping `Calendar::DATA_SCHEMA_VERSION` therefore
 isolates the new envelope shape into fresh cache buckets, so a deploy that

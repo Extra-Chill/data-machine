@@ -75,6 +75,29 @@ final class CalendarOccurrenceContractTest extends TestCase {
 		}
 	}
 
+	public function test_calendar_event_projects_source_without_changing_portable_contract(): void {
+		$calendar = new Calendar();
+		$entry    = $this->seeded_raw_occurrence();
+		$event    = $calendar->serialize_occurrence( $entry )['event'];
+		$this->assertSame(
+			array(
+				'url'  => 'https://example.com/listings/seeded-show',
+				'name' => 'Seeded Productions',
+			),
+			$event['source']
+		);
+		$this->assertArrayNotHasKey( 'source', $calendar->serialize_contract_occurrence( $entry )['event'] );
+
+		$entry['post_id'] = 507002;
+		$this->assertSame(
+			array(
+				'url'  => '',
+				'name' => '',
+			),
+			$calendar->serialize_occurrence( $entry )['event']['source']
+		);
+	}
+
 	/**
 	 * Portable pin checks must reject producer version and hash drift.
 	 */

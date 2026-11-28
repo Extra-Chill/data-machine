@@ -283,6 +283,7 @@ class DiceFm extends EventImportHandler {
 			'artist'           => '',
 			'price'            => $price,
 			'ticketUrl'        => esc_url_raw( $event['url'] ?? '' ),
+			'source_url'       => esc_url_raw( $event['url'] ?? '' ),
 			'description'      => wp_kses_post( $event['description'] ?? '' ),
 			'venueAddress'     => sanitize_text_field( $venue_data['venue_address'] ),
 			'venueCity'        => sanitize_text_field( $venue_data['venue_city'] ),

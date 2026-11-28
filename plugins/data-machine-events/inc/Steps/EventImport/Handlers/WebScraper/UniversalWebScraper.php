@@ -790,6 +790,7 @@ class UniversalWebScraper extends EventImportHandler {
 					'pipeline_id'      => $context->getPipelineId(),
 					'flow_id'          => $context->getFlowId(),
 					'original_title'   => 'HTML Section from ' . wp_parse_url( $current_url, PHP_URL_HOST ),
+					'_engine_data'     => array( 'source_url' => $detail_data['detail_url'] ?? $current_url ),
 					'event_identifier' => $event_section['identifier'],
 					'item_identifier'  => $event_section['identifier'],
 					'import_timestamp' => time(),
