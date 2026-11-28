@@ -76,7 +76,7 @@ class WebScraperStableIdentityTest extends EventUpsertTestCase {
 		$request->set_param( 'month', self::future_year() . '-11' );
 		$calendar = new Calendar();
 		$before   = $calendar->calendar( $request )->get_data();
-		$this->assertSame( 7, $before['schema']['version'] );
+		$this->assertSame( \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION, $before['schema']['version'] );
 		$events = array_column( $before['events'], null, 'id' );
 		$this->assertSame(
 			array(
