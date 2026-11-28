@@ -4,13 +4,15 @@
 namespace DataMachine\Abilities\Email;
 
 use DataMachine\Abilities\AbilityRegistration;
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
 use DataMachine\Core\Email\MailboxTransport;
 
 defined( 'ABSPATH' ) || exit;
 
 final class ForwardEmailAbility {
+
+	use EmailMailboxPermission;
+
 	private const MAX_BYTES = 20971520;
 
 	public function __construct() {
@@ -48,8 +50,8 @@ final class ForwardEmailAbility {
 		} );
 	}
 
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	public function checkPermission( $input = null ): bool {
+		return $this->authorizeMailboxRef( $input, array( 'read', 'send' ), new EmailAuth() );
 	}
 
 	public function execute( array $input ): array|\WP_Error {

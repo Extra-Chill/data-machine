@@ -119,6 +119,7 @@ namespace {
 	$root = dirname( __DIR__ );
 	require_once $root . '/inc/Abilities/Fetch/Traits/HasApplyKeywordSearch.php';
 	require_once $root . '/inc/Abilities/Fetch/Traits/HasApplyKeywordExclusion.php';
+	require_once $root . '/inc/Abilities/Email/EmailMailboxPermission.php';
 	require_once $root . '/inc/Abilities/Fetch/FetchEmailAbility.php';
 	require_once $root . '/inc/Core/Steps/Fetch/Handlers/Email/Email.php';
 

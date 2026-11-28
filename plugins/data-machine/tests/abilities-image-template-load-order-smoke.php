@@ -214,6 +214,7 @@ $assert(
 $reset();
 require_once $plugin_root . '/inc/Abilities/AbilityCategories.php';
 require_once $plugin_root . '/inc/Abilities/AgentAbilities.php';
+require_once $plugin_root . '/inc/Abilities/Email/EmailMailboxPermission.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailAbility.php';
 require_once $plugin_root . '/inc/Abilities/Publish/SendEmailQueuedAbility.php';
 require_once $plugin_root . '/inc/Core/Bootstrap/AbilityServiceProvider.php';
