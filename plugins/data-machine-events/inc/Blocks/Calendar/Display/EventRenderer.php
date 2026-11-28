@@ -222,12 +222,12 @@ class EventRenderer {
 
 		$placeholder_data = array(
 			'id'              => $event_post->ID,
-			'title'           => get_the_title( $event_post ),
+			'title'           => wp_specialchars_decode( get_the_title( $event_post ), ENT_QUOTES ),
 			'permalink'       => get_the_permalink( $event_post ),
 			'event_data'      => $event_data,
 			'display_vars'    => $display_vars,
 			'display_context' => $display_context,
-			'badges_html'     => TaxonomyBadges::render_taxonomy_badges( $event_post->ID ),
+			'badges'          => TaxonomyBadges::get_display_data( $event_post->ID ),
 			'button_classes'  => implode( ' ', apply_filters( 'data_machine_events_more_info_button_classes', array( 'data-machine-more-info-button' ) ) ),
 		);
 

@@ -62,7 +62,7 @@ if ( $is_affiliate_ticket ) {
 
 		<h4 class="data-machine-event-title">
 			<a href="<?php echo esc_url( (string) get_the_permalink() ); ?>">
-				<?php the_title(); ?>
+				<?php echo esc_html( get_the_title() ); ?>
 			</a>
 		</h4>
 

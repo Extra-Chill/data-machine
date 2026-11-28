@@ -1,12 +1,4 @@
 /**
- * Badge rendering treats `badges_html` as authoritative (#3999).
- *
- * `taxonomies` is unfiltered event data and can include taxonomies the
- * server-side badge filter hides (e.g. a lineup). Client cards must not
- * rebuild badges from it whenever the envelope ships `badges_html`.
- */
-
-/**
  * Internal dependencies
  */
 import { renderEventCard } from './event-renderer';
@@ -69,26 +61,44 @@ function event( extra: Partial< CalendarEventItem > ): CalendarEventItem {
 }
 
 describe( 'event card badges', () => {
-	it( 'renders no badges when the server sends empty badges_html', () => {
-		const card = renderEventCard( event( { badges_html: '' } ), occurrence );
-		expect( card.querySelector( '.data-machine-taxonomy-badges' ) ).toBeNull();
+	it( 'renders no badges when the server sends no badge items', () => {
+		const card = renderEventCard(
+			event( { badges: { wrapper_classes: '', items: [] } } ),
+			occurrence
+		);
+		expect(
+			card.querySelector( '.data-machine-taxonomy-badges' )
+		).toBeNull();
 		expect( card.textContent ).not.toContain( 'Headliner' );
 	} );
 
-	it( 'injects server badges instead of rebuilding from taxonomies', () => {
+	it( 'renders filtered classes and labels as data, not markup', () => {
+		const label = '<strong>Charleston</strong>';
 		const card = renderEventCard(
 			event( {
-				badges_html:
-					'<div class="data-machine-taxonomy-badges"><span class="server-badge">Charleston</span></div>',
+				badges: {
+					wrapper_classes: 'themed-wrapper',
+					items: [
+						{
+							classes: 'server-badge',
+							taxonomy: 'venue',
+							term: 'charleston',
+							label,
+							url: '/venue/charleston/',
+						},
+					],
+				},
 			} ),
 			occurrence
 		);
-		expect( card.querySelector( '.server-badge' )?.textContent ).toBe( 'Charleston' );
+		const badge = card.querySelector< HTMLAnchorElement >(
+			'.themed-wrapper .server-badge'
+		);
+		expect( badge?.textContent ).toBe( label );
+		expect( badge?.getAttribute( 'href' ) ).toContain(
+			'/venue/charleston/'
+		);
+		expect( badge?.querySelector( 'strong' ) ).toBeNull();
 		expect( card.textContent ).not.toContain( 'Headliner' );
-	} );
-
-	it( 'falls back to taxonomies only for envelopes without badges_html', () => {
-		const card = renderEventCard( event( {} ), occurrence );
-		expect( card.querySelector( '.data-machine-taxonomy-badges' )?.textContent ).toContain( 'Headliner' );
 	} );
 } );

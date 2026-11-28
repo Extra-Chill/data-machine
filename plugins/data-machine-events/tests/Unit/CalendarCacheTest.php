@@ -36,7 +36,8 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		CalendarCache::get_generation();
 
 		global $wp_rest_server;
-		$this->server = $wp_rest_server = new WP_REST_Server();
+		$wp_rest_server = new WP_REST_Server();
+		$this->server   = $wp_rest_server;
 		do_action( 'rest_api_init' );
 
 		if ( ! post_type_exists( 'data_machine_events' ) ) {
@@ -121,12 +122,12 @@ class CalendarCacheTest extends WP_UnitTestCase {
 			'geo_radius_unit' => 'mi',
 		);
 
-		$other_lat            = $params;
-		$other_lat['geo_lat'] = '33.7765';
+		$other_lat                  = $params;
+		$other_lat['geo_lat']       = '33.7765';
 		$other_radius               = $params;
 		$other_radius['geo_radius'] = 50;
-		$other_time               = $params;
-		$other_time['time_start'] = '20:00:00';
+		$other_time                 = $params;
+		$other_time['time_start']   = '20:00:00';
 
 		$key = CalendarCache::generate_key( $params, 'dates' );
 		$this->assertNotSame( $key, CalendarCache::generate_key( $other_lat, 'dates' ) );
@@ -148,36 +149,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		);
 	}
 
-	/**
-	 * The `format` envelope field MUST be part of the cache key so the
-	 * legacy HTML-string envelope and the phase-1 data-only envelope
-	 * never collide in the same bucket. See refactor #298.
-	 */
-	public function test_full_response_key_includes_format() {
-		$html_envelope = array(
-			'paged'            => 1,
-			'past'             => false,
-			'event_search'     => '',
-			'date_start'       => '',
-			'date_end'         => '',
-			'scope'            => '',
-			'tax_filter'       => array(),
-			'archive_taxonomy' => '',
-			'archive_term_id'  => 0,
-			'geo_lat'          => '',
-			'geo_lng'          => '',
-			'geo_radius'       => 25,
-			'geo_radius_unit'  => 'mi',
-			'format'           => '',
-		);
-
-		$data_envelope           = $html_envelope;
-		$data_envelope['format'] = 'data';
-
-		$this->assertNotEquals(
-			CalendarCache::generate_full_response_key( $html_envelope ),
-			CalendarCache::generate_full_response_key( $data_envelope ),
-			'format=data MUST produce a distinct cache key from the legacy HTML envelope'
+	public function test_full_response_key_includes_schema_version() {
+		$this->assertNotSame(
+			CalendarCache::generate_full_response_key( array( 'data_schema_version' => 6 ) ),
+			CalendarCache::generate_full_response_key( array( 'data_schema_version' => \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION ) )
 		);
 	}
 
@@ -190,33 +165,31 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	 */
 	public function test_past_request_served_from_cache_without_rerunning_query() {
 		$envelope = array(
-			'paged'            => 1,
-			'past'             => true,
-			'event_search'     => '',
-			'date_start'       => '',
-			'date_end'         => '',
-			'scope'            => '',
-			'tax_filter'       => array(),
-			'archive_taxonomy' => '',
-			'archive_term_id'  => 0,
-			'geo_lat'          => '',
-			'geo_lng'          => '',
-			'geo_radius'       => 25,
-			'geo_radius_unit'  => 'mi',
+			'paged'               => 1,
+			'past'                => true,
+			'event_search'        => '',
+			'date_start'          => '',
+			'date_end'            => '',
+			'scope'               => '',
+			'tax_filter'          => array(),
+			'archive_taxonomy'    => '',
+			'archive_term_id'     => 0,
+			'geo_lat'             => '',
+			'geo_lng'             => '',
+			'geo_radius'          => 25,
+			'geo_radius_unit'     => 'mi',
+			'data_schema_version' => \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION,
 		);
 
 		$sentinel = array(
 			'success'    => true,
-			'html'       => '<!-- SENTINEL CACHE HIT past=1 -->',
 			'pagination' => array(
-				'html'         => '<!-- SENTINEL pagination -->',
 				'current_page' => 1,
-				'max_pages'    => 1,
-				'total_events' => 999999,
+				'total_pages'  => 1,
+				'total_items'  => 999999,
 			),
-			'counter'    => '<!-- SENTINEL counter -->',
+			'counter'    => array( 'total_count' => 999999 ),
 			'navigation' => array(
-				'html'         => '<!-- SENTINEL navigation -->',
 				'past_count'   => 999999,
 				'future_count' => 0,
 				'show_past'    => true,
@@ -239,13 +212,13 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		$data = $response->get_data();
 
 		$this->assertEquals(
-			$sentinel['html'],
-			$data['html'],
+			$sentinel['counter'],
+			$data['counter'],
 			'past=1 cache hit MUST return the cached body, not a freshly computed one'
 		);
 		$this->assertEquals(
-			$sentinel['pagination']['total_events'],
-			$data['pagination']['total_events'],
+			$sentinel['pagination']['total_items'],
+			$data['pagination']['total_items'],
 			'past=1 cache hit MUST return the cached pagination, not a freshly computed one'
 		);
 		$this->assertEquals(
@@ -320,7 +293,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 		$this->assertNotSame( $generation, CalendarCache::get_generation() );
 		$this->assertNotNull( EventDatesTable::get( $post_id ) );
-		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array(
+			'scope'  => 'upcoming',
+			'fields' => 'ids',
+		) );
 		$this->assertContains( $post_id, $direct['posts'] );
 		wp_set_current_user( 0 );
 
@@ -332,8 +308,8 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 		$before_unfiltered = $this->server->dispatch( $unfiltered )->get_data();
 		$before_searched   = $this->server->dispatch( $searched )->get_data();
-		$this->assertStringContainsString( 'Flow Tribe', $before_unfiltered['html'] );
-		$this->assertStringContainsString( 'Flow Tribe', $before_searched['html'] );
+		$this->assertContains( $post_id, array_column( $before_unfiltered['events'], 'id' ) );
+		$this->assertContains( $post_id, array_column( $before_searched['events'], 'id' ) );
 
 		$ttl = CalendarCache::ttl_for_envelope( array( 'past' => false ) );
 		$this->assertLessThanOrEqual( 61, $ttl );
@@ -341,10 +317,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 		$after_unfiltered = $this->server->dispatch( $unfiltered )->get_data();
 		$after_searched   = $this->server->dispatch( $searched )->get_data();
-		$this->assertStringNotContainsString( 'Flow Tribe', $after_unfiltered['html'] );
-		$this->assertStringNotContainsString( 'Flow Tribe', $after_searched['html'] );
-		$this->assertSame( 0, $after_unfiltered['pagination']['total_events'] );
-		$this->assertSame( 0, $after_searched['pagination']['total_events'] );
+		$this->assertNotContains( $post_id, array_column( $after_unfiltered['events'], 'id' ) );
+		$this->assertNotContains( $post_id, array_column( $after_searched['events'], 'id' ) );
+		$this->assertSame( 0, $after_unfiltered['pagination']['total_items'] );
+		$this->assertSame( 0, $after_searched['pagination']['total_items'] );
 	}
 
 	/**
@@ -353,33 +329,31 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	 */
 	public function test_admin_user_bypasses_cache() {
 		$envelope = array(
-			'paged'            => 1,
-			'past'             => true,
-			'event_search'     => '',
-			'date_start'       => '',
-			'date_end'         => '',
-			'scope'            => '',
-			'tax_filter'       => array(),
-			'archive_taxonomy' => '',
-			'archive_term_id'  => 0,
-			'geo_lat'          => '',
-			'geo_lng'          => '',
-			'geo_radius'       => 25,
-			'geo_radius_unit'  => 'mi',
+			'paged'               => 1,
+			'past'                => true,
+			'event_search'        => '',
+			'date_start'          => '',
+			'date_end'            => '',
+			'scope'               => '',
+			'tax_filter'          => array(),
+			'archive_taxonomy'    => '',
+			'archive_term_id'     => 0,
+			'geo_lat'             => '',
+			'geo_lng'             => '',
+			'geo_radius'          => 25,
+			'geo_radius_unit'     => 'mi',
+			'data_schema_version' => \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION,
 		);
 
 		$sentinel = array(
 			'success'    => true,
-			'html'       => '<!-- SENTINEL admin should bypass -->',
 			'pagination' => array(
-				'html'         => '',
 				'current_page' => 1,
-				'max_pages'    => 1,
-				'total_events' => 999999,
+				'total_pages'  => 1,
+				'total_items'  => 999999,
 			),
-			'counter'    => '',
+			'counter'    => array( 'total_count' => 999999 ),
 			'navigation' => array(
-				'html'         => '',
 				'past_count'   => 999999,
 				'future_count' => 0,
 				'show_past'    => true,
@@ -402,8 +376,8 @@ class CalendarCacheTest extends WP_UnitTestCase {
 
 		// Admin should see freshly computed data, not the sentinel.
 		$this->assertNotEquals(
-			$sentinel['html'],
-			$data['html'],
+			$sentinel['counter'],
+			$data['counter'],
 			'admin users with manage_options MUST bypass the cache'
 		);
 
@@ -588,14 +562,14 @@ class CalendarCacheTest extends WP_UnitTestCase {
 		$snapshots      = array();
 		$external_cache = wp_using_ext_object_cache();
 		wp_using_ext_object_cache( false );
-		$cache_key      = $this->prime_invalidation_sentinel();
-		$cache_observer = static function () use ( $cache_key, &$invalidations ): void {
+		$cache_key       = $this->prime_invalidation_sentinel();
+		$cache_observer  = static function () use ( $cache_key, &$invalidations ): void {
 			if ( false === CalendarCache::get( $cache_key ) ) {
 				++$invalidations;
 				CalendarCache::set( $cache_key, 'primed', MINUTE_IN_SECONDS );
 			}
 		};
-		$nested_removal = static function ( $object_id, $tt_ids, $taxonomy ) use ( $post_id, $first, &$nested ): void {
+		$nested_removal  = static function ( $object_id, $tt_ids, $taxonomy ) use ( $post_id, $first, &$nested ): void {
 			if ( ! $nested && $post_id === (int) $object_id && 'venue' === $taxonomy ) {
 				$nested = true;
 				wp_remove_object_terms( $post_id, array( $first['term_id'] ), 'venue' );
@@ -738,10 +712,10 @@ class CalendarCacheTest extends WP_UnitTestCase {
 	}
 
 	public function test_scope_tokens_isolate_boundary_cache_keys_without_leaking_contents() {
-		$first_token = 'signed.private.boundary.scope.a';
+		$first_token  = 'signed.private.boundary.scope.a';
 		$second_token = 'signed.private.boundary.scope.b';
-		$first_key = CalendarCache::generate_key( array( 'scope_token' => $first_token ), 'dates' );
-		$second_key = CalendarCache::generate_key( array( 'scope_token' => $second_token ), 'dates' );
+		$first_key    = CalendarCache::generate_key( array( 'scope_token' => $first_token ), 'dates' );
+		$second_key   = CalendarCache::generate_key( array( 'scope_token' => $second_token ), 'dates' );
 
 		$this->assertNotSame( $first_key, $second_key );
 		$this->assertNotSame( CalendarCache::generate_key( array(), 'dates' ), $first_key );

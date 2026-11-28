@@ -10,35 +10,37 @@ import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
-import type { CarouselObserverEntry } from '../types';
-
-const observers = new Map< HTMLElement, CarouselObserverEntry[] >();
+const observers = new WeakMap< HTMLElement, Map< HTMLElement, () => void > >();
 const MAX_VISIBLE_DOTS = 12;
 const DESKTOP_MAX_VISIBLE_DOTS = 36;
 const DOT_WIDTH = 7;
 const DOT_GAP = 8;
 
-export function initCarousel( calendar: HTMLElement ): void {
-	const groups = calendar.querySelectorAll< HTMLElement >(
+export function initCarousel(
+	calendar: HTMLElement,
+	groups: Iterable< HTMLElement > = calendar.querySelectorAll< HTMLElement >(
 		'.data-machine-date-group'
-	);
-
-	groups.forEach( function ( group ) {
+	)
+): void {
+	const entries =
+		observers.get( calendar ) || new Map< HTMLElement, () => void >();
+	observers.set( calendar, entries );
+	Array.from( groups ).forEach( function ( group ) {
+		entries.get( group )?.();
+		entries.delete( group );
 		const wrapper = group.querySelector< HTMLElement >(
 			'.data-machine-events-wrapper'
 		);
-		if ( ! wrapper ) {
+		if ( ! wrapper || wrapper.dataset.deferred === 'true' ) {
 			return;
 		}
-
-		const eventCount = parseInt( group.dataset.eventCount || '0', 10 ) || 0;
-		if ( eventCount <= 1 ) {
-			return;
-		}
-
 		const events = wrapper.querySelectorAll< HTMLElement >(
 			'.data-machine-event-item'
 		);
+		const eventCount = events.length;
+		if ( eventCount <= 1 ) {
+			return;
+		}
 
 		let indicators: HTMLElement | null = null;
 		let chevronLeft: HTMLButtonElement | null = null;
@@ -285,7 +287,7 @@ export function initCarousel( calendar: HTMLElement ): void {
 				indicators.className = 'data-machine-carousel-indicators';
 				group.appendChild( indicators );
 			}
-			indicators.innerHTML = '';
+			indicators.replaceChildren();
 
 			const isMobileScreen =
 				window.matchMedia( '(max-width: 768px)' ).matches;
@@ -351,44 +353,31 @@ export function initCarousel( calendar: HTMLElement ): void {
 			updateIndicators();
 		};
 
-		requestAnimationFrame( setupIndicators );
-
+		let frame = requestAnimationFrame( setupIndicators );
+		let observer: ResizeObserver | undefined;
 		if ( typeof ResizeObserver !== 'undefined' ) {
-			const observer = new ResizeObserver( function () {
-				requestAnimationFrame( setupIndicators );
+			observer = new ResizeObserver( function () {
+				cancelAnimationFrame( frame );
+				frame = requestAnimationFrame( setupIndicators );
 			} );
 			observer.observe( wrapper );
-			if ( events[ 0 ] ) {
-				observer.observe( events[ 0 ] );
-			}
-
-			const existing = observers.get( calendar ) || [];
-			existing.push( { observer, wrapper, events } );
-			observers.set( calendar, existing );
+			observer.observe( events[ 0 ] );
 		}
+		entries.set( group, () => {
+			cancelAnimationFrame( frame );
+			observer?.disconnect();
+			stopHold();
+			if ( scrollHandler ) {
+				wrapper.removeEventListener( 'scroll', scrollHandler );
+			}
+			indicators?.remove();
+			chevronLeft?.remove();
+			chevronRight?.remove();
+		} );
 	} );
 }
 
 export function destroyCarousel( calendar: HTMLElement ): void {
-	const entries = observers.get( calendar );
-	if ( entries ) {
-		entries.forEach( function ( { observer, wrapper, events } ) {
-			observer.unobserve( wrapper );
-			if ( events && events[ 0 ] ) {
-				observer.unobserve( events[ 0 ] );
-			}
-			observer.disconnect();
-		} );
-		observers.delete( calendar );
-	}
-
-	const indicatorEls = calendar.querySelectorAll(
-		'.data-machine-carousel-indicators'
-	);
-	const chevronEls = calendar.querySelectorAll(
-		'.data-machine-carousel-chevron'
-	);
-
-	indicatorEls.forEach( ( el ) => el.remove() );
-	chevronEls.forEach( ( el ) => el.remove() );
+	observers.get( calendar )?.forEach( ( cleanup ) => cleanup() );
+	observers.delete( calendar );
 }

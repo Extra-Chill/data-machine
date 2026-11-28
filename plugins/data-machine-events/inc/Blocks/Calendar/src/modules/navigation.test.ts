@@ -1,7 +1,7 @@
 /**
  * Internal dependencies
  */
-import { initNavigation } from './navigation';
+import { initNavigation, syncTodayRecovery } from './navigation';
 
 describe( 'calendar empty-state recovery', () => {
 	beforeEach( () => {
@@ -71,9 +71,7 @@ describe( 'calendar empty-state recovery', () => {
 			<div class="data-machine-events-no-events">
 				<button type="button" class="data-machine-events-no-events-today-link">Show events from Today</button>
 			</div>`;
-		calendar.dispatchEvent(
-			new CustomEvent( 'data-machine-calendar-content-updated' )
-		);
+		syncTodayRecovery( calendar );
 		calendar
 			.querySelector< HTMLButtonElement >(
 				'.data-machine-events-no-events-today-link'

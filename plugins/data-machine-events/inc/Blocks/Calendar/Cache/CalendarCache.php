@@ -160,17 +160,7 @@ class CalendarCache {
 			'cutoff_hour'      => \DataMachineEvents\Blocks\Calendar\Grouping\LateNightCutoff::cutoff_hour(),
 			// Same-night classification cutoff (#833) shapes rendered output.
 			'next_day_cutoff'  => \DataMachineEvents\Admin\Settings_Page::get_next_day_cutoff(),
-			// Phase 1 of refactor #298: HTML and data-only responses
-			// have different shapes and MUST live in separate cache
-			// buckets — otherwise the first response shape served
-			// for a given envelope sticks for the cache TTL.
-			'format'           => (string) ( $envelope['format'] ?? '' ),
-			// #381: data-envelope schema version. Folding it into the key
-			// means a deploy that changes the envelope SHAPE never serves a
-			// stale older-shape response to the newer client for the cache
-			// TTL window. Only set for the data format (see Calendar
-			// controller); empty for HTML responses, which keeps their
-			// existing buckets unchanged.
+			// Isolate full responses across schema changes.
 			'data_schema'      => (int) ( $envelope['data_schema_version'] ?? 0 ),
 			// #318: month-grid mode scopes events to a specific YYYY-MM
 			// window (regardless of past/upcoming). Fold the month into

@@ -7,17 +7,17 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
 - **Base URL**: `/wp-json/datamachine/v1/`
 - **Route registration**: `inc/Api/Routes.php` maps resources to `Calendar`, `Filters`, `Venues`, and `Geocoding` controllers.
 - **Controller responsibilities**:
-  - `Calendar` handles event queries, HTML fragment rendering, pagination, and counter updates used by the Calendar block and JS modules.
+  - `Calendar` handles event queries and returns data for pagination, counters, navigation, and event rendering used by the Calendar block and JS modules.
   - `Filters` builds taxonomy hierarchies, counts, and dependency hints for the filter modal.
   - `Venues` surfaces venue metadata (and duplicate checks) to admin flows.
   - `Geocoding` proxies OpenStreetMap Nominatim lookups for venue creation.
 - **Security & sanitization**: Every route sanitizes inputs using `sanitize_text_field`, `absint`, `sanitize_key`, or custom callbacks, enforces capability checks where required, and returns standardized JSON responses.
-- **Progressive enhancement**: Calendar block falls back to server-rendered templates; REST responses simply replace fragments when JavaScript is active.
+- **Progressive enhancement**: Calendar block falls back to server-rendered templates; the frontend renders subsequent updates from REST data.
 
 ## Endpoints
 
 ### GET `/wp-json/datamachine/v1/events/calendar`
-- **Purpose**: Supplies calendar HTML fragments (`html`, `pagination`, `navigation`, `counter`) for the Calendar block while keeping server-side pagination/accounting.
+- **Purpose**: Supplies [structured calendar data](calendar-data-schema.md), including events, grouping, pagination, navigation, and counters.
 - **Controller**: `Calendar::calendar()`.
 - **Arguments**:
   - `event_search` (string): Free text search.
@@ -27,7 +27,7 @@ Data Machine Events exposes a focused REST surface under the `datamachine/v1` na
   - `archive_term_id` (int): Term ID for archive context.
   - `paged` (int): Page number.
   - `past` (string): Past-event toggle.
-- **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates via the `datamachine_event_dates` table, taxonomies), caches taxonomy counts via helper classes, and returns success + fragments for frontend replacement.
+- **Behavior**: Sanitizes every argument, builds SQL-based WP_Query filters (dates via the `datamachine_event_dates` table, taxonomies), caches taxonomy counts via helper classes, and returns data for client-side rendering.
 
 ### GET `/wp-json/datamachine/v1/events/filters`
 - **Purpose**: Provides taxonomy term data (counts, parents, dependencies) for the Calendar filter modal.

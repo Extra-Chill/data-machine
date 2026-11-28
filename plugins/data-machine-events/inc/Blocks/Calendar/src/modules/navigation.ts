@@ -83,36 +83,42 @@ export function initNavigation(
 		}
 
 		event.preventDefault();
-		const params = new URLSearchParams( window.location.search );
-		STRIP_ON_PAST_TOGGLE.forEach( ( key ) => params.delete( key ) );
-
-		if ( pastBtn ) {
-			params.set( 'past', '1' );
-		} else {
-			params.delete( 'past' );
-		}
-
-		onNavigate( params, pastBtn ? 'past' : 'upcoming' );
+		onNavigate(
+			buildPastToggleParams(
+				new URLSearchParams( window.location.search ),
+				Boolean( pastBtn )
+			),
+			pastBtn ? 'past' : 'upcoming'
+		);
 	} );
 
-	const syncRecoveryAction = (): void => {
-		const recoveryButton = calendar.querySelector< HTMLButtonElement >(
-			'.data-machine-events-no-events-today-link'
-		);
-		if ( recoveryButton ) {
-			recoveryButton.hidden = ! hasTodayRecoveryState( calendar );
-		}
-	};
+	syncTodayRecovery( calendar );
+}
 
-	syncRecoveryAction();
-	calendar.addEventListener(
-		'data-machine-calendar-content-updated',
-		syncRecoveryAction
+export function buildPastToggleParams(
+	source: URLSearchParams,
+	past: boolean
+): URLSearchParams {
+	const params = new URLSearchParams( source );
+	STRIP_ON_PAST_TOGGLE.forEach( ( key ) => params.delete( key ) );
+	if ( past ) {
+		params.set( 'past', '1' );
+	} else {
+		params.delete( 'past' );
+	}
+	return params;
+}
+
+export function syncTodayRecovery(
+	calendar: HTMLElement,
+	params = new URLSearchParams( window.location.search )
+): void {
+	const button = calendar.querySelector< HTMLButtonElement >(
+		'.data-machine-events-no-events-today-link'
 	);
-	calendar.addEventListener(
-		'data-machine-month-grid-updated',
-		syncRecoveryAction
-	);
+	if ( button ) {
+		button.hidden = ! hasTodayRecoveryState( calendar, params );
+	}
 }
 
 function buildTodayRecoveryParams( calendar: HTMLElement ): URLSearchParams {
@@ -131,8 +137,10 @@ function buildTodayRecoveryParams( calendar: HTMLElement ): URLSearchParams {
 	return params;
 }
 
-function hasTodayRecoveryState( calendar: HTMLElement ): boolean {
-	const params = new URLSearchParams( window.location.search );
+function hasTodayRecoveryState(
+	calendar: HTMLElement,
+	params: URLSearchParams
+): boolean {
 	if (
 		[ 'date_start', 'date_end', 'past', 'paged' ].some( ( key ) =>
 			params.has( key )

@@ -2,9 +2,7 @@
  * Data Machine Events Calendar Frontend
  *
  * Module orchestration for calendar blocks. Supports two modes:
- * - Page navigation (default): filter/pagination changes trigger full reload
- * - Geo sync (automatic): when an events-map block is present on the page,
- *   the calendar listens for map bounds changes and re-fetches via REST API
+ * Hydrates the initial PHP render and updates the calendar from REST data.
  */
 
 /**
@@ -39,6 +37,10 @@ import {
 } from './modules/month-grid-nav';
 import { initLoadMore, destroyLoadMore } from './modules/load-more';
 import { initScopePresets } from './modules/scope-presets';
+import {
+	buildCalendarRequest,
+	fetchCalendarEvents,
+} from './modules/api-client';
 
 import type { FlatpickrInstance } from './types';
 
@@ -141,12 +143,8 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 			handleFilterChange( calendar );
 		},
 		function ( params: URLSearchParams ) {
-			if ( isMonthGridMode( calendar ) ) {
-				applyFilterParams( calendar, params );
-			}
-			if ( ! handleMonthGridChange( calendar, params ) ) {
-				navigateToUrl( params );
-			}
+			applyFilterParams( calendar, params );
+			updateCalendar( calendar, params );
 		}
 	);
 
@@ -176,7 +174,12 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 				}
 			}
 
-			navigateToUrl( params );
+			if ( isMonthGridMode( calendar ) ) {
+				navigateToUrl( params );
+			} else {
+				applyFilterParams( calendar, params );
+				updateCalendar( calendar, params );
+			}
 		}
 	);
 
@@ -238,66 +241,6 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 	}
 
 	filterState.updateFilterCountBadge();
-
-	// Single owner for dynamic-module lifecycle when `.data-machine-events-content`
-	// is replaced. Fired by api-client.fetchCalendarEvents after every innerHTML
-	// swap (geo-sync re-fetch, pagination, scope switching, etc.). Modules that
-	// touch the content region must NOT drive their own destroy/init cycle —
-	// they register here, and only here. This is the architectural fix for the
-	// race where geo-sync forgot to re-init day-loader after a content swap,
-	// leaving deferred date shells permanently un-hydrated on location archives.
-	calendar.addEventListener(
-		'data-machine-calendar-content-updated',
-		function () {
-			destroyLazyRender( calendar );
-			destroyDayLoader( calendar );
-			destroyCarousel( calendar );
-			initLazyRender( calendar );
-			initDayLoader( calendar );
-			if ( ! gridMode && ! syncSingleDayListLayout( calendar ) ) {
-				initCarousel( calendar );
-			}
-
-			// Re-hydrate Load More after a content swap (issue #314).
-			// Every dynamic re-fetch path (geo-sync, scope tabs,
-			// filters) re-renders the server's `paginate_links()`
-			// nav into the DOM as the no-JS fallback. Without this,
-			// that fresh `.data-machine-events-pagination` nav stays
-			// numbered — the initial-mount `initLoadMore` already ran
-			// and its WeakMap guard makes a bare re-init a no-op,
-			// leaving a Load More button stranded ABOVE the
-			// re-injected numbered pagination on archive pages. Tear
-			// down the stale binding and re-hydrate so the freshly
-			// swapped nav becomes a Load More button again. Grid mode
-			// has no pagination nav, so this is a no-op there.
-			//
-			// CRITICAL (#158): only re-hydrate when a fresh NUMBERED
-			// `.data-machine-events-pagination` nav is actually
-			// present. The Load More APPEND path (load-more.ts) fires
-			// this same `content-updated` event to re-init the sibling
-			// modules above on the newly-appended date groups — but it
-			// does NOT re-inject a numbered nav (it appended in place;
-			// the working `.data-machine-events-load-more-nav` button
-			// is already bound). Unconditionally running
-			// destroyLoadMore + initLoadMore there tore the listener
-			// off the live button, and initLoadMore then early-returned
-			// because there is no `.data-machine-events-pagination` to
-			// hydrate — leaving a DEAD button that froze the calendar
-			// at the first appended page boundary (reported as "stuck
-			// at June 9"). Gate the re-hydrate on the numbered nav so
-			// the append path leaves its own working button untouched
-			// while full content swaps still re-hydrate as before.
-			if ( ! gridMode ) {
-				const hasNumberedNav = calendar.querySelector(
-					'.data-machine-events-pagination'
-				);
-				if ( hasNumberedNav ) {
-					destroyLoadMore( calendar );
-					initLoadMore( calendar );
-				}
-			}
-		}
-	);
 }
 
 function applyFilterParams(
@@ -342,26 +285,62 @@ function initSearchInput( calendar: HTMLElement ): void {
 }
 
 /**
- * Handle filter changes by building params and navigating.
- *
- * In list mode (default) a full page reload picks up the new filter
- * set server-side. In grid mode (#318) the month-grid controller
- * re-fetches the data envelope and swaps the grid in place so the
- * visible month doesn't reset.
+ * Fetch results for the current controls without leaving the calendar page.
  * @param calendar
  */
 function handleFilterChange( calendar: HTMLElement ): void {
 	const filterState = getFilterState( calendar );
 	const datePicker: FlatpickrInstance | null = getDatePicker( calendar );
 	const params = filterState.buildParams( datePicker );
+	if ( ! isMonthGridMode( calendar ) ) {
+		const current = new URLSearchParams( window.location.search );
+		const tier = current.get( 'venue_tier' );
+		if ( tier ) {
+			params.set( 'venue_tier', tier );
+		}
+		if ( ! params.has( 'date_start' ) && current.get( 'past' ) === '1' ) {
+			params.set( 'past', '1' );
+		}
+		if (
+			calendar.querySelector(
+				'.data-machine-events-scope-chip-active[data-scope=""]'
+			)
+		) {
+			params.set( 'scope', 'current' );
+		}
+	}
 
 	filterState.saveToStorage( params );
 
+	updateCalendar( calendar, params );
+}
+
+function updateCalendar(
+	calendar: HTMLElement,
+	params: URLSearchParams,
+	pushHistory = true
+): void {
 	if ( handleMonthGridChange( calendar, params ) ) {
 		return;
 	}
-
-	navigateToUrl( params );
+	const state = getFilterState( calendar );
+	const request = buildCalendarRequest( {
+		source: params,
+		archiveContext: state.getArchiveContext(),
+	} );
+	// Keep the page URL as the source for pagination, recovery, and map sync.
+	if (
+		pushHistory &&
+		new URLSearchParams( window.location.search ).toString() !==
+			params.toString()
+	) {
+		state.updateUrl( params );
+	}
+	void fetchCalendarEvents( calendar, request ).then( ( data ) => {
+		if ( data ) {
+			state.updateFilterCountBadge();
+		}
+	} );
 }
 
 function handleMonthGridChange(
@@ -416,6 +395,21 @@ function resolveMapSyncId( calendar: HTMLElement ): string {
 
 	return maps[ 0 ].dataset.syncId || maps[ 0 ].id || '';
 }
+
+window.addEventListener( 'popstate', function () {
+	const params = new URLSearchParams( window.location.search );
+	document
+		.querySelectorAll< HTMLElement >( '.data-machine-events-calendar' )
+		.forEach( ( calendar ) => {
+			if (
+				calendarInstances.has( calendar ) &&
+				! isMonthGridMode( calendar )
+			) {
+				applyFilterParams( calendar, params );
+				updateCalendar( calendar, params, false );
+			}
+		} );
+} );
 
 window.addEventListener( 'beforeunload', function () {
 	document

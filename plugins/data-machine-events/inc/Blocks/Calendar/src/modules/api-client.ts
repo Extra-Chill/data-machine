@@ -8,13 +8,15 @@
 import type {
 	ArchiveContext,
 	CalendarRequest,
-	CalendarResponse,
+	CalendarDataResponse,
 	DateContext,
 	FilterResponse,
 	FilterRequestContext,
 	GeoContext,
 	TaxFilters,
 } from '../types';
+
+import { renderCalendarResponse } from './calendar-response-renderer';
 
 /* ------------------------------------------------------------------ */
 /*  Calendar REST request builder — single source of truth             */
@@ -45,6 +47,7 @@ const CALENDAR_PASSTHROUGH_KEYS: ( keyof CalendarRequest )[] = [
 	// root's `data-scope-token` attribute (a server-embedded calendar has
 	// no `?scope_token=` in the URL on first paint).
 	'scope_token',
+	'venue_tier',
 ];
 
 /**
@@ -142,6 +145,8 @@ export function buildCalendarRequest(
 	return params;
 }
 
+const latestRequests = new WeakMap< HTMLElement, symbol >();
+
 export async function fetchCalendarEvents(
 	calendar: HTMLElement,
 	params: URLSearchParams,
@@ -150,106 +155,82 @@ export async function fetchCalendarEvents(
 		signal?: AbortSignal;
 		shouldApply?: () => boolean;
 	} = {}
-): Promise< CalendarResponse > {
-	const content = calendar.querySelector< HTMLElement >(
-		'.data-machine-events-content'
-	);
-
+): Promise< CalendarDataResponse | null > {
+	const content = calendar.querySelector( '.data-machine-events-content' );
 	if ( ! content ) {
-		return {
-			success: false,
-			html: '',
-			pagination: null,
-			counter: null,
-			navigation: null,
-		};
+		return null;
 	}
-
+	const request = Symbol();
+	latestRequests.set( calendar, request );
+	const isLatest = () => latestRequests.get( calendar ) === request;
+	const shouldApply = () =>
+		isLatest() &&
+		! options.signal?.aborted &&
+		options.shouldApply?.() !== false;
 	content.classList.add( 'loading' );
-
 	if ( archiveContext.taxonomy && archiveContext.term_id ) {
 		params.set( 'archive_taxonomy', archiveContext.taxonomy );
 		params.set( 'archive_term_id', String( archiveContext.term_id ) );
 	}
-
+	if ( ! params.has( 'scope' ) && calendar.dataset.scope ) {
+		params.set( 'scope', calendar.dataset.scope );
+	}
+	const scopeToken = calendar.dataset.scopeToken;
+	if ( scopeToken ) {
+		params.set( 'scope_token', scopeToken );
+	}
 	try {
-		const apiUrl = `/wp-json/datamachine/v1/events/calendar?${ params.toString() }`;
-
-		const response = await fetch( apiUrl, {
-			method: 'GET',
-			signal: options.signal,
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'application/json',
-				// Identifies this as an XHR/fetch call so the
-				// server-side BrowserNavigationGuard lets the JSON
-				// response through. Direct browser navigations
-				// (address bar, middle-click on a stale anchor) do
-				// not send this header and get redirected to the
-				// canonical archive URL or a 404 — never raw JSON.
-				// See Extra-Chill/data-machine-events#297.
-				'X-Requested-With': 'XMLHttpRequest',
-			},
-		} );
-
-		if ( ! response.ok ) {
-			throw new Error( 'Network response was not ok' );
+		const data = await requestCalendarData( params, options.signal );
+		if ( ! shouldApply() ) {
+			return null;
 		}
-
-		const data: CalendarResponse = await response.json();
-		if ( options.signal?.aborted || options.shouldApply?.() === false ) {
-			return data;
-		}
-
-		if ( data.success ) {
-			content.innerHTML = data.html;
-			updatePagination( calendar, data.pagination );
-			updateCounter( calendar, content, data.counter );
-			updateNavigation( calendar, content, data.navigation );
-
-			// Notify lifecycle owners (frontend.ts) that the content region was
-			// replaced, so they can re-init dynamic modules (lazy-render,
-			// day-loader, carousel) on the new DOM. This is the single point
-			// of truth for content-swap notifications — every module that
-			// touches `.data-machine-events-content` should rely on this event,
-			// not drive its own destroy/init cycle.
-			calendar.dispatchEvent(
-				new CustomEvent( 'data-machine-calendar-content-updated', {
-					bubbles: false,
-				} )
-			);
-		}
-
+		renderCalendarResponse( calendar, data, params );
 		return data;
 	} catch ( error ) {
-		if (
-			options.signal?.aborted ||
-			options.shouldApply?.() === false ||
-			( error as Error ).name === 'AbortError'
-		) {
-			return {
-				success: false,
-				html: '',
-				pagination: null,
-				counter: null,
-				navigation: null,
-			};
+		if ( shouldApply() && ( error as Error ).name !== 'AbortError' ) {
+			window.console.error( 'Error fetching calendar events:', error );
+			const message = document.createElement( 'p' );
+			message.className = 'data-machine-events-error';
+			message.setAttribute( 'role', 'alert' );
+			message.textContent = 'Error loading events. Please try again.';
+			content.querySelector( '.data-machine-events-error' )?.remove();
+			content.prepend( message );
 		}
-		window.console.error( 'Error fetching filtered events:', error );
-		content.innerHTML =
-			'<div class="data-machine-events-error"><p>Error loading events. Please try again.</p></div>';
-		return {
-			success: false,
-			html: '',
-			pagination: null,
-			counter: null,
-			navigation: null,
-		};
+		return null;
 	} finally {
-		if ( options.shouldApply?.() !== false ) {
+		if ( isLatest() ) {
+			latestRequests.delete( calendar );
 			content.classList.remove( 'loading' );
 		}
 	}
+}
+
+export async function requestCalendarData(
+	params: URLSearchParams,
+	signal?: AbortSignal
+): Promise< CalendarDataResponse > {
+	const response = await fetch(
+		`/wp-json/datamachine/v1/events/calendar?${ params.toString() }`,
+		{
+			signal,
+			headers: {
+				Accept: 'application/json',
+				'X-Requested-With': 'XMLHttpRequest',
+			},
+		}
+	);
+	if ( ! response.ok ) {
+		throw new Error( `HTTP ${ response.status }` );
+	}
+	const data: CalendarDataResponse = await response.json();
+	if (
+		! data?.success ||
+		! Array.isArray( data.events ) ||
+		! data.grouping
+	) {
+		throw new Error( 'Invalid calendar data response' );
+	}
+	return data;
 }
 
 /**
@@ -336,77 +317,4 @@ export async function fetchFilters(
 	}
 
 	return response.json();
-}
-
-/* ------------------------------------------------------------------ */
-/*  DOM update helpers                                                 */
-/* ------------------------------------------------------------------ */
-
-function updatePagination(
-	calendar: HTMLElement,
-	pagination: { html: string } | null
-): void {
-	// A prior Load More hydration (issue #314) may have replaced the
-	// numbered `.data-machine-events-pagination` nav with a
-	// `.data-machine-events-load-more-nav`. Remove that stale button
-	// so the fresh server-rendered pagination nav can be re-injected
-	// and then re-hydrated by `initLoadMore` on the content-updated
-	// event. Without this, the selector below misses the converted
-	// nav and we leak a duplicate, producing a Load More button
-	// stacked above numbered pagination on archive re-fetches.
-	const loadMoreNav = calendar.querySelector(
-		'.data-machine-events-load-more-nav'
-	);
-	if ( loadMoreNav ) {
-		loadMoreNav.remove();
-	}
-
-	const paginationContainer = calendar.querySelector(
-		'.data-machine-events-pagination'
-	);
-
-	if ( pagination?.html ) {
-		if ( paginationContainer ) {
-			paginationContainer.outerHTML = pagination.html;
-		} else {
-			const content = calendar.querySelector(
-				'.data-machine-events-content'
-			);
-			content?.insertAdjacentHTML( 'afterend', pagination.html );
-		}
-	} else if ( paginationContainer ) {
-		paginationContainer.remove();
-	}
-}
-
-function updateCounter(
-	calendar: HTMLElement,
-	content: HTMLElement,
-	counter: string | null
-): void {
-	const counterContainer = calendar.querySelector(
-		'.data-machine-events-results-counter'
-	);
-
-	if ( counterContainer && counter ) {
-		counterContainer.outerHTML = counter;
-	} else if ( ! counterContainer && counter ) {
-		content.insertAdjacentHTML( 'afterend', counter );
-	}
-}
-
-function updateNavigation(
-	calendar: HTMLElement,
-	content: HTMLElement,
-	navigation: { html: string } | null
-): void {
-	const navigationContainer = calendar.querySelector(
-		'.data-machine-events-past-navigation'
-	);
-
-	if ( navigationContainer && navigation?.html ) {
-		navigationContainer.outerHTML = navigation.html;
-	} else if ( ! navigationContainer && navigation?.html ) {
-		calendar.insertAdjacentHTML( 'beforeend', navigation.html );
-	}
 }
