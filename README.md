@@ -10,7 +10,7 @@ Click the badge above to try core in your browser. Nothing is installed, and not
 
 ## What's in this repository
 
-One core plugin and four extensions built on it. Each is a separate WordPress plugin with its own version, releases and activation, so a site installs only what it needs.
+One core plugin and three extensions built on it. Each is a separate WordPress plugin with its own version, releases and activation, so a site installs only what it needs.
 
 | Plugin | What it adds |
 |---|---|
@@ -18,16 +18,15 @@ One core plugin and four extensions built on it. Each is a separate WordPress pl
 | [`data-machine-events`](plugins/data-machine-events) | **Events.** AI-assisted import from Ticketmaster, Eventbrite, ICS, venue websites and more, with deduplication, venue geocoding and a block-based calendar. |
 | [`data-machine-socials`](plugins/data-machine-socials) | **Social.** Publishing, reading and engagement across X, Facebook, Instagram, Threads, Bluesky, Mastodon, LinkedIn, Pinterest, Tumblr, TikTok, YouTube and Reddit. |
 | [`data-machine-business`](plugins/data-machine-business) | **Business.** Google Analytics, Search Console, Bing Webmaster Tools, PageSpeed, Google Sheets and Drive, Slack, Discord, Sendy, Mediavine, Amazon Associates and media maintenance, as abilities and agent tools. |
-| [`data-machine-github`](plugins/data-machine-github) | **GitHub.** Fetch added, changed, and removed repository files into pipelines. |
 
 The extensions double as the reference for building your own: each registers handlers, abilities and tools through core's public hooks, the same way a third-party plugin would.
 
 ## How the pieces fit
 
 ```text
-data-machine-events  data-machine-socials  data-machine-business  data-machine-github
-          \                    |                    /                      /
-           +---------- public hooks, abilities, handlers ----------------+
+data-machine-events  data-machine-socials  data-machine-business  (your extension)
+          \                    |                    /                   /
+           +---------- public hooks, abilities, handlers -------------+
                                    |
                          data-machine (core)
           pipelines, flows, jobs, memory, modes, tools, approvals

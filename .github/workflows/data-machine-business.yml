@@ -27,6 +27,21 @@ permissions:
   issues: write
 
 jobs:
+  unit:
+    name: Unit (standalone PHP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+      # Stubs core's database classes, so it runs outside WordPress.
+      - name: Prepare in-tree Data Machine core
+        run: composer install --working-dir=plugins/data-machine --no-dev --no-interaction --no-progress --prefer-dist
+      - name: GitHub files unit test
+        run: php plugins/data-machine-business/tests/github-files-smoke.php
+
   homeboy:
     name: Homeboy (${{ matrix.command }})
     runs-on: ubuntu-latest

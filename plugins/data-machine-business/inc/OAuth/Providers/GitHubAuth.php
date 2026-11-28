@@ -2,10 +2,10 @@
 /**
  * GitHub personal access token provider (no OAuth flow).
  *
- * @package DataMachineGitHub
+ * @package DataMachineBusiness
  */
 
-namespace DataMachineGitHub\OAuth\Providers;
+namespace DataMachineBusiness\OAuth\Providers;
 
 use DataMachine\Core\OAuth\BaseAuthProvider;
 
@@ -20,10 +20,10 @@ final class GitHubAuth extends BaseAuthProvider {
 	public function get_config_fields(): array {
 		return array(
 			'access_token' => array(
-				'label'       => __( 'Personal Access Token', 'data-machine-github' ),
+				'label'       => __( 'Personal Access Token', 'data-machine-business' ),
 				'type'        => 'password',
 				'required'    => false,
-				'description' => __( 'Optional for public repositories. For private repositories, grant read access to repository contents.', 'data-machine-github' ),
+				'description' => __( 'Optional for public repositories. For private repositories, grant read access to repository contents.', 'data-machine-business' ),
 			),
 		);
 	}

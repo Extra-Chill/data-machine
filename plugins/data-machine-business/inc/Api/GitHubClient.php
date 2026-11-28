@@ -2,10 +2,10 @@
 /**
  * Read-only GitHub REST client.
  *
- * @package DataMachineGitHub
+ * @package DataMachineBusiness
  */
 
-namespace DataMachineGitHub\Api;
+namespace DataMachineBusiness\Api;
 
 use DataMachine\Core\HttpClient;
 use WP_Error;
@@ -48,7 +48,7 @@ final class GitHubClient {
 			return $result;
 		}
 		if ( ! empty( $result['truncated'] ) ) {
-			return new WP_Error( 'github_tree_truncated', __( 'GitHub truncated the recursive tree. File changes cannot be determined from an incomplete tree.', 'data-machine-github' ) );
+			return new WP_Error( 'github_tree_truncated', __( 'GitHub truncated the recursive tree. File changes cannot be determined from an incomplete tree.', 'data-machine-business' ) );
 		}
 		if ( ! isset( $result['tree'] ) || ! is_array( $result['tree'] ) || ! array_is_list( $result['tree'] ) ) {
 			return $this->invalid_response();
@@ -69,7 +69,7 @@ final class GitHubClient {
 		$result  = $this->get( $repo, '/git/blobs/' . rawurlencode( $sha ), 3 * $max_bytes + 4096 );
 		$content = $this->decode_contents( $result );
 		if ( ! is_wp_error( $content ) && strlen( $content ) > $max_bytes ) {
-			return new WP_Error( 'github_blob_too_large', __( 'GitHub returned a blob larger than the configured file size limit.', 'data-machine-github' ) );
+			return new WP_Error( 'github_blob_too_large', __( 'GitHub returned a blob larger than the configured file size limit.', 'data-machine-business' ) );
 		}
 		return $content;
 	}
@@ -99,7 +99,7 @@ final class GitHubClient {
 
 	private function get( string $repo, string $endpoint = '', int $response_limit = 0 ): array|WP_Error {
 		if ( ! preg_match( '#^[a-zA-Z0-9-]+/(?!\.{1,2}$)[a-zA-Z0-9_.-]+$#D', $repo ) ) {
-			return new WP_Error( 'github_invalid_repo', __( 'GitHub repo must be in owner/name format.', 'data-machine-github' ) );
+			return new WP_Error( 'github_invalid_repo', __( 'GitHub repo must be in owner/name format.', 'data-machine-business' ) );
 		}
 
 		$result = HttpClient::get(
@@ -124,8 +124,8 @@ final class GitHubClient {
 		if ( empty( $result['success'] ) || $status < 200 || $status >= 300 ) {
 			$message = $status > 0
 				/* translators: %d: HTTP status code. */
-				? sprintf( __( 'GitHub API returned HTTP %d. Check repository access, branch or file references, and API rate limits.', 'data-machine-github' ), $status )
-				: __( 'Could not connect to the GitHub API.', 'data-machine-github' );
+				? sprintf( __( 'GitHub API returned HTTP %d. Check repository access, branch or file references, and API rate limits.', 'data-machine-business' ), $status )
+				: __( 'Could not connect to the GitHub API.', 'data-machine-business' );
 			return new WP_Error( 'github_api_error', $message, array( 'status' => $status ) );
 		}
 
@@ -134,6 +134,6 @@ final class GitHubClient {
 	}
 
 	private function invalid_response(): WP_Error {
-		return new WP_Error( 'github_invalid_response', __( 'GitHub API returned an invalid or unsupported response.', 'data-machine-github' ) );
+		return new WP_Error( 'github_invalid_response', __( 'GitHub API returned an invalid or unsupported response.', 'data-machine-business' ) );
 	}
 }

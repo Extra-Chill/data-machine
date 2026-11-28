@@ -5,7 +5,7 @@
  * github-files-smoke.php covers behavior with stubbed database classes; this
  * checks that the core APIs the handler relies on exist with those shapes.
  *
- * @package DataMachineGitHub
+ * @package DataMachineBusiness
  */
 
 $wp_path = getenv( 'WP_PATH' );
@@ -27,12 +27,12 @@ if ( ! class_exists( \DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::class 
 	require_once $datamachine_core;
 }
 
-// The runtime may not activate this plugin; load it and register its handler directly.
-if ( ! function_exists( 'datamachine_github_load_handlers' ) ) {
-	require_once dirname( __DIR__ ) . '/data-machine-github.php';
-}
+// The runtime may not activate this plugin; register its handler directly.
 if ( ! isset( apply_filters( 'datamachine_handlers', array(), 'fetch' )['github'] ) ) {
-	datamachine_github_load_handlers();
+	if ( ! defined( 'DATAMACHINE_BUSINESS_VERSION' ) ) {
+		require_once dirname( __DIR__ ) . '/data-machine-business.php';
+	}
+	new \DataMachineBusiness\Handlers\GitHub\GitHubFetch();
 }
 
 $failures = array();
@@ -45,7 +45,7 @@ $check    = static function ( bool $condition, string $message ) use ( &$failure
 $handlers = apply_filters( 'datamachine_handlers', array(), 'fetch' );
 $github   = $handlers['github'] ?? null;
 $check( is_array( $github ), 'The github fetch handler is not registered.' );
-$check( ( $github['class'] ?? '' ) === \DataMachineGitHub\Handlers\GitHub\GitHubFetch::class, 'The github handler class is wrong.' );
+$check( ( $github['class'] ?? '' ) === \DataMachineBusiness\Handlers\GitHub\GitHubFetch::class, 'The github handler class is wrong.' );
 $check( ( $github['meta']['data_source'] ?? '' ) === 'files', 'The github handler does not declare the files data source.' );
 
 $methods = array(

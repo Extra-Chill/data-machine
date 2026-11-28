@@ -30,6 +30,7 @@ Data Machine Business connects WordPress automation, agents, and pipelines to an
 | Google Drive | List folders, export native Google files, download binaries, and feed files into pipelines | Abilities, fetch handler |
 | Slack | Fetch channel messages and publish messages or thread replies | Abilities, fetch/publish handlers |
 | Discord | Fetch channel messages and publish text or embeds | Abilities, fetch/publish handlers |
+| GitHub | Fetch repository files, deduplicated by blob SHA, with removal tracking | Fetch handler (`github`) |
 | Amazon Associates | Search products and generate Creators API affiliate links | AI tool |
 | Sendy | Subscribe users, create or update campaigns, and read email-funnel metrics | Abilities |
 | Mediavine | Fetch page, aggregate, device, country, normalized-source, and ad-unit publisher revenue reports | Ability, WP-CLI |
@@ -350,6 +351,10 @@ Create a Slack app with a bot token and grant the scopes needed by your flows:
 - `channels:read` and `groups:read` when channel listing is needed
 
 Add the bot to each channel it should access, then configure its `xoxb-...` token in Data Machine settings.
+
+### GitHub
+
+A token is optional for public repositories. For private repositories, add a fine-grained token with read access to contents in the GitHub auth settings. See [docs/github.md](docs/github.md).
 
 ### Discord
 

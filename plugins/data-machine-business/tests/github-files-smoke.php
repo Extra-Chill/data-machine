@@ -3,7 +3,7 @@
  * Exercise the real HTTP client and fetch pipeline with in-memory WP transport and storage.
  * Run with: php tests/github-files-smoke.php
  *
- * @package DataMachineGitHub\Tests
+ * @package DataMachineBusiness\Tests
  */
 
 namespace DataMachine\Core\Database\ProcessedItems {
@@ -51,7 +51,7 @@ namespace DataMachine\Core {
 
 namespace {
 	use DataMachine\Core\Database\ProcessedItems\ProcessedItems;
-	use DataMachineGitHub\Api\GitHubClient;
+	use DataMachineBusiness\Api\GitHubClient;
 
 	define( 'ABSPATH', __DIR__ );
 	define( 'WPINC', 'wp-includes' );
@@ -79,7 +79,7 @@ namespace {
 		return dirname( $file ) . '/';
 	}
 	function plugin_dir_url( $file ) {
-		return 'https://example.test/wp-content/plugins/data-machine-github/';
+		return 'https://example.test/wp-content/plugins/data-machine-business/';
 	}
 	function home_url() {
 		return 'https://example.test';
@@ -157,6 +157,13 @@ namespace {
 	$core = getenv( 'DATA_MACHINE_PATH' ) ?: dirname( __DIR__, 2 ) . '/data-machine';
 	spl_autoload_register(
 		static function ( $class ) use ( $core ) {
+			if ( str_starts_with( $class, 'DataMachineBusiness\\' ) ) {
+				$file = dirname( __DIR__ ) . '/inc/' . str_replace( '\\', '/', substr( $class, strlen( 'DataMachineBusiness\\' ) ) ) . '.php';
+				if ( is_file( $file ) ) {
+					require $file;
+				}
+				return;
+			}
 			if ( str_starts_with( $class, 'DataMachine\\' ) ) {
 				$file = $core . '/inc/' . str_replace( '\\', '/', substr( $class, strlen( 'DataMachine\\' ) ) ) . '.php';
 				if ( is_file( $file ) ) {
@@ -165,8 +172,7 @@ namespace {
 			}
 		}
 	);
-	require dirname( __DIR__ ) . '/data-machine-github.php';
-	do_action( 'plugins_loaded' );
+	new DataMachineBusiness\Handlers\GitHub\GitHubFetch();
 	$registration = apply_filters( 'datamachine_handlers', array(), 'fetch' )['github'];
 	check( 'files' === $registration['meta']['data_source'], 'GitHub files source was not registered.' );
 	$handler = new $registration['class']();

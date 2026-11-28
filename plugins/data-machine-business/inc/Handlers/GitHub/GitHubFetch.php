@@ -2,17 +2,17 @@
 /**
  * Fetch repository files and report deletions from complete GitHub trees.
  *
- * @package DataMachineGitHub
+ * @package DataMachineBusiness
  */
 
-namespace DataMachineGitHub\Handlers\GitHub;
+namespace DataMachineBusiness\Handlers\GitHub;
 
 use DataMachine\Core\Database\TrackedItems\TrackedItems;
 use DataMachine\Core\ExecutionContext;
 use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
 use DataMachine\Core\Steps\HandlerRegistrationTrait;
-use DataMachineGitHub\Api\GitHubClient;
-use DataMachineGitHub\OAuth\Providers\GitHubAuth;
+use DataMachineBusiness\Api\GitHubClient;
+use DataMachineBusiness\OAuth\Providers\GitHubAuth;
 use WP_Error;
 
 defined( 'ABSPATH' ) || exit;
@@ -28,8 +28,8 @@ final class GitHubFetch extends FetchHandler {
 			'github',
 			'fetch',
 			self::class,
-			__( 'GitHub Files', 'data-machine-github' ),
-			__( 'Fetch files from a GitHub repository. A token is optional for public repositories.', 'data-machine-github' ),
+			__( 'GitHub Files', 'data-machine-business' ),
+			__( 'Fetch files from a GitHub repository. A token is optional for public repositories.', 'data-machine-business' ),
 			true,
 			GitHubAuth::class,
 			GitHubFetchSettings::class,
@@ -124,7 +124,7 @@ final class GitHubFetch extends FetchHandler {
 			return new WP_Error(
 				'github_missing_file_path',
 				/* translators: %s: configured repository path. */
-				sprintf( __( 'GitHub file_path "%s" does not exist in the repository tree.', 'data-machine-github' ), $prefix )
+				sprintf( __( 'GitHub file_path "%s" does not exist in the repository tree.', 'data-machine-business' ), $prefix )
 			);
 		}
 
@@ -183,7 +183,7 @@ final class GitHubFetch extends FetchHandler {
 				'metadata'        => $state,
 			)
 		) ) {
-			return new WP_Error( 'github_snapshot_error', __( 'Could not save the GitHub file snapshot for this flow step.', 'data-machine-github' ) );
+			return new WP_Error( 'github_snapshot_error', __( 'Could not save the GitHub file snapshot for this flow step.', 'data-machine-business' ) );
 		}
 
 		return array( 'items' => $items );
@@ -230,7 +230,7 @@ final class GitHubFetch extends FetchHandler {
 		return array(
 			'title'    => 'removed' === $change
 				/* translators: %s: removed repository path. */
-				? sprintf( __( 'Removed: %s', 'data-machine-github' ), $path )
+				? sprintf( __( 'Removed: %s', 'data-machine-business' ), $path )
 				: $path,
 			'content'  => '',
 			'metadata' => array(
