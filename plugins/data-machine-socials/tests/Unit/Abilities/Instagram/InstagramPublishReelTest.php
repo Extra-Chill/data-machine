@@ -149,7 +149,7 @@ class InstagramPublishReelTest extends WP_UnitTestCase {
 		) );
 
 		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'not authenticated', strtolower( $result->get_error_message() ) );
+		$this->assertSame( 'missing_auth', $result->get_error_code() );
 	}
 
 	public function test_reel_container_creation_failure(): void {

@@ -100,9 +100,8 @@ abstract class AbstractSocialAbility {
 	/**
 	 * Resolve a valid OAuth access token for a platform, entirely server-side.
 	 *
-	 * Resolves + authenticates the provider, then asks it for a valid
-	 * (refreshed if needed) access token. Secrets never travel through
-	 * ability input.
+	 * Resolves the provider and asks it for a valid (refreshed if needed)
+	 * access token. Secrets never travel through ability input.
 	 *
 	 * @param string $platform Provider key (e.g. 'reddit').
 	 * @param string $label    Human-readable platform label for errors.
@@ -121,8 +120,7 @@ abstract class AbstractSocialAbility {
 	 *
 	 * @param string               $platform              Provider key.
 	 * @param string               $label                 Human-readable platform label for errors.
-	 * @param bool                 $require_authenticated When true, enforce is_authenticated(). Pass
-	 *                                                    false so an expired token can still refresh.
+	 * @param bool                 $require_authenticated Enforce is_authenticated() for providers without a token lifecycle.
 	 * @param class-string<T>|null $expected_class        Expected provider class, if any.
 	 * @return ($expected_class is null ? array{provider: object, token: string}|\WP_Error : array{provider: T, token: string}|\WP_Error)
 	 */

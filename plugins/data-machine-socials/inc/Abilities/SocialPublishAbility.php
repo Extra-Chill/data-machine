@@ -168,7 +168,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 		);
 	}
 
-	/** Resolve provider registration and local configuration without contacting it. */
+	/** Resolve provider readiness, refreshing credentials after local checks pass. */
 	protected function providerStatus( string $channel ): string {
 		if ( ! wp_get_ability( 'datamachine/' . $channel . '-publish' ) ) {
 			return 'publish_ability_missing';
@@ -181,7 +181,7 @@ class SocialPublishAbility extends AbstractSocialAbility {
 		if ( method_exists( $provider, 'is_configured' ) && ! $provider->is_configured() ) {
 			return 'provider_not_configured';
 		}
-		if ( ! method_exists( $provider, 'is_authenticated' ) || ! $provider->is_authenticated() ) {
+		if ( is_wp_error( CredentialResolver::authenticateForPublish( $provider, $channel ) ) ) {
 			return 'provider_not_authenticated';
 		}
 

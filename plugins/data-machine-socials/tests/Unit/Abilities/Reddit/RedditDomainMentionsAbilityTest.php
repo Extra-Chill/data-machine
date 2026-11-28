@@ -248,8 +248,8 @@ class RedditDomainMentionsAbilityTest extends WP_UnitTestCase {
 				return $this->authenticated;
 			}
 
-			public function get_valid_access_token(): string {
-				return 'reddit-token';
+			public function get_valid_access_token(): ?string {
+				return $this->authenticated ? 'reddit-token' : null;
 			}
 		};
 

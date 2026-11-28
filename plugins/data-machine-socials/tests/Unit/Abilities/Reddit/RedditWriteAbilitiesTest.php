@@ -165,7 +165,7 @@ class RedditWriteAbilitiesTest extends WP_UnitTestCase {
 			}
 
 			public function get_valid_access_token(): ?string {
-				return 'provider-token';
+				return $this->authenticated ? 'provider-token' : null;
 			}
 		};
 
