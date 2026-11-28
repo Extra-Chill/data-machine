@@ -17,6 +17,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 	require_once $wp_path . '/wp-load.php';
 }
 
+// The runtime mounts core as a dependency without activating it.
+if ( ! class_exists( \DataMachine\Core\Steps\Fetch\Handlers\FetchHandler::class ) ) {
+	$datamachine_core = WP_PLUGIN_DIR . '/data-machine/data-machine.php';
+	if ( ! is_readable( $datamachine_core ) ) {
+		fwrite( STDERR, "Data Machine core is not available at {$datamachine_core}.\n" );
+		exit( 1 );
+	}
+	require_once $datamachine_core;
+}
+
 // The runtime may not activate this plugin; load it and register its handler directly.
 if ( ! function_exists( 'datamachine_github_load_handlers' ) ) {
 	require_once dirname( __DIR__ ) . '/data-machine-github.php';
@@ -49,8 +59,8 @@ foreach ( $methods as $class => $names ) {
 	}
 }
 
-$upsert = new ReflectionMethod( \DataMachine\Core\Database\TrackedItems\TrackedItems::class, 'upsert' );
-$check( 1 === $upsert->getNumberOfRequiredParameters(), 'TrackedItems::upsert() no longer takes a single row array.' );
+$upsert = ! class_exists( \DataMachine\Core\Database\TrackedItems\TrackedItems::class ) ? null : new ReflectionMethod( \DataMachine\Core\Database\TrackedItems\TrackedItems::class, 'upsert' );
+$check( $upsert && 1 === $upsert->getNumberOfRequiredParameters(), 'TrackedItems::upsert() no longer takes a single row array.' );
 
 if ( $failures ) {
 	fwrite( STDERR, implode( "\n", $failures ) . "\n" );
