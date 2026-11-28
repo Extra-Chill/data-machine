@@ -1,25 +1,10 @@
-jest.mock(
-	'@wordpress/i18n',
-	() => ( {
-		__: jest.fn( ( text: string ) => text ),
-	} ),
-	{ virtual: true }
-);
-
-/**
- * WordPress dependencies
- */
-import { __ } from '@wordpress/i18n';
 /**
  * Internal dependencies
  */
 import { initCarousel } from './carousel';
 
-const mockTranslate = __ as jest.Mock;
-
 describe( 'calendar carousel controls', () => {
 	beforeEach( () => {
-		mockTranslate.mockClear();
 		document.body.innerHTML = `
 			<div class="data-machine-events-calendar">
 				<div class="data-machine-date-group" data-event-count="3">
@@ -84,14 +69,6 @@ describe( 'calendar carousel controls', () => {
 			'Show previous events'
 		);
 		expect( next.getAttribute( 'aria-label' ) ).toBe( 'Show next events' );
-		expect( mockTranslate ).toHaveBeenCalledWith(
-			'Show previous events',
-			'data-machine-events'
-		);
-		expect( mockTranslate ).toHaveBeenCalledWith(
-			'Show next events',
-			'data-machine-events'
-		);
 
 		next.focus();
 		next.click();

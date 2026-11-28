@@ -1,47 +1,4 @@
-/**
- * Load More orchestrator (issue #314, phase 2 of #298)
- *
- * Replaces the bottom paginate_links() nav with a single
- * "Load More Events" button on JS-enabled mount. Clicking the button
- * fetches the next page via the data-only REST envelope
- * (`?format=data`, introduced in #301) and appends the new date
- * groups in place — no innerHTML blasts, no page reload.
- *
- * Architectural notes:
- *
- *   - This is the first real consumer of the data-only schema from
- *     #301. It uses the structured `events` / `grouping` / `pagination`
- *     payload and renders cards client-side via `renderEventCard()`,
- *     `renderDateGroup()`, `renderGapSeparator()`.
- *
- *   - The legacy `paginate_links()` HTML envelope is NOT removed —
- *     it remains the no-JS fallback. On JS mount we hydrate the
- *     existing `<nav class="data-machine-events-pagination">` into
- *     a Load More button. Browsers with JS disabled still see
- *     functional numbered pagination.
- *
- *   - Geo / archive / taxonomy filter state flows through the same
- *     `buildCalendarRequest()` helper every other calendar fetch
- *     uses. A map pan that updates `currentGeo` is automatically
- *     reflected on the next Load More — no special-case wiring.
- *
- * Open-question decisions (see PR body for rationale):
- *
- *   1. URL preservation: yes — `pushState` to `?paged=N` after each
- *      Load More so refresh / share roughly preserves position.
- *      Refreshing the URL reloads the highest-loaded page from
- *      the server alone; older pages don't come back. Acceptable.
- *
- *   2. Past-mode label flip: yes — button reads "Load Earlier
- *      Events" when `?past=1` is active. One line of conditional
- *      copy, clarifies direction.
- *
- *   3. Scroll position after append: stays put. We append below
- *      the current content; browsers don't shift scroll on append.
- *
- *   4. "All loaded" empty state: silent disappear. The events are
- *      the content; a "you reached the end" chip is chrome.
- */
+/** Hydrate initial numbered navigation and append subsequent pages from REST data. */
 
 /**
  * Internal dependencies
@@ -53,7 +10,8 @@ import type {
 	GeoContext,
 } from '../types';
 
-import { buildCalendarRequest } from './api-client';
+import { buildCalendarRequest, requestCalendarData } from './api-client';
+import { initCarousel } from './carousel';
 import { renderDateGroup } from './date-group-renderer';
 import { renderEventCard } from './event-renderer';
 import { renderGapSeparator } from './gap-renderer';
@@ -73,13 +31,17 @@ const instances = new WeakMap< HTMLElement, LoadMoreState >();
  *
  * Idempotent: re-init on the same calendar is a no-op.
  * @param calendar
+ * @param pagination REST metadata, when it is available.
  */
-export function initLoadMore( calendar: HTMLElement ): void {
+export function initLoadMore(
+	calendar: HTMLElement,
+	pagination?: CalendarDataResponse[ 'pagination' ]
+): void {
 	if ( instances.has( calendar ) ) {
 		return;
 	}
 
-	const replaced = replacePaginationWithLoadMore( calendar );
+	const replaced = replacePaginationWithLoadMore( calendar, pagination );
 	if ( ! replaced ) {
 		return;
 	}
@@ -140,9 +102,11 @@ export function setLoadMoreGeo(
  * is the `.page-numbers.current` span, and total_pages is the highest
  * numeric link / span inside the nav.
  * @param calendar
+ * @param pagination REST metadata, when it is available.
  */
 function replacePaginationWithLoadMore(
-	calendar: HTMLElement
+	calendar: HTMLElement,
+	pagination?: CalendarDataResponse[ 'pagination' ]
 ): HTMLButtonElement | null {
 	const nav = calendar.querySelector< HTMLElement >(
 		'.data-machine-events-pagination'
@@ -151,7 +115,12 @@ function replacePaginationWithLoadMore(
 		return null;
 	}
 
-	const { currentPage, totalPages } = readPaginationBounds( nav );
+	const { currentPage, totalPages } = pagination
+		? {
+				currentPage: pagination.current_page,
+				totalPages: pagination.total_pages,
+		  }
+		: readPaginationBounds( nav );
 	if ( totalPages <= 1 || currentPage >= totalPages ) {
 		// Single page, or we're already on the last page — nothing to
 		// load. Remove the nav so the legacy HTML doesn't render.
@@ -248,15 +217,14 @@ function createClickHandler(
 		// Lock the button: prevent double-clicks, signal aria-busy.
 		button.disabled = true;
 		button.setAttribute( 'aria-busy', 'true' );
-		const idleLabel = loadMoreLabel( calendar );
 		button.textContent = 'Loading\u2026';
 
 		try {
 			const nextPage = currentPage + 1;
 			const data = await fetchPage( calendar, nextPage );
 
-			if ( ! data || ! data.success ) {
-				throw new Error( 'API returned success: false' );
+			if ( instances.get( calendar )?.button !== button ) {
+				return;
 			}
 
 			appendPage( calendar, data );
@@ -281,16 +249,6 @@ function createClickHandler(
 			if ( serverCurrent >= serverTotal ) {
 				button.hidden = true;
 			}
-
-			// Notify content-updated owners (frontend.ts) so
-			// lazy-render / day-loader / carousel re-init on the
-			// newly-appended date groups. Same event the legacy
-			// innerHTML swap path dispatches.
-			calendar.dispatchEvent(
-				new CustomEvent( 'data-machine-calendar-content-updated', {
-					bubbles: false,
-				} )
-			);
 		} catch ( err ) {
 			// Surface the error inline; let the user retry. The
 			// existing `.data-machine-events-error` styles apply.
@@ -303,7 +261,7 @@ function createClickHandler(
 			// Only reset to idleLabel on success; retry-text stays
 			// on error. Detect via textContent — sloppy but adequate.
 			if ( button.textContent === 'Loading\u2026' ) {
-				button.textContent = idleLabel;
+				button.textContent = loadMoreLabel( calendar );
 			}
 		}
 	};
@@ -316,7 +274,7 @@ function createClickHandler(
 async function fetchPage(
 	calendar: HTMLElement,
 	pageNumber: number
-): Promise< CalendarDataResponse | null > {
+): Promise< CalendarDataResponse > {
 	const filterState = getFilterState( calendar );
 	const archiveContext: Partial< ArchiveContext > =
 		filterState.getArchiveContext();
@@ -333,36 +291,15 @@ async function fetchPage(
 		geoContext: geo,
 		overrides: {
 			paged: String( pageNumber ),
-			// `format=data` is not in the CalendarRequest interface
-			// (it's a transport concern, not a URL state field).
-			// Append it directly after build.
 		},
 	} );
-
-	// Activate the data-only envelope from #301.
-	params.set( 'format', 'data' );
-
-	const response = await fetch(
-		`/wp-json/datamachine/v1/events/calendar?${ params.toString() }`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'application/json',
-				// BrowserNavigationGuard (#297): JS callers
-				// identify themselves so the guard doesn't
-				// redirect/404 them. Same header every other
-				// calendar fetch sends.
-				'X-Requested-With': 'XMLHttpRequest',
-			},
-		}
-	);
-
-	if ( ! response.ok ) {
-		throw new Error( `HTTP ${ response.status }` );
+	if ( ! params.has( 'scope' ) && calendar.dataset.scope ) {
+		params.set( 'scope', calendar.dataset.scope );
 	}
-
-	return ( await response.json() ) as CalendarDataResponse;
+	if ( calendar.dataset.scopeToken ) {
+		params.set( 'scope_token', calendar.dataset.scopeToken );
+	}
+	return requestCalendarData( params );
 }
 
 /* ------------------------------------------------------------------ */
@@ -395,6 +332,7 @@ function appendPage( calendar: HTMLElement, data: CalendarDataResponse ): void {
 	const gaps = data.grouping.gaps || {};
 	const byDate = data.grouping.by_date || {};
 
+	const changedGroups: HTMLElement[] = [];
 	orderedDates.forEach( ( date, index ) => {
 		const occurrences = byDate[ date ] || [];
 		if ( occurrences.length === 0 ) {
@@ -415,6 +353,7 @@ function appendPage( calendar: HTMLElement, data: CalendarDataResponse ): void {
 				'.data-machine-events-wrapper'
 			);
 			if ( wrapper ) {
+				changedGroups.push( existingGroup );
 				occurrences.forEach( ( occurrence ) => {
 					const event = eventsById.get( occurrence.post_id );
 					if ( ! event ) {
@@ -477,7 +416,13 @@ function appendPage( calendar: HTMLElement, data: CalendarDataResponse ): void {
 
 		const group = renderDateGroup( date, occurrences, eventsById );
 		content.appendChild( group );
+		changedGroups.push( group );
 	} );
+	if (
+		! calendar.classList.contains( 'data-machine-events-single-day-list' )
+	) {
+		initCarousel( calendar, changedGroups );
+	}
 }
 
 /* ------------------------------------------------------------------ */

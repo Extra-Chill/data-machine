@@ -8,6 +8,7 @@
 /**
  * Internal dependencies
  */
+import { renderEventItem } from './event-renderer';
 import type { EventDisplayVars, EventPlaceholderData } from '../types';
 
 interface LazyObserverEntry {
@@ -95,111 +96,17 @@ function hydratePlaceholder( placeholder: HTMLElement ): void {
 		return;
 	}
 
-	const displayVars: Partial< EventDisplayVars > = data.display_vars || {};
-	const formattedTimeDisplay = displayVars.formatted_time_display || '';
-	const performerName = displayVars.performer_name || '';
-	const showPerformer = displayVars.show_performer !== false;
-	const multiDayLabel = displayVars.multi_day_label || '';
-	const venueName = displayVars.venue_name || '';
-	const isoStartDate = displayVars.iso_start_date || '';
-	const ticketUrl = displayVars.ticket_url || '';
-	const isAffiliateTicket = displayVars.is_affiliate_ticket === true;
-	const showTicketLink = displayVars.show_ticket_link !== false;
-
-	const itemClasses = [ 'data-machine-event-item' ];
-	if ( displayVars.is_continuation ) {
-		itemClasses.push( 'data-machine-event-continuation' );
-	}
-	if ( displayVars.is_multi_day ) {
-		itemClasses.push( 'data-machine-event-multi-day' );
-	}
-
-	let timeHtml = '';
-	if ( formattedTimeDisplay ) {
-		timeHtml =
-			'<div class="data-machine-event-time">' +
-			'<span class="dashicons dashicons-clock"></span>' +
-			escapeHtml( formattedTimeDisplay );
-		if ( multiDayLabel ) {
-			timeHtml +=
-				'<span class="data-machine-event-multi-day-label">' +
-				escapeHtml( multiDayLabel ) +
-				'</span>';
-		}
-		timeHtml += '</div>';
-	}
-
-	let performerHtml = '';
-	if ( showPerformer && performerName ) {
-		performerHtml =
-			'<div class="data-machine-event-performer">' +
-			'<span class="dashicons dashicons-admin-users"></span>' +
-			escapeHtml( performerName ) +
-			'</div>';
-	}
-
-	const html =
-		'<div class="data-machine-event-link">' +
-		( data.badges_html || '' ) +
-		'<h4 class="data-machine-event-title">' +
-		'<a href="' +
-		escapeAttr( data.permalink ) +
-		'">' +
-		escapeHtml( data.title ) +
-		'</a>' +
-		'</h4>' +
-		'<div class="data-machine-event-meta">' +
-		timeHtml +
-		performerHtml +
-		'<a href="' +
-		escapeAttr( data.permalink ) +
-		'" class="' +
-		escapeAttr( data.button_classes || 'data-machine-more-info-button' ) +
-		'">More Info</a>' +
-		'</div>' +
-		'</div>';
-
-	placeholder.className = itemClasses.join( ' ' );
+	const display: Partial< EventDisplayVars > = data.display_vars || {};
 	placeholder.removeAttribute( 'data-event-json' );
-	placeholder.setAttribute( 'data-title', data.title );
-	placeholder.setAttribute( 'data-venue', venueName );
-	placeholder.setAttribute( 'data-performer', performerName );
-	placeholder.setAttribute( 'data-date', isoStartDate );
-	// Ticketmaster compliance (issue #816): when the ticket URL is an
-	// affiliate/redirect wrapper, `ticketUrl` above is already empty (see
-	// DisplayVars::build()) and we expose the gated ref (this placeholder's
-	// own event ID) instead of a `data-ticket-url` attribute.
-	if ( isAffiliateTicket ) {
-		placeholder.setAttribute( 'data-ticket-ref', String( data.id ) );
-	} else {
-		placeholder.setAttribute( 'data-ticket-url', ticketUrl );
-	}
-	placeholder.setAttribute(
-		'data-has-tickets',
-		showTicketLink && ( ticketUrl !== '' || isAffiliateTicket )
-			? 'true'
-			: 'false'
+	renderEventItem(
+		{
+			...data,
+			ticket: {
+				url: display.ticket_url || '',
+				is_affiliate: display.is_affiliate_ticket,
+			},
+		},
+		display,
+		placeholder
 	);
-	placeholder.innerHTML = html;
-}
-
-function escapeHtml( str: string ): string {
-	if ( ! str ) {
-		return '';
-	}
-	const div = document.createElement( 'div' );
-	div.textContent = str;
-	return div.innerHTML;
-}
-
-function escapeAttr( str: string ): string {
-	if ( ! str ) {
-		return '';
-	}
-	return str
-		.replace( /&/g, '&amp;' )
-		.replace( /"/g, '&quot;' )
-		.replace( /'/g, '&#39;' )
-		.replace( /</g, '&lt;' )
-		.replace( />/g, '&gt;' );
 }

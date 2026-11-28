@@ -65,13 +65,16 @@ class Badges {
 
 	/**
 	 * @param int $post_id Event post ID
-	 * @return string Badge HTML with wrapper and data attributes for each term
+	 * @return array Filtered badge display data shared by PHP and TypeScript renderers.
 	 */
-	public static function render_taxonomy_badges( $post_id ) {
+	public static function get_display_data( $post_id ): array {
 		$taxonomies = self::get_event_taxonomies( $post_id );
 
 		if ( empty( $taxonomies ) ) {
-			return '';
+			return array(
+				'wrapper_classes' => '',
+				'items'           => array(),
+			);
 		}
 
 		$venue_terms = get_the_terms( $post_id, 'venue' );
@@ -85,51 +88,64 @@ class Badges {
 			$post_id
 		);
 
-		$output = '<div class="' . esc_attr( implode( ' ', $wrapper_classes ) ) . '">';
+		$items = array();
 
 		foreach ( $taxonomies as $taxonomy_slug => $taxonomy_data ) {
-			$taxonomy_object = $taxonomy_data['taxonomy'];
-			$terms           = $taxonomy_data['terms'];
-
-			foreach ( $terms as $term ) {
+			foreach ( $taxonomy_data['terms'] as $term ) {
 				if ( 'promoter' === $taxonomy_slug && '' !== $venue_name && strcasecmp( trim( $term->name ), trim( $venue_name ) ) === 0 ) {
 					continue;
 				}
 
 				$badge_classes = array(
 					'data-machine-taxonomy-badge',
-					'data-machine-taxonomy-' . esc_attr( $taxonomy_slug ),
-					'data-machine-term-' . esc_attr( $term->slug ),
+					'data-machine-taxonomy-' . $taxonomy_slug,
+					'data-machine-term-' . $term->slug,
 				);
 
 				$badge_classes = apply_filters( 'data_machine_events_badge_classes', $badge_classes, $taxonomy_slug, $term, $post_id );
 
 				$term_link = get_term_link( $term, $taxonomy_slug );
 
-				if ( is_wp_error( $term_link ) ) {
-					$output .= sprintf(
-						'<span class="%s" data-taxonomy="%s" data-term="%s">%s</span>',
-						esc_attr( implode( ' ', $badge_classes ) ),
-						esc_attr( $taxonomy_slug ),
-						esc_attr( $term->slug ),
-						esc_html( $term->name )
-					);
-				} else {
-					$output .= sprintf(
-						'<a href="%s" class="%s" data-taxonomy="%s" data-term="%s">%s</a>',
-						esc_url( $term_link ),
-						esc_attr( implode( ' ', $badge_classes ) ),
-						esc_attr( $taxonomy_slug ),
-						esc_attr( $term->slug ),
-						esc_html( $term->name )
-					);
-				}
+				$items[] = array(
+					'classes'  => implode( ' ', $badge_classes ),
+					'taxonomy' => $taxonomy_slug,
+					'term'     => $term->slug,
+					'label'    => wp_specialchars_decode( $term->name, ENT_QUOTES ),
+					'url'      => is_wp_error( $term_link ) ? '' : esc_url_raw( $term_link, array( 'http', 'https' ) ),
+				);
 			}
 		}
 
-		$output .= '</div>';
+		return array(
+			'wrapper_classes' => implode( ' ', $wrapper_classes ),
+			'items'           => $items,
+		);
+	}
 
-		return $output;
+	/**
+	 * @param int $post_id Event post ID.
+	 * @return string Escaped badge markup for the initial server render.
+	 */
+	public static function render_taxonomy_badges( $post_id ): string {
+		$badges = self::get_display_data( $post_id );
+		if ( empty( $badges['items'] ) ) {
+			return '';
+		}
+
+		$output = '<div class="' . esc_attr( $badges['wrapper_classes'] ) . '">';
+		foreach ( $badges['items'] as $badge ) {
+			$attrs   = sprintf(
+				'class="%s" data-taxonomy="%s" data-term="%s"',
+				esc_attr( $badge['classes'] ),
+				esc_attr( $badge['taxonomy'] ),
+				esc_attr( $badge['term'] )
+			);
+			$output .= '' === $badge['url']
+				? sprintf( '<span %s>%s</span>', $attrs, esc_html( $badge['label'] ) )
+				: sprintf( '<a href="%s" %s>%s</a>', esc_url( $badge['url'] ), $attrs, esc_html( $badge['label'] ) );
+		}
+
+		return $output . '</div>';
 	}
 
 	/**

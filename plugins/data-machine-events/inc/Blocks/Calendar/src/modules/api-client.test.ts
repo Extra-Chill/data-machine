@@ -33,10 +33,11 @@ describe( 'calendar response lifecycle', () => {
 			ok: true,
 			json: async () => ( {
 				success: true,
-				html: '<p>stale</p>',
-				pagination: null,
-				counter: null,
-				navigation: null,
+				events: [],
+				grouping: { ordered_dates: [], by_date: {}, gaps: {} },
+				pagination: { current_page: 1, total_pages: 1 },
+				counter: { showing_count: 0 },
+				navigation: { has_past: true },
 			} ),
 		} as Response );
 		await request;

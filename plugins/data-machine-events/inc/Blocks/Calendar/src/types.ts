@@ -106,6 +106,7 @@ export interface CalendarRequest {
 	 * fetch. See Extra-Chill/data-machine-events#160.
 	 */
 	scope_token: string;
+	venue_tier: string;
 }
 
 export interface FilterRequestContext {
@@ -118,32 +119,22 @@ export interface FilterRequestContext {
 /*  REST API responses                                                 */
 /* ------------------------------------------------------------------ */
 
-export interface CalendarResponse {
-	success: boolean;
-	html: string;
-	pagination: { html: string } | null;
-	counter: string | null;
-	navigation: { html: string } | null;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Data-only REST response (phase 1 of refactor #298)                 */
-/* ------------------------------------------------------------------ */
-/*  Activated by passing `format=data` to                              */
-/*  `/wp-json/datamachine/v1/events/calendar`. The legacy              */
-/*  `CalendarResponse` schema above remains the default. No existing   */
-/*  consumer is wired to this shape yet — porting consumers is the     */
-/*  scope of phase 2+ in #298.                                         */
-/*                                                                     */
-/*  See `docs/calendar-data-schema.md` for the full schema doc.        */
-/* ------------------------------------------------------------------ */
-
-/** Identifies the schema version + phase the server returned. */
 export interface CalendarDataSchemaMeta {
 	name: 'calendar-data';
-	version: 4;
+	version: number;
 	phase: 1;
 	issue: 298;
+}
+
+export interface CalendarBadges {
+	wrapper_classes: string;
+	items: {
+		classes: string;
+		taxonomy: string;
+		term: string;
+		label: string;
+		url: string;
+	}[];
 }
 
 /** Date / time slot for a single event, sourced from EventHydrator. */
@@ -209,15 +200,7 @@ export interface CalendarEventItem {
 	status: string;
 	address: string;
 	taxonomies: Record< string, CalendarEventTaxonomyTerm[] >;
-	/**
-	 * Server-rendered, filter-applied badge markup from
-	 * `Badges::render_taxonomy_badges()`. When present, the event renderer
-	 * injects this directly so client-appended (Load More) cards honor the
-	 * `data_machine_events_badge_*_classes` filters themes hook for styling,
-	 * instead of rebuilding badges from `taxonomies` (which drops those
-	 * theme classes). See #381.
-	 */
-	badges_html?: string;
+	badges: CalendarBadges;
 	/**
 	 * Server-filtered "More Info" button class list from the
 	 * `data_machine_events_more_info_button_classes` filter. When present,
@@ -323,7 +306,6 @@ export interface CalendarDataResponse {
 	pagination: CalendarDataPagination;
 	counter: CalendarDataCounter;
 	navigation: CalendarDataNavigation;
-	empty_html: string;
 }
 
 export interface FilterResponse {
@@ -365,7 +347,7 @@ export interface EventPlaceholderData {
 	id: number;
 	title: string;
 	permalink: string;
-	badges_html: string;
+	badges: CalendarBadges;
 	button_classes: string;
 	display_vars?: EventDisplayVars;
 }
@@ -382,14 +364,4 @@ export interface FlatpickrInstance {
 		triggerChange?: boolean
 	) => void;
 	destroy: () => void;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Carousel observer tracking                                         */
-/* ------------------------------------------------------------------ */
-
-export interface CarouselObserverEntry {
-	observer: ResizeObserver;
-	wrapper: HTMLElement;
-	events: NodeListOf< HTMLElement >;
 }
