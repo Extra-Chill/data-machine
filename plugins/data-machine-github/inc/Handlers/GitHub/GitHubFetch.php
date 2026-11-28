@@ -112,7 +112,11 @@ final class GitHubFetch extends FetchHandler {
 			$sha            = $entry['sha'];
 			$before         = $previous[ $path ] ?? null;
 			$change         = null === $before ? 'added' : ( $sha === $before['sha'] ? $before['change'] : 'modified' );
-			$paths[ $path ] = array( 'sha' => $sha, 'change' => $change, 'commit' => $commit );
+			$paths[ $path ] = array(
+				'sha'    => $sha,
+				'change' => $change,
+				'commit' => $commit,
+			);
 			$candidates[ self::item_identifier( self::dedup_key( $repo, $path, $sha ) ) ] = $path;
 		}
 
@@ -127,7 +131,11 @@ final class GitHubFetch extends FetchHandler {
 		// Hold tombstones until the downstream pipeline marks them processed so
 		// caps, in-flight claims and downstream failures cannot drop removals.
 		foreach ( array_diff_key( $previous, $paths ) as $path => $entry ) {
-			$pending[ $path ] = array( 'sha' => $entry['sha'], 'old_commit' => $entry['commit'], 'commit' => $commit );
+			$pending[ $path ] = array(
+				'sha'        => $entry['sha'],
+				'old_commit' => $entry['commit'],
+				'commit'     => $commit,
+			);
 		}
 		foreach ( $pending as $path => $entry ) {
 			$path = (string) $path;
@@ -161,8 +169,11 @@ final class GitHubFetch extends FetchHandler {
 			$items[]         = $item;
 		}
 
-		$state = array( 'paths' => $paths, 'removals' => $pending );
-		if ( $ledger && $state !== ( $snapshot['metadata'] ?? null ) && null === $ledger->upsert(
+		$state = array(
+			'paths'    => $paths,
+			'removals' => $pending,
+		);
+		if ( $ledger && ( $snapshot['metadata'] ?? null ) !== $state && null === $ledger->upsert(
 			array(
 				'namespace'       => $namespace,
 				'item_id'         => 'snapshot',
@@ -199,7 +210,8 @@ final class GitHubFetch extends FetchHandler {
 	}
 
 	private static function filename( string $path ): string {
-		return substr( strrchr( '/' . $path, '/' ), 1 );
+		$slash = strrpos( $path, '/' );
+		return false === $slash ? $path : substr( $path, $slash + 1 );
 	}
 
 	private static function dedup_key( string $repo, string $path, string $sha ): string {

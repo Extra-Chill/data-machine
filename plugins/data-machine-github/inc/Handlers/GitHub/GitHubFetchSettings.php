@@ -40,11 +40,11 @@ final class GitHubFetchSettings extends SettingsHandler {
 				'description' => __( 'Optional glob, e.g. *.md. Patterns without a slash match filenames at any depth.', 'data-machine-github' ),
 			),
 			'max_file_size' => array(
-				'type'        => 'number',
-				'label'       => __( 'Maximum File Size (bytes)', 'data-machine-github' ),
-				'default'     => self::DEFAULT_MAX_FILE_SIZE,
-				'min'         => 1,
-				'max'         => self::MAX_FILE_SIZE,
+				'type'    => 'number',
+				'label'   => __( 'Maximum File Size (bytes)', 'data-machine-github' ),
+				'default' => self::DEFAULT_MAX_FILE_SIZE,
+				'min'     => 1,
+				'max'     => self::MAX_FILE_SIZE,
 			),
 		);
 	}

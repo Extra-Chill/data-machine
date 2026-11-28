@@ -109,7 +109,10 @@ final class GitHubClient {
 					'Accept'               => 'application/vnd.github+json',
 					'X-GitHub-Api-Version' => '2022-11-28',
 				),
-				'auth'                      => array( 'type' => 'bearer', 'token' => $this->token ),
+				'auth'                      => array(
+					'type'  => 'bearer',
+					'token' => $this->token,
+				),
 				'timeout'                   => 30,
 				'context'                   => 'GitHub API',
 				'limit_response_size'       => $response_limit,

@@ -9,7 +9,7 @@
           "../data-machine"
         ],
         "wordpress_test_paths": [
-          "tests/github-files-smoke.php"
+          "tests/github-handler-contract-smoke.php"
         ]
       }
     }
