@@ -5,7 +5,7 @@
 	"require": {
 		"php": ">=8.2",
 		"wordpress/agents-api": "dev-main",
-		"woocommerce/action-scheduler": "^3.9",
+		"woocommerce/action-scheduler": "^4.2",
 		"automattic/blocks-engine-php-transformer": "dev-trunk"
 	},
 	"autoload": {
