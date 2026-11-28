@@ -8,8 +8,8 @@
 		"start": "wp-scripts start"
 	},
 	"devDependencies": {
-		"@wordpress/scripts": "^35.0.0",
-		"js-yaml": "^4.3.2"
+		"@wordpress/scripts": "^37.2.0",
+		"js-yaml": "^5.5.0"
 	},
 	"overrides": {
 		"js-yaml": "$js-yaml",
@@ -22,14 +22,14 @@
 	},
 	"dependencies": {
 		"@tanstack/react-query": "^5.90.12",
-		"@wordpress/api-fetch": "^7.36.0",
-		"@wordpress/components": "^35.0.1",
-		"@wordpress/data": "^10.36.0",
-		"@wordpress/dom-ready": "^4.36.0",
-		"@wordpress/element": "^6.36.0",
-		"@wordpress/hooks": "^4.36.0",
-		"@wordpress/i18n": "^6.9.0",
-		"@wordpress/notices": "^5.36.0",
+		"@wordpress/api-fetch": "^8.2.0",
+		"@wordpress/components": "^45.0.0",
+		"@wordpress/data": "^11.2.0",
+		"@wordpress/dom-ready": "^5.2.0",
+		"@wordpress/element": "^10.2.0",
+		"@wordpress/hooks": "^5.2.0",
+		"@wordpress/i18n": "^7.2.0",
+		"@wordpress/notices": "^6.2.0",
 		"zustand": "^5.0.9"
 	}
 }
