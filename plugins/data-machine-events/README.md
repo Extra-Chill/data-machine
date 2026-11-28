@@ -74,17 +74,21 @@ Full API documentation: [docs/rest-api.md](docs/rest-api.md)
 
 ## Development
 
+Run these commands from `plugins/data-machine-events` with Node.js 24 for the JS tooling:
+
 ```bash
 # PHP dependencies
 composer install --no-dev --optimize-autoloader
 
-# Build blocks
-cd inc/Blocks/Calendar && npm ci && npm run build
-cd ../EventDetails && npm ci && npm run build
+# Build Calendar, Event Details, and Events Map
+npm ci
+npm run build
 
-# Package for distribution
-./build.sh  # Creates /dist/data-machine-events.zip
+# Run the block JavaScript tests
+npm test
 ```
+
+Each block still emits its assets under its own `inc/Blocks/<Block>/build/` directory. The shared Release workflow runs the plugin-level build and packages those assets into the plugin ZIP.
 
 ## Documentation
 
