@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine will be documented in this file.
 
+## [0.207.2] - 2026-11-28
+
+### Fixed
+- gate email abilities on mailbox ownership, not just use_tools
+
 ## [0.207.1] - 2026-11-28
 
 ### Fixed
