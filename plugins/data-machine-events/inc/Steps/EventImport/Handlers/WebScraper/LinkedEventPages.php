@@ -47,6 +47,7 @@ class LinkedEventPages {
 				continue;
 			}
 			foreach ( $extractor->extract( $body, $url ) as $event ) {
+				$event['source_url'] = $url;
 				if ( empty( $event['ticketUrl'] ) ) {
 					$event['ticketUrl'] = $url;
 				}

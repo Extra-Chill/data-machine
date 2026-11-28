@@ -19,6 +19,7 @@ use DataMachineEvents\Core\Venue_Taxonomy;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarGenerationFence;
 use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Steps\Upsert\Events\EventUpsert;
 use const DataMachineEvents\Api\API_NAMESPACE;
 
 class EventRestControllerTest extends WP_UnitTestCase {
@@ -170,7 +171,15 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$response = $this->server->dispatch( $request );
 
 		$this->assertSame( 200, $response->get_status() );
-		$this->assertSame( array( $post_id ), array_column( $response->get_data()['events'], 'id' ) );
+		$events = $response->get_data()['events'];
+		$this->assertSame( array( $post_id ), array_column( $events, 'id' ) );
+		$this->assertSame(
+			array(
+				'url'  => '',
+				'name' => '',
+			),
+			$events[0]['source']
+		);
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
@@ -225,6 +234,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $affiliate_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
 			)
 		);
+		update_post_meta( $post_id, EventUpsert::SOURCE_URL_META_KEY, $affiliate_url );
 
 		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
 		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
@@ -239,6 +249,7 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertSame( $post_id, $event['id'] );
 		$this->assertSame( '', $event['ticket']['url'] );
 		$this->assertTrue( $event['ticket']['is_affiliate'] );
+		$this->assertSame( '', $event['source']['url'] );
 
 		$raw_response = wp_json_encode( $data );
 		$this->assertStringNotContainsString( 'evyy.net', $raw_response );

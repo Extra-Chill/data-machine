@@ -300,6 +300,11 @@ class EventEngineData {
 			$payload['eventStatus'] = $event_status;
 		}
 
+		// Original listing attribution stays in engine data, outside AI-generated fields.
+		if ( ! empty( $event_data['source_url'] ) ) {
+			$payload['source_url'] = $event_data['source_url'];
+		}
+
 		// Core event fields.
 		$core_fields = array(
 			'startDate' => $event_data['startDate'] ?? '',

@@ -19,16 +19,42 @@ namespace {
 		) {}
 	}
 
+	function get_post_meta( int $post_id, string $key, bool $single ): string {
+		return 507001 === $post_id && '_datamachine_event_source_url' === $key ? 'https://example.com/listings/seeded-show' : '';
+	}
+
+	function esc_url_raw( string $url, ?array $protocols = null ): string {
+		return $url;
+	}
+
+	function wp_specialchars_decode( string $text, int $quote_style = ENT_NOQUOTES ): string {
+		return htmlspecialchars_decode( $text, $quote_style );
+	}
+
+	function wp_parse_url( string $url, int $component = -1 ): mixed {
+		return parse_url( $url, $component );
+	}
+
 	function get_permalink( int $post_id ): string {
 		return 'https://producer.invalid/events/' . $post_id;
 	}
 
 	function get_the_terms( int $post_id, string $taxonomy ): array|false {
-		if ( 507001 === $post_id && 'venue' === $taxonomy ) {
-			return array( new DME_Contract_Term( 507101, 'Seeded Hall', 'seeded-hall' ) );
+		if ( 507001 !== $post_id ) {
+			return false;
 		}
 
-		return false;
+		return match ( $taxonomy ) {
+			'venue'    => array( new DME_Contract_Term( 507101, 'Seeded Hall', 'seeded-hall' ) ),
+			'artist'   => array( new DME_Contract_Term( 507102, 'The Seeded Performers', 'the-seeded-performers' ) ),
+			'location' => array( new DME_Contract_Term( 507103, 'Seed City', 'seed-city' ) ),
+			'promoter' => array( new DME_Contract_Term( 507104, 'Seeded Productions', 'seeded-productions' ) ),
+			default    => false,
+		};
+	}
+
+	function get_object_taxonomies( string $post_type, string $output ): array {
+		return array_fill_keys( array( 'artist', 'location', 'promoter' ), (object) array( 'sort' => false ) );
 	}
 
 	function is_wp_error(): bool {
@@ -54,7 +80,7 @@ namespace DataMachineEvents\Core {
 	 * for that input without pulling `wp_parse_url()` into this portable,
 	 * WordPress-free test run.
 	 */
-	function data_machine_events_is_affiliate_ticket_url( string $url ): bool {
+	function data_machine_events_is_gated_ticket_url( string $url ): bool {
 		return false;
 	}
 
@@ -81,20 +107,11 @@ namespace DataMachineEvents\Core {
 
 namespace DataMachineEvents\Blocks\Calendar\Taxonomy {
 	final class Badges {
-		public static function get_event_taxonomies( int $post_id ): array {
-			if ( 507001 !== $post_id ) {
-				return array();
-			}
-
+		public static function get_display_data( int $post_id ): array {
 			return array(
-				'artist'   => array( 'terms' => array( new \DME_Contract_Term( 507102, 'The Seeded Performers', 'the-seeded-performers' ) ) ),
-				'location' => array( 'terms' => array( new \DME_Contract_Term( 507103, 'Seed City', 'seed-city' ) ) ),
-				'promoter' => array( 'terms' => array( new \DME_Contract_Term( 507104, 'Seeded Productions', 'seeded-productions' ) ) ),
+				'wrapper_classes' => 507001 === $post_id ? 'presentation-only' : '',
+				'items'           => array(),
 			);
-		}
-
-		public static function render_taxonomy_badges( int $post_id ): string {
-			return 507001 === $post_id ? '<div>presentation-only</div>' : '';
 		}
 	}
 }

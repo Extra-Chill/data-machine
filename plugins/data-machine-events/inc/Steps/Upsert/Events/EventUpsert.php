@@ -41,6 +41,7 @@ use DataMachine\Core\WordPress\TaxonomyHandler;
 use DataMachine\Core\WordPress\WordPressSettingsResolver;
 use DataMachine\Core\WordPress\WordPressPublishHelper;
 use DataMachineEvents\Utilities\EventIdentifierGenerator;
+use DataMachineEvents\Utilities\EventSourceUrl;
 use DataMachineEvents\Tasks\CalendarGenerationPublisher;
 
 defined( 'ABSPATH' ) || exit;
@@ -50,6 +51,7 @@ class EventUpsert extends UpsertHandler {
 	public const SOURCE_IDENTITY_META_KEY = '_datamachine_event_source_identity';
 	public const SOURCE_NAME_META_KEY     = '_datamachine_event_source';
 	public const SOURCE_ID_META_KEY       = '_datamachine_event_source_id';
+	public const SOURCE_URL_META_KEY      = EventSourceUrl::META_KEY;
 
 	protected TaxonomyHandler $taxonomy_handler;
 
@@ -666,6 +668,16 @@ class EventUpsert extends UpsertHandler {
 				update_post_meta( $post_id, self::SOURCE_IDENTITY_META_KEY, $source_identity );
 				update_post_meta( $post_id, self::SOURCE_NAME_META_KEY, sanitize_text_field( (string) ( $parameters['source'] ?? '' ) ) );
 				update_post_meta( $post_id, self::SOURCE_ID_META_KEY, sanitize_text_field( (string) ( $parameters['source_id'] ?? '' ) ) );
+			}
+
+			// Core skips meta_input on unchanged content. Reconcile attribution
+			// here without replacing another source's provenance or erasing a
+			// previously known URL when an import omits it.
+			if ( ! $link_identity ) {
+				$source_url = EventSourceUrl::sanitize( $engine->get( 'source_url' ) ?? $parameters['source_url'] ?? '' );
+				if ( '' !== $source_url && update_post_meta( $post_id, self::SOURCE_URL_META_KEY, $source_url ) ) {
+					CacheInvalidator::invalidate_event( $post_id );
+				}
 			}
 
 			// 7. Content idempotency does not imply taxonomy or identity integrity.
