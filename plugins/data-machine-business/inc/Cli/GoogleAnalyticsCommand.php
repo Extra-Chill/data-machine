@@ -309,8 +309,8 @@ class GoogleAnalyticsCommand extends BaseCommand {
 		}
 
 		if ( isset( $assoc_args['hostname'] ) ) {
-			$filters   = isset( $input['filters'] ) && is_array( $input['filters'] ) ? $input['filters'] : array();
-			$filters[] = array(
+			$filters          = isset( $input['filters'] ) && is_array( $input['filters'] ) ? $input['filters'] : array();
+			$filters[]        = array(
 				'field_name' => 'hostName',
 				'match_type' => 'EXACT',
 				'value'      => (string) $assoc_args['hostname'],
@@ -318,7 +318,11 @@ class GoogleAnalyticsCommand extends BaseCommand {
 			$input['filters'] = $filters;
 		}
 
-		foreach ( array( 'property-id' => 'property_id', 'country' => 'country' ) as $flag => $key ) {
+		$passthrough = array(
+			'property-id' => 'property_id',
+			'country'     => 'country',
+		);
+		foreach ( $passthrough as $flag => $key ) {
 			if ( isset( $assoc_args[ $flag ] ) ) {
 				$input[ $key ] = (string) $assoc_args[ $flag ];
 			}
@@ -328,21 +332,6 @@ class GoogleAnalyticsCommand extends BaseCommand {
 		}
 
 		return $input;
-	}
-
-	/**
-	 * Map CLI flags to ability input keys.
-	 *
-	 * @param array $input      Ability input (modified by reference).
-	 * @param array $assoc_args CLI associative arguments.
-	 * @param array $mapping    Flag-to-key mapping (cli-flag => ability_key).
-	 */
-	private function map_optional( array &$input, array $assoc_args, array $mapping ): void {
-		foreach ( $mapping as $flag => $key ) {
-			if ( isset( $assoc_args[ $flag ] ) ) {
-				$input[ $key ] = $assoc_args[ $flag ];
-			}
-		}
 	}
 
 	/**
