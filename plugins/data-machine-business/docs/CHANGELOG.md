@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.32.0] - 2026-11-28
+
+### Added
+- GitHub files fetch handler
+
 ## [0.31.1] - 2026-11-28
 
 ### Fixed
