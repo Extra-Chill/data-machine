@@ -1,5 +1,11 @@
+/**
+ * WordPress dependencies
+ */
 import { __, _n, sprintf } from '@wordpress/i18n';
 
+/**
+ * Internal dependencies
+ */
 import type { CalendarDataResponse } from '../types';
 import { renderDateGroup } from './date-group-renderer';
 import { renderGapSeparator } from './gap-renderer';

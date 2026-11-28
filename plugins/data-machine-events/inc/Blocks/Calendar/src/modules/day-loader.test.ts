@@ -1,3 +1,6 @@
+/**
+ * Internal dependencies
+ */
 import { destroyDayLoader, initDayLoader } from './day-loader';
 
 it( 'renders only the requested day from structured data', async () => {

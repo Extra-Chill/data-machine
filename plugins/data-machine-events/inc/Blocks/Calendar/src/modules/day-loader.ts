@@ -1,5 +1,8 @@
 /** Resolve deferred day shells from the structured calendar endpoint. */
 
+/**
+ * Internal dependencies
+ */
 import { buildCalendarRequest, requestCalendarData } from './api-client';
 import { initCarousel } from './carousel';
 import { renderEventCard } from './event-renderer';
