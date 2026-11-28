@@ -1228,7 +1228,7 @@
   "extensions": {
     "wordpress": {
       "database_type": "sqlite",
-      "node": "20",
+      "node": "24",
       "php": "8.2",
       "release_latest_branch": "release-latest",
       "settings": {

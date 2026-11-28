@@ -41,6 +41,7 @@ jobs:
     with:
       components: ${{ inputs.component == '' && 'all' || '' }}
       component: ${{ inputs.component }}
+      node-version: '24'
       args: ${{ inputs.component && inputs.bump && format('--bump {0} --force-lower-bump', inputs.bump) || '' }}
       dry-run: ${{ inputs.dry-run || false }}
       # Deploy on release instead of waiting for the poller (Extra-Chill/extrachill#1092).
