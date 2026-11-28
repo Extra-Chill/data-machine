@@ -109,7 +109,7 @@ Typed, permissioned functions registered via WordPress's Abilities API. Extensio
 | `datamachine/run-flow` | Execute a flow programmatically |
 | ... | Additional core abilities across pipelines, flows, jobs, memory, media, SEO, email, and infrastructure |
 
-Social publishing, workspace, GitHub, and business integration abilities live in extension plugins such as data-machine-socials, data-machine-code, and data-machine-business.
+Social publishing, workspace, GitHub, and business integrations live in extension plugins such as data-machine-socials, data-machine-code, data-machine-github, and data-machine-business.
 
 ### Agent Bundles
 
@@ -265,6 +265,7 @@ Detailed endpoint docs live under [`docs/api/`](docs/api/). Routes under `wp-jso
 | [data-machine-code](https://github.com/Extra-Chill/data-machine-code) | Workspace management, GitHub integration, git operations |
 | [data-machine-socials](../data-machine-socials) | Publish to Instagram (images, carousels, Reels, Stories), Twitter (text + media + video), Facebook, Threads, Bluesky, Pinterest (image + video pins). Reddit fetch. |
 | [data-machine-business](../data-machine-business) | Google Sheets (fetch + publish), Slack, Discord integrations |
+| [data-machine-github](../data-machine-github) | Fetch added, modified, and removed files from GitHub repositories |
 | [data-machine-editor](https://github.com/Extra-Chill/data-machine-editor) | Gutenberg inline diff visualization, accept/reject review, editor sidebar |
 | [data-machine-frontend-chat](https://github.com/Extra-Chill/data-machine-frontend-chat) | Floating agent chat widget for any WordPress site |
 | [data-machine-chat-bridge](https://github.com/Extra-Chill/data-machine-chat-bridge) | Message queue, webhook delivery, and REST API for external chat clients |

@@ -1,0 +1,20 @@
+{
+	"name": "extra-chill/data-machine-github",
+	"description": "GitHub file fetch integration for Data Machine",
+	"version": "0.1.0",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": ">=8.2"
+	},
+	"autoload": {
+		"psr-4": {
+			"DataMachineGitHub\\": "inc/"
+		}
+	},
+	"authors": [
+		{
+			"name": "Chris Huber",
+			"email": "chris@chubes.net"
+		}
+	]
+}

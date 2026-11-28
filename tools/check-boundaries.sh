@@ -20,16 +20,23 @@ set -euo pipefail
 root="$(git rev-parse --show-toplevel)"
 cd "${root}"
 
-extensions=(events socials business)
+extensions=(events socials business github)
 allowlist="tools/boundary-allowlist.txt"
 
 # Identifiers owned by the given extensions, e.g. "events socials".
 pattern_for() {
-  local names=("$@") lower upper title
+  local names=("$@") lower title ext constant constants=()
   lower="$(IFS='|'; echo "${names[*]}")"
-  upper="$(echo "${lower}" | tr '[:lower:]' '[:upper:]')"
-  title="$(echo "${lower}" | sed -E 's/(^|\|)([a-z])/\1\u\2/g')"
-  printf '%s' "DataMachine(${title})\\\\|DATAMACHINE_(${upper})_|data-machine-(${lower})/|data_?machine_?(${lower})\\b|plugins/data-machine-(${lower})"
+  title="$(echo "${lower}" | sed -E 's/(^|\|)([a-z])/\1\u\2/g; s/Github/GitHub/g')"
+  for ext in "${names[@]}"; do
+    constant="${ext^^}_"
+    if [[ "${ext}" == github ]]; then
+      # DATAMACHINE_GITHUB_TOKEN already belongs to core's bundle downloader.
+      constant='GITHUB_(VERSION|PATH|URL)\b'
+    fi
+    constants+=("${constant}")
+  done
+  printf '%s' "DataMachine(${title})\\\\|DATAMACHINE_($(IFS='|'; echo "${constants[*]}"))|data-machine-(${lower})/|data_?machine_?(${lower})\\b|plugins/data-machine-(${lower})"
 }
 
 # Code only: docs, changelogs and READMEs may describe the ecosystem.
