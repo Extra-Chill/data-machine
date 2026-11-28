@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 Homeboy maintains this file from conventional commits at release time —
 do not edit by hand.
 
+## [0.31.1] - 2026-11-28
+
+### Fixed
+- translate or reject generic CLI flags for aggregate_report
+
 ## [0.31.0] - 2026-11-26
 
 ### Added
