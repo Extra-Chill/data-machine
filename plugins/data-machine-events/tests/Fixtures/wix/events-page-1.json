@@ -1,0 +1,22 @@
+{
+	"total": 101,
+	"offset": 0,
+	"limit": 100,
+	"events": [
+		{
+			"id": "event-one",
+			"title": "First Fixture Show",
+			"status": "ACTIVE",
+			"scheduling": {
+				"config": {
+					"startDate": "2099-08-01T00:00:00.000Z",
+					"timeZoneId": "America/New_York"
+				}
+			},
+			"location": {
+				"name": "Fixture Room",
+				"address": "100 Example Street"
+			}
+		}
+	]
+}

@@ -1,0 +1,194 @@
+<?php
+/**
+ * Smoke test for host-neutral runtime vocabulary.
+ *
+ * Run with: php tests/runtime-vocabulary-smoke.php
+ *
+ * @package DataMachine\Tests
+ */
+
+$root     = dirname( __DIR__ );
+$failures = array();
+$passes   = 0;
+
+echo "runtime-vocabulary-smoke\n";
+
+function datamachine_runtime_vocab_assert( bool $condition, string $label, array &$failures, int &$passes ): void {
+	if ( $condition ) {
+		++$passes;
+		echo "  PASS {$label}\n";
+		return;
+	}
+
+	$failures[] = $label;
+	echo "  FAIL {$label}\n";
+}
+
+function datamachine_runtime_vocab_relative_path( string $root, string $path ): string {
+	$relative = substr( $path, strlen( $root ) + 1 );
+	return str_replace( DIRECTORY_SEPARATOR, '/', false === $relative ? $path : $relative );
+}
+
+function datamachine_runtime_vocab_is_excluded_dir( string $relative_path ): bool {
+	if ( 'vendor/wordpress/agents-api/tests' === $relative_path || str_starts_with( $relative_path, 'vendor/wordpress/agents-api/tests/' ) ) {
+		return false;
+	}
+
+	$excluded_roots = array(
+		'.git',
+		'.datamachine',
+		'.claude',
+		'.homeboy-action',
+		'build',
+		'dist',
+		'node_modules',
+		'vendor',
+	);
+
+	foreach ( $excluded_roots as $excluded_root ) {
+		if ( $excluded_root === $relative_path || str_starts_with( $relative_path, $excluded_root . '/' ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+function datamachine_runtime_vocab_is_allowed_file( string $relative_path ): bool {
+	if ( '.git' === $relative_path ) {
+		return true;
+	}
+
+	$allowed_files = array(
+		// Generated local agent guidance; not part of plugin runtime behavior.
+		'AGENTS.md',
+		// Generated release history is intentionally not hand-edited.
+		'docs/CHANGELOG.md',
+		// Developer/release harness config. Runtime code must remain generic.
+		'.buildignore',
+		'composer.json',
+		'homeboy.json',
+		// Documented release tooling and historical audit evidence, not runtime dependencies.
+		'README.md',
+		'docs/wordpress-org-submission.md',
+		'docs/plugin-check-v01740-reviewer-dossier.md',
+		'docs/plugin-check-v01740-hook-names-dossier.md',
+		'docs/development/plugin-check-v01740-slow-query-audit.md',
+		'docs/development/post-identity-reservations.md',
+		// Explicit host harness contracts and external-schema interoperability fixtures.
+		'tests/ai-concurrency-release-wakeup-smoke.php',
+		'tests/agent-daily-memory-pipeline-scope-smoke.php',
+		'tests/eslint-source-inventory-smoke.sh',
+		'tests/cli-global-options-smoke.php',
+		'tests/email-multi-inbox-forward-smoke.php',
+		'tests/phpunit-file-isolation-smoke.php',
+		'tests/typed-artifact-handler-smoke.php',
+		'tests/fuzz/README.md',
+		'tests/fuzz/pipeline-builder-runtime.json',
+		'tests/fuzz/pipeline-builder-runtime-contract.test.mjs',
+	);
+
+	if ( in_array( $relative_path, $allowed_files, true ) ) {
+		return true;
+	}
+
+	// CI workflow files are source-control harness config, not runtime logic.
+	return str_starts_with( $relative_path, '.github/workflows/' );
+}
+
+/**
+ * Git-tracked first-party paths, or null when git is unavailable.
+ *
+ * Runners drop untracked files into the checkout (for example `.homeboy-bin/`
+ * and shard plans). Those belong to the host, not to first-party source.
+ *
+ * @param string $root Repository root.
+ * @return array<string, true>|null
+ */
+function datamachine_runtime_vocab_tracked_files( string $root ): ?array {
+	$output = array();
+	$status = 1;
+	exec( 'git -C ' . escapeshellarg( $root ) . ' ls-files 2>/dev/null', $output, $status ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.system_calls_exec -- CLI-only smoke reads the git index.
+	if ( 0 !== $status || array() === $output ) {
+		return null;
+	}
+
+	return array_fill_keys( $output, true );
+}
+
+$tracked_files = datamachine_runtime_vocab_tracked_files( $root );
+
+$host_specific_patterns = array(
+	'wp-site-generator' => '/wp-site-generator/i',
+	'wpsg'              => '/\bwpsg\b/i',
+	'codebox'           => '/(?:wp[-_ ]?)?codebox/i',
+	'homeboy'           => '/homeboy/i',
+);
+
+$violations                = array();
+$runtime_source_violations = array();
+$iterator                  = new RecursiveIteratorIterator(
+	new RecursiveCallbackFilterIterator(
+		new RecursiveDirectoryIterator( $root, FilesystemIterator::SKIP_DOTS ),
+		function ( SplFileInfo $file ) use ( $root ): bool {
+			$relative_path = datamachine_runtime_vocab_relative_path( $root, $file->getPathname() );
+			return ! $file->isDir() || ! datamachine_runtime_vocab_is_excluded_dir( $relative_path );
+		}
+	)
+);
+
+foreach ( $iterator as $file ) {
+	if ( ! $file instanceof SplFileInfo || ! $file->isFile() ) {
+		continue;
+	}
+
+	$path          = $file->getPathname();
+	$relative_path = datamachine_runtime_vocab_relative_path( $root, $path );
+
+	if ( __FILE__ === $path || datamachine_runtime_vocab_is_allowed_file( $relative_path ) ) {
+		continue;
+	}
+
+	// Vendored Agents API tests are scanned on purpose; other untracked files are runner output.
+	if ( null !== $tracked_files && ! isset( $tracked_files[ $relative_path ] ) && ! str_starts_with( $relative_path, 'vendor/' ) ) {
+		continue;
+	}
+
+	$contents = file_get_contents( $path );
+	if ( false === $contents ) {
+		continue;
+	}
+
+	foreach ( $host_specific_patterns as $label => $pattern ) {
+		if ( preg_match( $pattern, $contents ) ) {
+			$violations[] = "{$relative_path} contains {$label}";
+			if ( str_starts_with( $relative_path, 'inc/' ) || 'data-machine.php' === $relative_path || 'uninstall.php' === $relative_path ) {
+				$runtime_source_violations[] = "{$relative_path} contains {$label}";
+			}
+		}
+	}
+}
+
+datamachine_runtime_vocab_assert( array() === $runtime_source_violations, 'runtime source uses host-neutral vocabulary', $failures, $passes );
+datamachine_runtime_vocab_assert( array() === $violations, 'first-party source uses host-neutral vocabulary outside explicit harness/generated allowlists', $failures, $passes );
+
+if ( ! empty( $runtime_source_violations ) ) {
+	echo "\nRuntime source host-specific mentions:\n";
+	foreach ( $runtime_source_violations as $violation ) {
+		echo "  - {$violation}\n";
+	}
+}
+
+if ( ! empty( $violations ) ) {
+	echo "\nHost-specific mentions:\n";
+	foreach ( $violations as $violation ) {
+		echo "  - {$violation}\n";
+	}
+}
+
+if ( ! empty( $failures ) ) {
+	echo "\nRuntime vocabulary smoke failed (" . count( $failures ) . " failure(s)).\n";
+	exit( 1 );
+}
+
+echo "\nRuntime vocabulary smoke passed ({$passes} assertions).\n";

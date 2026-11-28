@@ -1,0 +1,909 @@
+<?php
+/**
+ * Direct asynchronous job ownership and idempotency coverage.
+ *
+ * @package DataMachine\Tests\Unit\Abilities\Job
+ */
+
+namespace DataMachine\Tests\Unit\Abilities\Job;
+
+use AgentsAPI\AI\WP_Agent_Execution_Principal;
+use DataMachine\Abilities\Job\DeleteJobsAbility;
+use DataMachine\Abilities\Job\ExecuteWorkflowAbility;
+use DataMachine\Abilities\Job\FailJobAbility;
+use DataMachine\Abilities\Job\FlowHealthAbility;
+use DataMachine\Abilities\Job\GetJobsAbility;
+use DataMachine\Abilities\Job\HydrateJobArtifactAbility;
+use DataMachine\Abilities\Job\JobsSummaryAbility;
+use DataMachine\Abilities\Job\RecoverStuckJobsAbility;
+use DataMachine\Abilities\Job\RetryJobAbility;
+use DataMachine\Abilities\Job\RunMetricsAbility;
+use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Engine\ExecuteStepAbility;
+use DataMachine\Core\Database\Agents\Agents;
+use DataMachine\Core\Database\Jobs\Jobs;
+use DataMachine\Core\DirectJobEnqueuer;
+use DataMachine\Core\DirectOperationRecoveryPolicy;
+use DataMachine\Core\JobRetryPolicy;
+use DataMachine\Core\JobStatus;
+use WP_UnitTestCase;
+
+class DirectJobOwnershipTest extends WP_UnitTestCase {
+
+	private int $owner_id;
+	private int $other_user_id;
+	private int $admin_id;
+	private int $agent_id;
+
+	public function set_up(): void {
+		parent::set_up();
+
+		datamachine_test_prepare_site();
+		$this->owner_id      = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		$this->other_user_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
+		$this->admin_id      = self::factory()->user->create( array( 'role' => 'administrator' ) );
+		get_user_by( 'id', $this->owner_id )->add_cap( 'datamachine_manage_flows' );
+		get_user_by( 'id', $this->other_user_id )->add_cap( 'datamachine_manage_flows' );
+		$this->agent_id = ( new Agents() )->create_if_missing( 'direct-job-owner', 'Direct Job Owner', $this->owner_id );
+
+	}
+
+	public function tear_down(): void {
+		PermissionHelper::clear_agent_context();
+		wp_set_current_user( 0 );
+		parent::tear_down();
+	}
+
+	public function test_authenticated_caller_owns_direct_job_and_identity_survives_engine_snapshot(): void {
+		wp_set_current_user( $this->owner_id );
+
+		$result = $this->execute( 'authenticated-caller' );
+		$job    = ( new Jobs() )->get_job( (int) $result['job_id'] );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( $this->owner_id, (int) $job['user_id'] );
+		$this->assertNull( $job['agent_id'] );
+		$this->assertSame( $this->owner_id, (int) $job['engine_data']['job']['user_id'] );
+		$this->assertSame( (int) $job['job_id'], (int) $job['engine_data']['job']['job_id'] );
+	}
+
+	public function test_delegated_principal_and_effective_agent_are_persisted(): void {
+		wp_set_current_user( $this->owner_id );
+		PermissionHelper::set_agent_context( $this->agent_id, $this->owner_id );
+		PermissionHelper::set_execution_principal(
+			WP_Agent_Execution_Principal::user_session(
+				$this->other_user_id,
+				(string) $this->agent_id,
+				WP_Agent_Execution_Principal::REQUEST_CONTEXT_REST
+			)
+		);
+
+		$result = $this->execute( 'delegated-caller' );
+		$job    = ( new Jobs() )->get_job( (int) $result['job_id'] );
+
+		$this->assertSame( $this->other_user_id, (int) $job['user_id'] );
+		$this->assertSame( $this->agent_id, (int) $job['agent_id'] );
+		$this->assertSame( $this->other_user_id, (int) $job['engine_data']['job']['user_id'] );
+		$this->assertSame( $this->agent_id, (int) $job['engine_data']['job']['agent_id'] );
+		$this->assertSame( $this->other_user_id, (int) $job['engine_data']['calling_user_id'] );
+	}
+
+	public function test_absent_caller_fails_closed_for_user_scoped_execution(): void {
+		wp_set_current_user( 0 );
+
+		$result = $this->execute( 'missing-caller' );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'workflow_ownership_denied', $result->get_error_code() );
+		$this->assertStringContainsString( 'authenticated acting caller', $result->get_error_message() );
+		$this->assertSame( 403, $result->get_error_data()['status'] );
+		$this->assertFalse( $result->get_error_data()['retryable'] );
+		$this->assertSame( 'caller', $result->get_error_data()['ownership'] );
+	}
+
+	public function test_forged_system_context_input_does_not_grant_internal_authority(): void {
+		wp_set_current_user( 0 );
+
+		$result = ( new ExecuteWorkflowAbility() )->execute(
+			array(
+				'workflow'      => $this->workflow(),
+				'operation_key' => 'forged-system-context',
+				'system_context' => true,
+			)
+		);
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'workflow_ownership_denied', $result->get_error_code() );
+		$this->assertStringContainsString( 'authenticated acting caller', $result->get_error_message() );
+		$this->assertSame( 'caller', $result->get_error_data()['ownership'] );
+
+		$internal = ( new ExecuteWorkflowAbility( false ) )->executeInternal(
+			array(
+				'workflow' => $this->workflow(),
+			)
+		);
+		$this->assertTrue( $internal['success'] );
+
+		wp_set_current_user( $this->other_user_id );
+		$this->assertSame( 'job_access_denied', ( new GetJobsAbility() )->execute( array( 'job_id' => $internal['job_id'] ) )->get_error_code() );
+		wp_set_current_user( $this->admin_id );
+		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $internal['job_id'] ) )['success'] );
+	}
+
+	public function test_ownership_survives_deferred_worker_resume(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'deferred-resume' );
+		$jobs    = new Jobs();
+
+		$retry = JobRetryPolicy::maybeRetry(
+			(int) $created['job_id'],
+			'ai_step_failed',
+			array(
+				'retryable'   => true,
+				'flow_step_id' => 'ephemeral_step_0',
+			),
+			$jobs
+		);
+		$job = $jobs->get_job( (int) $created['job_id'] );
+
+		$this->assertTrue( $retry['retried'] );
+		$this->assertSame( $this->owner_id, (int) $job['user_id'] );
+		$this->assertSame( $this->owner_id, (int) $job['engine_data']['job']['user_id'] );
+		$this->assertSame( $this->owner_id, (int) $job['engine_data']['calling_user_id'] );
+	}
+
+	public function test_owner_access_unrelated_denial_and_privileged_access(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'access-matrix' );
+		$job_id  = (int) $created['job_id'];
+
+		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
+
+		wp_set_current_user( $this->other_user_id );
+		$denied = ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $denied );
+		$this->assertSame( 'job_access_denied', $denied->get_error_code() );
+		$metrics_denied = ( new RunMetricsAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $metrics_denied );
+		$this->assertSame( 'job_access_denied', $metrics_denied->get_error_code() );
+		$fail_denied = ( new FailJobAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $fail_denied );
+		$this->assertSame( 'job_access_denied', $fail_denied->get_error_code() );
+		$retry_denied = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+		$this->assertWPError( $retry_denied );
+		$this->assertSame( 'job_access_denied', $retry_denied->get_error_code() );
+
+		wp_set_current_user( $this->admin_id );
+		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
+	}
+
+	public function test_collection_filters_cannot_escape_owner_scope(): void {
+		wp_set_current_user( $this->owner_id );
+		$owned = $this->execute( 'owned-collection' );
+		wp_set_current_user( $this->other_user_id );
+		$other = $this->execute( 'other-collection' );
+
+		wp_set_current_user( $this->owner_id );
+		$list = ( new GetJobsAbility() )->execute( array() );
+		$this->assertContains( $owned['job_id'], array_map( 'intval', array_column( $list['jobs'], 'job_id' ) ) );
+		$this->assertNotContains( $other['job_id'], array_map( 'intval', array_column( $list['jobs'], 'job_id' ) ) );
+
+		$forged = ( new GetJobsAbility() )->execute( array( 'user_id' => $this->other_user_id ) );
+		$this->assertWPError( $forged );
+		$this->assertSame( 'job_access_denied', $forged->get_error_code() );
+		$forged_summary = ( new JobsSummaryAbility() )->execute( array( 'user_id' => $this->other_user_id ) );
+		$this->assertWPError( $forged_summary );
+		$this->assertSame( 'job_access_denied', $forged_summary->get_error_code() );
+
+		$owner_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertTrue( $owner_summary['success'] );
+		$this->assertSame( $this->owner_id, (int) $owner_summary['summary']['filters']['user_id'] );
+		$this->assertArrayNotHasKey( 'jobs', $owner_summary['summary'] );
+
+		wp_set_current_user( 0 );
+		$anonymous_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertWPError( $anonymous_summary );
+		$this->assertSame( 'job_access_denied', $anonymous_summary->get_error_code() );
+
+		wp_set_current_user( $this->admin_id );
+		$operator_list = ( new GetJobsAbility() )->execute( array() );
+		$operator_ids  = array_map( 'intval', array_column( $operator_list['jobs'], 'job_id' ) );
+		$this->assertContains( $owned['job_id'], $operator_ids );
+		$this->assertContains( $other['job_id'], $operator_ids );
+
+		$operator_summary = ( new JobsSummaryAbility() )->execute( array() );
+		$this->assertTrue( $operator_summary['success'] );
+		$this->assertArrayNotHasKey( 'user_id', $operator_summary['summary']['filters'] );
+		$this->assertArrayNotHasKey( 'jobs', $operator_summary['summary'] );
+	}
+
+	public function test_compact_summary_reports_authoritative_stuck_count(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->admin_id );
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id' => 'direct',
+				'flow_id'     => 'direct',
+			)
+		);
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array(
+				'status'     => 'processing',
+				'created_at' => gmdate( 'Y-m-d H:i:s', time() - 3 * HOUR_IN_SECONDS ),
+			),
+			array( 'job_id' => $job_id )
+		);
+
+		$compact = ( new JobsSummaryAbility() )->execute( array( 'compact' => true ) );
+		$full    = ( new JobsSummaryAbility() )->execute( array() );
+
+		$this->assertTrue( $compact['success'] );
+		$this->assertGreaterThanOrEqual( 1, $compact['summary']['stuck_processing_count'] );
+		$this->assertSame( $full['summary']['stuck_processing_count'], $compact['summary']['stuck_processing_count'] );
+	}
+
+	public function test_query_validation_and_not_found_use_native_errors(): void {
+		wp_set_current_user( $this->admin_id );
+
+		$invalid_job = ( new GetJobsAbility() )->execute( array( 'job_id' => 0 ) );
+		$this->assertWPError( $invalid_job );
+		$this->assertSame( 'invalid_job_id', $invalid_job->get_error_code() );
+		$this->assertSame( 400, $invalid_job->get_error_data()['status'] );
+
+		$invalid_delete = ( new DeleteJobsAbility() )->execute( array( 'type' => 'invalid' ) );
+		$this->assertWPError( $invalid_delete );
+		$this->assertSame( 'delete_failed', $invalid_delete->get_error_code() );
+		$this->assertSame( 'type is required and must be "all" or "failed"', $invalid_delete->get_error_message() );
+		$this->assertSame( 500, $invalid_delete->get_error_data()['status'] );
+
+		$invalid_flow = ( new FlowHealthAbility() )->execute( array( 'flow_id' => 0 ) );
+		$this->assertWPError( $invalid_flow );
+		$this->assertSame( 'invalid_flow_id', $invalid_flow->get_error_code() );
+
+		$missing_flow = ( new FlowHealthAbility() )->execute( array( 'flow_id' => PHP_INT_MAX ) );
+		$this->assertWPError( $missing_flow );
+		$this->assertSame( 'flow_not_found', $missing_flow->get_error_code() );
+		$this->assertSame( 404, $missing_flow->get_error_data()['status'] );
+	}
+
+	public function test_artifact_authorization_runs_before_hydration(): void {
+		wp_set_current_user( $this->owner_id );
+		$created      = $this->execute( 'artifact-access' );
+		$artifact_ref = 'datamachine://jobs/' . $created['job_id'] . '/artifacts/tool-trace';
+		$content      = 'owner-only artifact';
+		$jobs         = new Jobs();
+		$engine_data  = $jobs->retrieve_engine_data( (int) $created['job_id'] );
+		$engine_data['artifact_files'] = array(
+			'tool_trace' => array(
+				'artifact_ref' => $artifact_ref,
+				'type'         => 'tool_trace',
+				'bytes'        => strlen( $content ),
+				'sha256'       => hash( 'sha256', $content ),
+			),
+		);
+		$this->assertTrue( $jobs->store_engine_data( (int) $created['job_id'], $engine_data ) );
+
+		$hydrate_count = 0;
+		$resolver      = static function () use ( &$hydrate_count, $content ) {
+			++$hydrate_count;
+			return $content;
+		};
+		add_filter( 'datamachine_job_artifact_ref_content', $resolver );
+
+		wp_set_current_user( $this->other_user_id );
+		$denied = ( new HydrateJobArtifactAbility() )->execute( array( 'artifact_ref' => $artifact_ref ) );
+		$this->assertWPError( $denied );
+		$this->assertSame( 'job_access_denied', $denied->get_error_code() );
+		$this->assertSame( 403, $denied->get_error_data()['status'] );
+		$this->assertSame( 0, $hydrate_count );
+
+		wp_set_current_user( $this->owner_id );
+		$owner_result = ( new HydrateJobArtifactAbility() )->execute( array( 'artifact_ref' => $artifact_ref ) );
+		$this->assertTrue( $owner_result['success'] );
+		$this->assertSame( 1, $hydrate_count );
+
+		wp_set_current_user( $this->admin_id );
+		$operator_result = ( new HydrateJobArtifactAbility() )->execute( array( 'artifact_ref' => $artifact_ref ) );
+		$this->assertTrue( $operator_result['success'] );
+		$this->assertSame( 2, $hydrate_count );
+		remove_filter( 'datamachine_job_artifact_ref_content', $resolver );
+	}
+
+	public function test_matching_replay_is_idempotent_after_failure_and_conflicts_are_rejected(): void {
+		wp_set_current_user( $this->owner_id );
+		$first = $this->execute( 'stable-operation' );
+		$this->assertTrue( ( new Jobs() )->complete_job( (int) $first['job_id'], 'failed - test' ) );
+
+		$replay = $this->execute( 'stable-operation' );
+		$this->assertTrue( $replay['success'] );
+		$this->assertTrue( $replay['replayed'] );
+		$this->assertSame( $first['job_id'], $replay['job_id'] );
+		$this->assertSame( (int) ( new Jobs() )->get_job( (int) $first['job_id'] )['operation_action_id'], (int) ( new Jobs() )->get_job( (int) $replay['job_id'] )['operation_action_id'] );
+
+		$conflict = $this->execute( 'stable-operation', 'different input' );
+		$this->assertWPError( $conflict );
+		$this->assertSame( 'operation_key_conflict', $conflict->get_error_code() );
+		$this->assertStringContainsString( 'different workflow input', $conflict->get_error_message() );
+		$this->assertSame( 409, $conflict->get_error_data()['status'] );
+		$this->assertFalse( $conflict->get_error_data()['retryable'] );
+		$this->assertSame( 'operation', $conflict->get_error_data()['ownership'] );
+
+		$distinct = $this->execute( 'distinct-operation' );
+		$this->assertTrue( $distinct['success'] );
+		$this->assertNotSame( $first['job_id'], $distinct['job_id'] );
+	}
+
+	public function test_invalid_workflow_does_not_claim_operation_key(): void {
+		wp_set_current_user( $this->owner_id );
+		$invalid = ( new ExecuteWorkflowAbility() )->execute(
+			array(
+				'workflow'      => array( 'steps' => array() ),
+				'operation_key' => 'validation-before-claim',
+			)
+		);
+
+		$this->assertWPError( $invalid );
+		$this->assertSame( 'invalid_workflow', $invalid->get_error_code() );
+		$this->assertSame( 400, $invalid->get_error_data()['status'] );
+		$this->assertFalse( $invalid->get_error_data()['retryable'] );
+		$this->assertTrue( $this->execute( 'validation-before-claim' )['success'] );
+	}
+
+	public function test_terminal_replay_survives_engine_data_retention(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->owner_id );
+		$first = $this->execute( 'retained-operation' );
+		$jobs  = new Jobs();
+		$this->assertTrue( $jobs->complete_job( (int) $first['job_id'], 'failed - retained' ) );
+		$wpdb->update( $wpdb->prefix . 'datamachine_jobs', array( 'engine_data' => null ), array( 'job_id' => $first['job_id'] ) );
+
+		$replay = $this->execute( 'retained-operation' );
+		$retained_job = $jobs->get_job( (int) $first['job_id'] );
+		$this->assertTrue( $replay['success'] );
+		$this->assertTrue( $replay['replayed'] );
+		$this->assertSame( $first['job_id'], $replay['job_id'] );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', (string) $retained_job['request_fingerprint'] );
+		$this->assertSame( 'enqueued', $retained_job['operation_state'] );
+	}
+
+	public function test_enqueue_failure_is_reclaimable_and_concurrent_calls_schedule_once(): void {
+		global $wpdb;
+
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+
+		$failing = new DirectJobEnqueuer( $jobs, static fn() => false, static fn() => 0, static fn() => false );
+		$this->assertFalse( $failing->enqueue( $job_id, 'ephemeral_step_0' )['success'] );
+		$this->assertSame( 'enqueue_failed', $jobs->get_job( $job_id )['operation_state'] );
+
+		$schedule_count = 0;
+		$scheduled_id   = 0;
+		$enqueuer       = new DirectJobEnqueuer(
+			$jobs,
+			static function () use ( &$schedule_count, &$scheduled_id ) {
+				++$schedule_count;
+				$scheduled_id = 91;
+				return $scheduled_id;
+			},
+			static function () use ( &$scheduled_id ) {
+				return $scheduled_id;
+			},
+			static fn() => true
+		);
+		$first  = $enqueuer->enqueue( $job_id, 'ephemeral_step_0' );
+		$second = $enqueuer->enqueue( $job_id, 'ephemeral_step_0' );
+
+		$this->assertTrue( $first['success'] );
+		$this->assertTrue( $second['success'] );
+		$this->assertSame( 1, $schedule_count );
+
+		$crashed_job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$this->assertIsArray( $jobs->claim_operation_enqueue( $crashed_job_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
+			array( 'job_id' => $crashed_job_id )
+		);
+		$recovered = ( new DirectJobEnqueuer( $jobs, static fn() => 92, static fn() => 0, static fn() => true ) )->enqueue( $crashed_job_id, 'ephemeral_step_0' );
+		$this->assertTrue( $recovered['success'] );
+		$this->assertSame( 'enqueued', $jobs->get_job( $crashed_job_id )['operation_state'] );
+	}
+
+	public function test_positive_scheduler_id_without_receipt_is_reclaimable(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+
+		$result = ( new DirectJobEnqueuer( $jobs, static fn() => 999999, static fn() => 0, static fn() => false ) )->enqueue( $job_id, 'ephemeral_step_0' );
+		$job    = $jobs->get_job( $job_id );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'action_receipt_missing', $result['error'] );
+		$this->assertSame( 'enqueue_failed', $job['operation_state'] );
+		$this->assertSame( 0, (int) $job['operation_action_id'] );
+	}
+
+	public function test_non_owner_gets_retryable_in_progress_until_action_is_durable(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$this->assertIsArray( $jobs->claim_operation_enqueue( $job_id ) );
+
+		$result = ( new DirectJobEnqueuer( $jobs, static fn() => 99, static fn() => 0, static fn() => true ) )->enqueue( $job_id, 'ephemeral_step_0' );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertTrue( $result['retryable'] );
+		$this->assertSame( 'enqueue_in_progress', $result['error'] );
+		$this->assertSame( 0, $result['action_id'] );
+	}
+
+	public function test_replay_commits_scheduled_action_after_submitter_crash(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$claim = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $claim );
+
+		$result = ( new DirectJobEnqueuer( $jobs, static fn() => 999, static fn() => 404, static fn() => true ) )->enqueue( $job_id, 'ephemeral_step_0' );
+		$job    = $jobs->get_job( $job_id );
+
+		$this->assertTrue( $result['success'] );
+		$this->assertSame( 404, $result['action_id'] );
+		$this->assertSame( 'enqueued', $job['operation_state'] );
+		$this->assertSame( 404, (int) $job['operation_action_id'] );
+		$this->assertSame( $claim['generation'], (int) $job['operation_generation'] );
+		$this->assertSame( $claim['token'], $job['operation_claim_token'] );
+	}
+
+	public function test_expired_lease_takeover_fences_slow_generation(): void {
+		global $wpdb;
+
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'      => 'direct',
+				'flow_id'          => 'direct',
+				'operation_state'  => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$takeover_claim = null;
+		$slow = new DirectJobEnqueuer(
+			$jobs,
+			static function () use ( &$takeover_claim, $jobs, $wpdb, $job_id ) {
+				$wpdb->update(
+					$wpdb->prefix . 'datamachine_jobs',
+					array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
+					array( 'job_id' => $job_id )
+				);
+				$takeover_claim = $jobs->claim_operation_enqueue( $job_id );
+				return 101;
+			},
+			static fn() => 0,
+			static fn() => true
+		);
+
+		$slow_result = $slow->enqueue( $job_id, 'ephemeral_step_0' );
+		$this->assertFalse( $slow_result['success'] );
+		$this->assertSame( 'enqueue_claim_fenced', $slow_result['error'] );
+		$this->assertIsArray( $takeover_claim );
+		$this->assertSame( 2, $takeover_claim['generation'] );
+		$this->assertTrue( $jobs->finish_operation_enqueue( $job_id, 'enqueued', 202, $takeover_claim['token'], $takeover_claim['generation'] ) );
+
+		$job = $jobs->get_job( $job_id );
+		$this->assertSame( 2, (int) $job['operation_generation'] );
+		$this->assertSame( 202, (int) $job['operation_action_id'] );
+		$stale = ( new ExecuteStepAbility() )->execute(
+			array(
+				'job_id'               => $job_id,
+				'flow_step_id'          => 'ephemeral_step_0',
+				'operation_generation' => 1,
+				'operation_claim_token' => 'superseded-token',
+			)
+		);
+		$this->assertTrue( $stale['stale_generation'] );
+	}
+
+	public function test_worker_defers_until_generation_commit_without_starting_job(): void {
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$worker_result = null;
+		$enqueued      = ( new DirectJobEnqueuer(
+			$jobs,
+			static function ( int $run_at, string $hook, array $args ) use ( &$worker_result ) {
+				$run_at;
+				$hook;
+				$worker_result = ( new ExecuteStepAbility() )->execute( $args );
+				return 303;
+			},
+			static fn() => 0,
+			static fn() => true
+		) )->enqueue( $job_id, 'ephemeral_step_0' );
+
+		$this->assertTrue( $worker_result['deferred'] );
+		$this->assertTrue( $worker_result['retryable'] );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+		$this->assertTrue( $enqueued['success'] );
+		$this->assertSame( 'enqueued', $jobs->get_job( $job_id )['operation_state'] );
+	}
+
+	public function test_deferred_worker_becomes_stale_after_crashed_claim_takeover(): void {
+		global $wpdb;
+
+		$jobs   = new Jobs();
+		$job_id = $jobs->create_job(
+			array(
+				'pipeline_id'       => 'direct',
+				'flow_id'           => 'direct',
+				'operation_state'   => 'preparing',
+				'operation_step_id' => 'ephemeral_step_0',
+			)
+		);
+		$first_claim = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $first_claim );
+		$action_args = array(
+			'job_id'               => $job_id,
+			'flow_step_id'         => 'ephemeral_step_0',
+			'operation_generation' => $first_claim['generation'],
+			'operation_claim_token' => $first_claim['token'],
+		);
+
+		$before_takeover = ( new ExecuteStepAbility() )->execute( $action_args );
+		$this->assertTrue( $before_takeover['deferred'] );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'operation_claimed_at' => '2000-01-01 00:00:00' ),
+			array( 'job_id' => $job_id )
+		);
+		$takeover = $jobs->claim_operation_enqueue( $job_id );
+		$this->assertIsArray( $takeover );
+		$this->assertGreaterThan( $first_claim['generation'], $takeover['generation'] );
+
+		$after_takeover = ( new ExecuteStepAbility() )->execute( $action_args );
+		$this->assertTrue( $after_takeover['stale_generation'] );
+		$this->assertArrayNotHasKey( 'deferred', $after_takeover );
+		$this->assertSame( 'pending', $jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_processing_direct_workflow_retry_waits_for_live_generation(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'processing-direct-retry' );
+		$jobs    = new Jobs();
+		$original_job        = $jobs->get_job( (int) $created['job_id'] );
+		$original_action_id  = (int) $original_job['operation_action_id'];
+		$original_generation = (int) $original_job['operation_generation'];
+		$this->assertTrue( $jobs->start_job( (int) $created['job_id'] ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
+		$job   = $jobs->get_job( (int) $created['job_id'] );
+
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_execution_in_progress', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertTrue( $retry->get_error_data()['retryable'] );
+		$this->assertSame( (int) $created['job_id'], $retry->get_error_data()['job_id'] );
+		$this->assertSame( $original_generation, $retry->get_error_data()['generation'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
+		$this->assertSame( 'processing', $job['status'] );
+		$this->assertSame( 'enqueued', $job['operation_state'] );
+		$this->assertSame( $original_action_id, (int) $job['operation_action_id'] );
+		$this->assertSame( $original_generation, (int) $job['operation_generation'] );
+	}
+
+	public function test_processing_direct_retry_atomically_requeues_missing_action(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'manual-missing-action-retry' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$before  = $jobs->get_job( $job_id );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $before['operation_action_id'] ), array( '%d' ) ) );
+		$job_count = $jobs->get_jobs_count();
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+		$after = $jobs->get_job( $job_id );
+
+		$this->assertTrue( $retry['success'] );
+		$this->assertTrue( $retry['direct_requeued'] );
+		$this->assertSame( $job_id, (int) $retry['job_id'] );
+		$this->assertSame( $job_count, $jobs->get_jobs_count() );
+		$this->assertSame( JobStatus::PENDING, $after['status'] );
+		$this->assertSame( 'enqueued', $after['operation_state'] );
+		$this->assertGreaterThan( (int) $before['operation_generation'], (int) $after['operation_generation'] );
+		$this->assertTrue( DirectOperationRecoveryPolicy::recordedActionExists( (int) $after['operation_action_id'] ) );
+		$this->assertSame( 'manual_retry', $after['engine_data']['direct_operation_recovery']['trigger'] );
+		$this->assertNull( $after['terminal_accounting_state'] );
+
+		$duplicate = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id, 'force' => true ) );
+		$after_duplicate = $jobs->get_job( $job_id );
+		$this->assertWPError( $duplicate );
+		$this->assertSame( 'job_reopen_failed', $duplicate->get_error_code() );
+		$this->assertTrue( $duplicate->get_error_data()['retryable'] );
+		$this->assertSame( $job_count, $jobs->get_jobs_count() );
+		$this->assertSame( (int) $after['operation_action_id'], (int) $after_duplicate['operation_action_id'] );
+		$this->assertSame( (int) $after['operation_generation'], (int) $after_duplicate['operation_generation'] );
+	}
+
+	public function test_missing_direct_action_requeue_rolls_back_unusable_receipt(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'manual-missing-action-rollback' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$before  = $jobs->get_job( $job_id );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $before['operation_action_id'] ), array( '%d' ) ) );
+
+		$result = $jobs->commit_missing_direct_operation_requeue(
+			$job_id,
+			(int) $before['operation_action_id'],
+			(int) $before['operation_generation'],
+			(string) $before['operation_claim_token'],
+			'manual_retry',
+			static fn(): int => 999999
+		);
+		$after = $jobs->get_job( $job_id );
+
+		$this->assertFalse( $result['success'] );
+		$this->assertSame( 'action_receipt_missing', $result['reason'] );
+		$this->assertSame( JobStatus::PROCESSING, $after['status'] );
+		$this->assertSame( (int) $before['operation_generation'], (int) $after['operation_generation'] );
+		$this->assertSame( (int) $before['operation_action_id'], (int) $after['operation_action_id'] );
+		$this->assertArrayNotHasKey( 'direct_operation_recovery', $after['engine_data'] );
+	}
+
+	public function test_processing_direct_retry_rejects_missing_action_after_effects_begin(): void {
+		global $wpdb;
+
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'manual-missing-action-effects' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$before  = $jobs->get_job( $job_id );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$this->assertTrue( $jobs->mark_operation_effects_begun( $job_id, (int) $before['operation_generation'], (string) $before['operation_claim_token'] ) );
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $before['operation_action_id'] ), array( '%d' ) ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_effects_begun', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertFalse( $retry->get_error_data()['retryable'] );
+		$this->assertSame( $job_id, $retry->get_error_data()['job_id'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
+		$this->assertSame( JobStatus::PROCESSING, $jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_processing_multistep_retry_detects_live_action_for_different_step(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'processing-multistep-retry' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$engine_data = $jobs->retrieve_engine_data( $job_id );
+		$first_step  = $engine_data['flow_config']['ephemeral_step_0'];
+		$second_step = $first_step;
+		$second_step['flow_step_id']   = 'ephemeral_step_1';
+		$second_step['execution_order'] = 1;
+		$engine_data['flow_config']['ephemeral_step_1'] = $second_step;
+		$engine_data['resumable'] = true;
+		$engine_data['step_results']['ephemeral_step_0'] = array( 'step_success' => true );
+		$this->assertTrue( $jobs->store_engine_data( $job_id, $engine_data ) );
+		$this->assertSame( 'ephemeral_step_1', JobRetryPolicy::resolveDirectResumeStepId( $engine_data ) );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $job_id ) );
+
+		$this->assertWPError( $retry );
+		$this->assertSame( 'job_execution_in_progress', $retry->get_error_code() );
+		$this->assertSame( 409, $retry->get_error_data()['status'] );
+		$this->assertTrue( $retry->get_error_data()['retryable'] );
+		$this->assertSame( $job_id, $retry->get_error_data()['job_id'] );
+		$this->assertSame( 'operation', $retry->get_error_data()['ownership'] );
+		$this->assertSame( 'processing', $jobs->get_job( $job_id )['status'] );
+	}
+
+	public function test_failed_direct_retry_uses_next_generation_while_old_action_remains(): void {
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'failed-direct-retry-generation' );
+		$jobs    = new Jobs();
+		$original_job        = $jobs->get_job( (int) $created['job_id'] );
+		$original_action_id  = (int) $original_job['operation_action_id'];
+		$original_generation = (int) $original_job['operation_generation'];
+		$this->assertTrue( $jobs->complete_job( (int) $created['job_id'], 'failed - test' ) );
+
+		$retry = ( new RetryJobAbility() )->execute( array( 'job_id' => $created['job_id'] ) );
+		$job   = $jobs->get_job( (int) $created['job_id'] );
+
+		$this->assertTrue( $retry['success'] );
+		$this->assertTrue( $retry['direct_requeued'] );
+		$this->assertSame( 'pending', $job['status'] );
+		$this->assertNotSame( $original_action_id, (int) $job['operation_action_id'] );
+		$this->assertGreaterThan( $original_generation, (int) $job['operation_generation'] );
+
+		$stale = ( new ExecuteStepAbility() )->execute(
+			array(
+				'job_id'               => (int) $created['job_id'],
+				'flow_step_id'          => 'ephemeral_step_0',
+				'operation_generation' => $original_generation,
+				'operation_claim_token' => (string) $original_job['operation_claim_token'],
+			)
+		);
+		$this->assertTrue( $stale['stale_generation'] );
+	}
+
+	public function test_stuck_recovery_requeues_missing_direct_operation_action_with_new_generation(): void {
+		global $wpdb;
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'missing-direct-action-recovery' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$before  = $jobs->get_job( $job_id );
+		$old_args = array(
+			'job_id'                => $job_id,
+			'flow_step_id'          => (string) $before['operation_step_id'],
+			'operation_generation'  => (int) $before['operation_generation'],
+			'operation_claim_token' => (string) $before['operation_claim_token'],
+		);
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $before['operation_action_id'] ), array( '%d' ) ) );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'        => $job_id,
+				'timeout_hours' => 1,
+				'limit'         => 3,
+			)
+		);
+		$after = $jobs->get_job( $job_id );
+
+		$this->assertSame( 1, $result['requeued'] );
+		$this->assertSame( JobStatus::PENDING, $after['status'] );
+		$this->assertSame( 'enqueued', $after['operation_state'] );
+		$this->assertGreaterThan( (int) $before['operation_generation'], (int) $after['operation_generation'] );
+		$this->assertNotSame( (int) $before['operation_action_id'], (int) $after['operation_action_id'] );
+		$this->assertSame( 'requeued', $after['engine_data']['direct_operation_recovery']['state'] );
+		$this->assertSame( (int) $before['operation_action_id'], (int) $after['engine_data']['direct_operation_recovery']['missing_action_id'] );
+		$this->assertArrayNotHasKey( 'status', $after['engine_data']['run_lifecycle'] );
+		$this->assertSame( 'requeued_missing_direct_action', $result['jobs'][0]['status'] );
+
+		$stale = ( new ExecuteStepAbility() )->execute( $old_args );
+		$this->assertTrue( $stale['stale_generation'] );
+	}
+
+	public function test_missing_direct_action_after_effects_terminalizes_parent_and_system_child(): void {
+		global $wpdb;
+		wp_set_current_user( $this->owner_id );
+		$created = $this->execute( 'missing-direct-action-after-effects' );
+		$jobs    = new Jobs();
+		$job_id  = (int) $created['job_id'];
+		$parent  = $jobs->get_job( $job_id );
+		$this->assertTrue( $jobs->start_job( $job_id ) );
+		$this->assertTrue( $jobs->mark_operation_effects_begun( $job_id, (int) $parent['operation_generation'], (string) $parent['operation_claim_token'] ) );
+		$child_id = $jobs->create_job(
+			array(
+				'pipeline_id'  => 'direct',
+				'flow_id'      => 'direct',
+				'source'       => 'pipeline_system_task',
+				'label'        => 'Interrupted system task',
+				'parent_job_id' => $job_id,
+			)
+		);
+		$this->assertTrue( $jobs->start_job( $child_id ) );
+		$wpdb->update(
+			$wpdb->prefix . 'datamachine_jobs',
+			array( 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ),
+			array( 'job_id' => $job_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+		$this->assertSame( 1, $wpdb->delete( $wpdb->prefix . 'actionscheduler_actions', array( 'action_id' => (int) $parent['operation_action_id'] ), array( '%d' ) ) );
+
+		$result = ( new RecoverStuckJobsAbility() )->execute(
+			array(
+				'job_id'        => $job_id,
+				'timeout_hours' => 1,
+				'limit'         => 3,
+			)
+		);
+		$parent_after = $jobs->get_job( $job_id );
+		$child_after  = $jobs->get_job( $child_id );
+
+		$this->assertSame( 1, $result['timed_out'] );
+		$this->assertTrue( JobStatus::isStatusFailure( $parent_after['status'] ) );
+		$this->assertTrue( JobStatus::isStatusFailure( $child_after['status'] ) );
+		$this->assertSame( 'cancelled', $parent_after['operation_state'] );
+		$this->assertGreaterThan( (int) $parent['operation_generation'], (int) $parent_after['operation_generation'] );
+		$this->assertSame( 'terminalized', $parent_after['engine_data']['direct_operation_recovery']['state'] );
+		$this->assertSame( (int) $parent['operation_action_id'], (int) $parent_after['engine_data']['direct_operation_recovery']['missing_action_id'] );
+		$this->assertSame( 1, $result['jobs'][0]['system_children_terminalized'] );
+	}
+
+	public function test_legacy_unowned_job_retains_capability_gated_access(): void {
+		$job_id = ( new Jobs() )->create_job(
+			array(
+				'pipeline_id' => 'direct',
+				'flow_id'     => 'direct',
+				'source'      => 'direct',
+			)
+		);
+
+		wp_set_current_user( $this->other_user_id );
+		$this->assertTrue( ( new GetJobsAbility() )->execute( array( 'job_id' => $job_id ) )['success'] );
+	}
+
+	private function execute( string $operation_key, string $prompt = 'input' ): array|\WP_Error {
+		return ( new ExecuteWorkflowAbility() )->execute(
+			array(
+				'workflow'      => $this->workflow( $prompt ),
+				'operation_key' => $operation_key,
+			)
+		);
+	}
+
+	private function workflow( string $prompt = 'input' ): array {
+		return array(
+			'steps' => array(
+				array(
+					'step_type'     => 'ai',
+					'system_prompt' => $prompt,
+				),
+			),
+		);
+	}
+}

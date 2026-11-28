@@ -1,0 +1,409 @@
+<?php
+// phpcs:disable Generic.CodeAnalysis.EmptyStatement.DetectedCatch -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+/**
+ * Centralized datetime parsing with timezone awareness for event imports.
+ *
+ * Provides consistent datetime handling across all event import handlers.
+ * Single source of truth for parsing various datetime formats and converting
+ * between timezones.
+ *
+ * Every parser returns {date, time, timezone, offset}:
+ *  - date/time  Wall clock in the zone the input was expressed in.
+ *  - timezone   An IANA identifier, or '' when the input carried only an
+ *               offset or no zone. Never a raw offset or "Z".
+ *  - offset     "+HH:MM" when the input pinned an instant (offset, Z, or an
+ *               IANA zone), else ''. Lets callers convert to venue time.
+ *
+ * @package DataMachineEvents\Core
+ */
+
+namespace DataMachineEvents\Core;
+
+use DateTime;
+use DateTimeZone;
+use Exception;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class DateTimeParser {
+
+	/**
+	 * Parse UTC datetime and convert to target timezone.
+	 *
+	 * Use when API returns UTC times with a separate timezone field.
+	 * Example: Dice.fm returns "2026-01-04T02:30:00Z" with timezone "America/Chicago"
+	 *
+	 * When `$timezone` is empty or invalid, falls back to the site timezone
+	 * (`wp_timezone()`) and emits a `datamachine_log` warning. This prevents
+	 * upstream regex / extractor bugs from silently destroying the date and
+	 * cascading into off-by-one duplicates on the calendar. See #254.
+	 *
+	 * @param string $datetime UTC datetime string (e.g., "2026-01-04T02:30:00Z")
+	 * @param string $timezone Target IANA timezone (e.g., "America/Chicago")
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	public static function parseUtc( string $datetime, string $timezone ): array {
+		$result = self::emptyResult();
+
+		if ( empty( $datetime ) ) {
+			return $result;
+		}
+
+		if ( ! self::isValidTimezone( $timezone ) ) {
+			$fallback = self::siteTimezoneName();
+			do_action(
+				'datamachine_log',
+				'warning',
+				'DateTimeParser::parseUtc received empty/invalid timezone; falling back to site timezone',
+				array(
+					'datetime'         => $datetime,
+					'invalid_timezone' => $timezone,
+					'fallback'         => $fallback,
+				)
+			);
+			$timezone = $fallback;
+		}
+
+		try {
+			$dt = new DateTime( $datetime, new DateTimeZone( 'UTC' ) );
+			$dt->setTimezone( new DateTimeZone( $timezone ) );
+
+			$result = self::fromDateTime( $dt, true );
+		} catch ( Exception $e ) {
+			// Invalid datetime format, return empty result
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Resolve a usable site timezone name for fallbacks.
+	 *
+	 * Prefers `wp_timezone()` when WordPress is loaded, otherwise falls back to
+	 * UTC so the parser still produces a stable result in non-WP contexts.
+	 *
+	 * @return string IANA timezone identifier
+	 */
+	private static function siteTimezoneName(): string {
+		if ( function_exists( 'wp_timezone' ) ) {
+			try {
+				$tz   = wp_timezone();
+				$name = $tz->getName();
+				if ( self::isValidTimezone( $name ) ) {
+					return $name;
+				}
+			} catch ( Exception $e ) {
+				// Fall through to UTC.
+			}
+		}
+
+		return 'UTC';
+	}
+
+	/**
+	 * Parse local datetime that's already in venue timezone.
+	 *
+	 * Use when API returns local date/time separately.
+	 * Example: Ticketmaster returns localDate "2026-01-15" and localTime "19:30"
+	 *
+	 * @param string $date Date string (e.g., "2026-01-15")
+	 * @param string $time Time string (e.g., "19:30" or "19:30:00")
+	 * @param string $timezone IANA timezone identifier
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	public static function parseLocal( string $date, string $time, string $timezone ): array {
+		$result = self::emptyResult();
+
+		if ( empty( $date ) ) {
+			return $result;
+		}
+
+		if ( ! empty( $timezone ) && ! self::isValidTimezone( $timezone ) ) {
+			$timezone = '';
+		}
+
+		try {
+			$datetime_string = $date;
+			if ( ! empty( $time ) ) {
+				$datetime_string .= ' ' . $time;
+			}
+
+			$tz = ! empty( $timezone ) ? new DateTimeZone( $timezone ) : null;
+			$dt = new DateTime( $datetime_string, $tz );
+
+			$result             = self::fromDateTime( $dt, null !== $tz && ! empty( $time ) );
+			$result['time']     = ! empty( $time ) ? $result['time'] : '';
+			$result['timezone'] = $timezone;
+		} catch ( Exception $e ) {
+			// Invalid datetime format, return empty result
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Parse ISO 8601 datetime with embedded timezone.
+	 *
+	 * Use when datetime string includes timezone offset.
+	 * Example: Eventbrite returns "2026-01-15T19:30:00-06:00"
+	 *
+	 * @param string $datetime ISO 8601 string (e.g., "2026-01-15T19:30:00-06:00")
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	public static function parseIso( string $datetime ): array {
+		$result = self::emptyResult();
+
+		if ( empty( $datetime ) ) {
+			return $result;
+		}
+
+		try {
+			$result = self::fromDateTime( new DateTime( $datetime ), self::hasEmbeddedTimezone( $datetime ) || (bool) preg_match( '/Z$/i', $datetime ) );
+		} catch ( Exception $e ) {
+			// Invalid datetime format, return empty result
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Parse ICS datetime with calendar timezone context.
+	 *
+	 * Handles ICS-specific datetime formats:
+	 * - UTC with Z suffix: "20230809T000000Z"
+	 * - Plain datetime: "20230809T000000"
+	 * - Uses calendar timezone (from VTIMEZONE section) when no explicit event timezone
+	 *
+	 * @param string $datetime ICS datetime string (e.g., "20230809T000000Z")
+	 * @param string $calendar_timezone Calendar timezone from VTIMEZONE section (e.g., "America/Chicago")
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	public static function parseIcs( string $datetime, string $calendar_timezone = 'UTC' ): array {
+		$result = self::emptyResult();
+
+		if ( empty( $datetime ) ) {
+			return $result;
+		}
+
+		try {
+			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime );
+			$is_explicit_utc = str_ends_with( strtoupper( $datetime ), 'Z' );
+
+			if ( $has_embedded_tz ) {
+				$dt = new DateTime( $datetime );
+			} elseif ( $is_explicit_utc ) {
+				$dt = new DateTime( $datetime, new DateTimeZone( 'UTC' ) );
+				if ( ! empty( $calendar_timezone ) && self::isValidTimezone( $calendar_timezone ) ) {
+					$dt->setTimezone( new DateTimeZone( $calendar_timezone ) );
+				}
+			} else {
+				$tz = ! empty( $calendar_timezone ) && self::isValidTimezone( $calendar_timezone )
+					? new DateTimeZone( $calendar_timezone )
+					: new DateTimeZone( 'UTC' );
+				$dt = new DateTime( $datetime, $tz );
+			}
+
+			$result = self::fromDateTime( $dt, true );
+		} catch ( Exception $e ) {
+			return $result;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Parse datetime with automatic format detection.
+	 *
+	 * Attempts to parse any datetime string and extract timezone if present.
+	 * Falls back to provided timezone if datetime has no embedded timezone.
+	 *
+	 * @param string $datetime Datetime string in any parseable format
+	 * @param string $fallback_timezone Timezone to use if not embedded in datetime
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	public static function parse( string $datetime, string $fallback_timezone = '' ): array {
+		$result = self::emptyResult();
+
+		if ( empty( $datetime ) ) {
+			return $result;
+		}
+
+		try {
+			if ( self::hasTimezoneAbbreviation( $datetime ) ) {
+				return $result;
+			}
+
+			$has_embedded_tz = self::hasEmbeddedTimezone( $datetime ) || preg_match( '/Z$/i', $datetime );
+			$constructor_tz  = ! $has_embedded_tz && self::isValidTimezone( $fallback_timezone )
+				? new DateTimeZone( $fallback_timezone )
+				: null;
+			$dt              = new DateTime( $datetime, $constructor_tz );
+
+			$result = self::fromDateTime( $dt, $has_embedded_tz || null !== $constructor_tz );
+			if ( null !== $constructor_tz ) {
+				$result['timezone'] = $fallback_timezone;
+			}
+		} catch ( Exception $e ) {
+			// Invalid datetime format, return empty result
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Strictly validate a Y-m-d date string.
+	 *
+	 * The single source of truth for "is this a real calendar date in
+	 * canonical YYYY-MM-DD form?". Rejects placeholder / TBD values
+	 * (e.g. "2026-07-??", "2026-??-??"), out-of-range values
+	 * (e.g. "2026-13-01"), and impossible calendar dates
+	 * (e.g. "2026-02-30"). Used at the AI gate, the storage chokepoint,
+	 * and the render path so an unparseable string can never reach a
+	 * `new DateTime()` and throw a DateMalformedStringException.
+	 *
+	 * @param string $date Date string to validate.
+	 * @return bool True when $date is a valid Y-m-d calendar date.
+	 */
+	public static function isValidYmd( string $date ): bool {
+		if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches ) ) {
+			return false;
+		}
+
+		return checkdate( (int) $matches[2], (int) $matches[3], (int) $matches[1] );
+	}
+
+	/**
+	 * Non-throwing DateTime factory.
+	 *
+	 * Returns null instead of throwing when the date is not a valid
+	 * Y-m-d calendar date. Render-path callers use this to degrade
+	 * gracefully (skip a row / fall back) when a malformed date slipped
+	 * into storage before the prevention layers existed.
+	 *
+	 * The date is validated with isValidYmd() first; a DateTime is only
+	 * constructed when the date is known-good, so this never throws.
+	 * An optional time-of-day suffix (e.g. " 00:00:00" or " 19:30") may
+	 * be appended after the Y-m-d date.
+	 *
+	 * @param string            $date Date string. May be a bare Y-m-d or
+	 *                                "Y-m-d H:i[:s]" — only the leading
+	 *                                Y-m-d portion is validated.
+	 * @param DateTimeZone|null  $tz   Optional timezone.
+	 * @return DateTime|null DateTime on success, null on invalid input.
+	 */
+	public static function safeCreate( string $date, ?DateTimeZone $tz = null ): ?DateTime {
+		$date = trim( $date );
+
+		if ( '' === $date ) {
+			return null;
+		}
+
+		// Only the leading Y-m-d is validated; an optional time suffix may follow.
+		$ymd = substr( $date, 0, 10 );
+		if ( ! self::isValidYmd( $ymd ) ) {
+			return null;
+		}
+
+		try {
+			return null !== $tz ? new DateTime( $date, $tz ) : new DateTime( $date );
+		} catch ( Exception $e ) {
+			return null;
+		}
+	}
+
+	/**
+	 * Validate IANA timezone identifier.
+	 *
+	 * @param string $timezone Timezone to validate
+	 * @return bool True if valid IANA timezone
+	 */
+	public static function isValidTimezone( string $timezone ): bool {
+		if ( empty( $timezone ) ) {
+			return false;
+		}
+
+		if ( ! in_array( $timezone, timezone_identifiers_list( DateTimeZone::ALL_WITH_BC ), true ) ) {
+			return false;
+		}
+
+		try {
+			new DateTimeZone( $timezone );
+		} catch ( Exception $e ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Check if datetime string has embedded timezone information.
+	 *
+	 * @param string $datetime Datetime string to check
+	 * @return bool True if timezone is embedded
+	 */
+	private static function hasEmbeddedTimezone( string $datetime ): bool {
+		// ICS parsing handles Z separately so it can convert to calendar timezone.
+		if ( preg_match( '/Z$/i', $datetime ) ) {
+			return false;
+		}
+
+		// Check for offset like +00:00, -05:00, +0530
+		if ( preg_match( '/[+-]\d{2}:?\d{2}$/', $datetime ) ) {
+			return true;
+		}
+
+		if ( preg_match( '/\s([^\s]+)$/', $datetime, $matches ) ) {
+			return self::isValidTimezone( $matches[1] );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Check for an ambiguous timezone abbreviation suffix.
+	 *
+	 * @param string $datetime Datetime string to check.
+	 * @return bool True when an abbreviation is present.
+	 */
+	private static function hasTimezoneAbbreviation( string $datetime ): bool {
+		if ( ! preg_match( '/\s([A-Z]{2,5})$/', $datetime, $matches ) ) {
+			return false;
+		}
+
+		return ! self::isValidTimezone( $matches[1] );
+	}
+
+	/**
+	 * Get empty result array.
+	 *
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	private static function emptyResult(): array {
+		return array(
+			'date'     => '',
+			'time'     => '',
+			'timezone' => '',
+			'offset'   => '',
+		);
+	}
+
+	/**
+	 * Build a result from a parsed DateTime.
+	 *
+	 * @param DateTime $dt       Parsed datetime.
+	 * @param bool     $anchored Whether the input pinned an instant.
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	private static function fromDateTime( DateTime $dt, bool $anchored ): array {
+		$name = $dt->getTimezone()->getName();
+
+		return array(
+			'date'     => $dt->format( 'Y-m-d' ),
+			'time'     => $dt->format( 'H:i' ),
+			'timezone' => $anchored && self::isValidTimezone( $name ) ? $name : '',
+			'offset'   => $anchored ? $dt->format( 'P' ) : '',
+		);
+	}
+}

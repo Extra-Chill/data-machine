@@ -1,0 +1,29 @@
+{
+  "auto_cleanup": false,
+  "changelog_target": "docs/CHANGELOG.md",
+  "extensions": {
+    "wordpress": {
+      "settings": {
+        "validation_dependencies": [
+          "../data-machine"
+        ],
+        "wp_codebox_phpunit_bootstrap_mode": "managed"
+      }
+    }
+  },
+  "id": "data-machine-socials",
+  "remote_path": "wp-content/plugins/data-machine-socials",
+  "version_targets": [
+    {
+      "file": "data-machine-socials.php",
+      "pattern": "(?m)^\\s*\\*?\\s*Version:\\s*([0-9.]+)"
+    },
+    {
+      "file": "data-machine-socials.php",
+      "pattern": "DATAMACHINE_SOCIALS_VERSION.+?([0-9.]+)"
+    }
+  ],
+  "github": {
+    "release_latest": false
+  }
+}

@@ -1,0 +1,931 @@
+<?php
+/**
+ * Calendar ability tests.
+ *
+ * @package DataMachineEvents\Tests\Unit
+ */
+
+namespace DataMachineEvents\Tests\Unit;
+
+use WP_UnitTestCase;
+use DataMachineEvents\Abilities\CalendarAbilities;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Query\ScopeResolver;
+
+class CalendarAbilitiesTest extends WP_UnitTestCase {
+
+	private CalendarAbilities $abilities;
+
+	public function setUp(): void {
+		// Create the table before WP_UnitTestCase rewrites CREATE TABLE as temporary.
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
+		}
+
+		parent::setUp();
+
+		if ( ! post_type_exists( Event_Post_Type::POST_TYPE ) ) {
+			Event_Post_Type::register();
+		}
+		if ( ! taxonomy_exists( 'venue' ) ) {
+			Venue_Taxonomy::register();
+		}
+		if ( ! taxonomy_exists( 'calendar_test_region' ) ) {
+			register_taxonomy( 'calendar_test_region', Event_Post_Type::POST_TYPE );
+		}
+		if ( ! taxonomy_exists( 'calendar_test_style' ) ) {
+			register_taxonomy( 'calendar_test_style', Event_Post_Type::POST_TYPE );
+		}
+		if ( ! taxonomy_exists( 'calendar_test_location' ) ) {
+			register_taxonomy( 'calendar_test_location', Event_Post_Type::POST_TYPE, array( 'hierarchical' => true ) );
+		}
+		$this->abilities = new CalendarAbilities();
+		delete_transient( 'data-machine_cal_counts' );
+	}
+
+	private function seed_event( string $title, string $start, string $end, int $venue_id = 0, array $terms = array() ): int {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_title'  => $title,
+				'post_type'   => Event_Post_Type::POST_TYPE,
+				'post_status' => 'publish',
+			)
+		);
+
+		EventDatesTable::upsert( $post_id, $start, $end, 'publish' );
+		if ( $venue_id ) {
+			wp_set_object_terms( $post_id, array( $venue_id ), 'venue' );
+		}
+		foreach ( $terms as $taxonomy => $term_ids ) {
+			wp_set_object_terms( $post_id, (array) $term_ids, $taxonomy );
+		}
+
+		return $post_id;
+	}
+
+	private function seed_venue( string $name, string $coordinates ): int {
+		$term = wp_insert_term( $name . ' ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $term );
+		$venue_id = (int) $term['term_id'];
+		add_term_meta( $venue_id, '_venue_coordinates', $coordinates, true );
+
+		return $venue_id;
+	}
+
+	private function result_post_ids( array $result ): array {
+		$post_ids = array();
+		foreach ( $result['paged_date_groups'] as $date_group ) {
+			$post_ids = array_merge( $post_ids, array_column( $date_group['events'], 'post_id' ) );
+		}
+
+		return $post_ids;
+	}
+
+	public function test_past_mode_returns_only_completed_events_with_chronological_boundaries(): void {
+		$now         = current_datetime();
+		$older_past  = $now->modify( '-4 days' );
+		$recent_past = $now->modify( '-1 day' );
+		$future      = $now->modify( '+4 days' );
+
+		$this->seed_event( 'Older past event', $older_past->format( 'Y-m-d 20:00:00' ), $older_past->format( 'Y-m-d 23:00:00' ) );
+		$recent_id = $this->seed_event( 'Recent past event', $recent_past->format( 'Y-m-d 20:00:00' ), $recent_past->format( 'Y-m-d 23:00:00' ) );
+		$this->seed_event( 'Future event', $future->format( 'Y-m-d 20:00:00' ), $future->format( 'Y-m-d 23:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'past'         => true,
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 2, $result['total_event_count'] );
+		$this->assertSame( 2, $result['event_count'] );
+		$this->assertSame( $recent_past->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertSame( $recent_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
+	}
+
+	public function test_past_mode_applies_completed_scope_to_taxonomy_buckets(): void {
+		$term = wp_insert_term( 'Past calendar venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $term );
+		$venue_id = (int) $term['term_id'];
+		$now      = current_datetime();
+		$past     = $now->modify( '-2 days' );
+		$future   = $now->modify( '+2 days' );
+
+		$past_id = $this->seed_event( 'Venue past event', $past->format( 'Y-m-d 20:00:00' ), $past->format( 'Y-m-d 23:00:00' ), $venue_id );
+		$this->seed_event( 'Venue future event', $future->format( 'Y-m-d 20:00:00' ), $future->format( 'Y-m-d 23:00:00' ), $venue_id );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'past'               => true,
+				'archive_taxonomy'   => 'venue',
+				'archive_term_id'    => $venue_id,
+				'include_html'       => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $past_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
+	}
+
+	public function test_hierarchical_archive_boundaries_include_descendants_once_and_reuse_across_pages(): void {
+		$root       = wp_insert_term( 'Root calendar location ' . uniqid(), 'calendar_test_location' );
+		$this->assertNotWPError( $root );
+		$child      = wp_insert_term( 'Child calendar location ' . uniqid(), 'calendar_test_location', array( 'parent' => (int) $root['term_id'] ) );
+		$this->assertNotWPError( $child );
+		$grandchild = wp_insert_term( 'Deep calendar location ' . uniqid(), 'calendar_test_location', array( 'parent' => (int) $child['term_id'] ) );
+		$outside    = wp_insert_term( 'Outside calendar location ' . uniqid(), 'calendar_test_location' );
+		$this->assertNotWPError( $grandchild );
+		$this->assertNotWPError( $outside );
+
+		$last_date_ids = array();
+		for ( $day = 0; $day < 6; ++$day ) {
+			$date = current_datetime()->modify( '+' . ( $day + 2 ) . ' days' );
+			for ( $event = 0; $event < 4; ++$event ) {
+				$terms   = 0 === $event
+					? array( (int) $child['term_id'], (int) $grandchild['term_id'] )
+					: ( 1 === $event ? array( (int) $root['term_id'] ) : array( (int) $grandchild['term_id'] ) );
+				$post_id = $this->seed_event(
+					"Hierarchical event {$day}-{$event}",
+					$date->format( 'Y-m-d 20:00:00' ),
+					$date->format( 'Y-m-d 22:00:00' ),
+					0,
+					array( 'calendar_test_location' => $terms )
+				);
+				if ( 5 === $day ) {
+					$last_date_ids[] = $post_id;
+				}
+			}
+		}
+		$outside_date = current_datetime()->modify( '+8 days' );
+		$this->seed_event(
+			'Outside hierarchy event',
+			$outside_date->format( 'Y-m-d 20:00:00' ),
+			$outside_date->format( 'Y-m-d 22:00:00' ),
+			0,
+			array( 'calendar_test_location' => (int) $outside['term_id'] )
+		);
+
+		global $wpdb;
+		CalendarCache::invalidate();
+		$aggregate_queries = array();
+		$observer          = static function ( string $sql ) use ( &$aggregate_queries ): string {
+			if ( str_contains( $sql, 'AS bucket_count' ) ) {
+				$aggregate_queries[] = $sql;
+			}
+			return $sql;
+		};
+		add_filter( 'query', $observer );
+		try {
+			$first = $this->abilities->executeGetCalendarPage(
+				array(
+					'archive_taxonomy' => 'calendar_test_location',
+					'archive_term_id'  => (int) $root['term_id'],
+					'include_html'     => false,
+				)
+			);
+			$second = $this->abilities->executeGetCalendarPage(
+				array(
+					'archive_taxonomy' => 'calendar_test_location',
+					'archive_term_id'  => (int) $root['term_id'],
+					'paged'            => 2,
+					'include_html'     => false,
+				)
+			);
+		} finally {
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 24, $first['total_event_count'] );
+		$this->assertSame( 2, $first['max_pages'] );
+		$this->assertSame( 24, $second['total_event_count'] );
+		$this->assertSame( 2, $second['current_page'] );
+		$this->assertSame( 4, $second['event_count'] );
+		$this->assertEqualsCanonicalizing( $last_date_ids, $this->result_post_ids( $second ) );
+		$this->assertCount( 1, $aggregate_queries, 'Generation-scoped date boundaries must be reused across archive pages.' );
+		$db_engine     = defined( 'DB_ENGINE' ) ? strtolower( (string) constant( 'DB_ENGINE' ) ) : '';
+		$database_type = defined( 'DATABASE_TYPE' ) ? strtolower( (string) constant( 'DATABASE_TYPE' ) ) : '';
+		if ( true === $wpdb->is_mysql && 'sqlite' !== $db_engine && 'sqlite' !== $database_type ) {
+			$this->assertStringContainsString( 'EXISTS (', $aggregate_queries[0] );
+			$this->assertStringContainsString( $wpdb->term_relationships, $aggregate_queries[0] );
+		}
+	}
+
+	public function test_upcoming_boundaries_exclude_past_dates_from_ongoing_multi_day_events(): void {
+		$today = current_datetime()->setTime( 12, 0 );
+		$start = $today->modify( '-3 days' );
+		$end   = $today->modify( '+2 days' );
+
+		$event_id = $this->seed_event( 'Ongoing multi-day event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertSame( 1, $result['event_count'], 'The page count reports unique event posts.' );
+		$this->assertSame(
+			array_fill( 0, 3, $event_id ),
+			$this->result_post_ids( $result ),
+			'A multi-day event has one occurrence in each visible date group.'
+		);
+	}
+
+	public function test_taxonomy_filtered_upcoming_boundaries_include_ongoing_multi_day_events(): void {
+		$term = wp_insert_term( 'Ongoing calendar venue ' . uniqid(), 'venue' );
+		$this->assertNotWPError( $term );
+		$venue_id = (int) $term['term_id'];
+		$today    = current_datetime()->setTime( 12, 0 );
+		$start    = $today->modify( '-3 days' );
+		$end      = $today->modify( '+2 days' );
+
+		$event_id = $this->seed_event( 'Taxonomy-filtered ongoing event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ), $venue_id );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'archive_taxonomy' => 'venue',
+				'archive_term_id'  => $venue_id,
+				'include_html'     => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $today->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertSame( array_fill( 0, 3, $event_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_month_intersects_explicit_date_range(): void {
+		$month_start = current_datetime()->modify( 'first day of +2 months' )->setTime( 0, 0 );
+		$outside     = $month_start->modify( '+4 days' );
+		$inside      = $month_start->modify( '+9 days' );
+		$this->seed_event( 'Outside explicit range', $outside->format( 'Y-m-d 20:00:00' ), $outside->format( 'Y-m-d 22:00:00' ) );
+		$inside_id = $this->seed_event( 'Inside explicit range', $inside->format( 'Y-m-d 20:00:00' ), $inside->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $month_start->format( 'Y-m' ),
+				'date_start'   => $inside->format( 'Y-m-d' ),
+				'date_end'     => $inside->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $inside->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $inside->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( $inside_id, $result['paged_date_groups'][0]['events'][0]['post_id'] );
+	}
+
+	public function test_month_intersects_resolved_scope_and_can_be_empty(): void {
+		$scope_bounds  = ScopeResolver::resolve( 'today' );
+		$this->assertIsArray( $scope_bounds );
+		$scope_date    = new \DateTimeImmutable( $scope_bounds['date_start'], wp_timezone() );
+		$outside_date  = new \DateTimeImmutable( $scope_bounds['date_end'], wp_timezone() );
+		$outside_date  = $outside_date->modify( '+1 day' );
+		$today_id      = $this->seed_event( 'Today scoped event', $scope_date->format( 'Y-m-d 12:00:00' ), $scope_date->format( 'Y-m-d 14:00:00' ) );
+		$future_id     = $this->seed_event( 'Tomorrow unscoped event', $outside_date->format( 'Y-m-d 12:00:00' ), $outside_date->format( 'Y-m-d 14:00:00' ) );
+		$current_month = $scope_date->format( 'Y-m' );
+
+		$scoped = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $current_month,
+				'scope'        => 'today',
+				'date_start'   => $scope_date->format( 'Y-m-d' ),
+				'date_end'     => $scope_date->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+		$scoped_ids = array_column( $scoped['paged_date_groups'][0]['events'], 'post_id' );
+		$this->assertSame( $scope_date->format( 'Y-m-d' ), $scoped['date_boundaries']['start_date'] );
+		$this->assertSame( $scope_date->format( 'Y-m-d' ), $scoped['date_boundaries']['end_date'] );
+		$this->assertContains( $today_id, $scoped_ids );
+		$this->assertNotContains( $future_id, $scoped_ids );
+
+		$empty = $this->abilities->executeGetCalendarPage(
+			array(
+				'month'        => $scope_date->modify( '+2 months' )->format( 'Y-m' ),
+				'scope'        => 'today',
+				'include_html' => false,
+			)
+		);
+		$this->assertSame( 0, $empty['event_count'] );
+		$this->assertSame( array(), $empty['paged_date_groups'] );
+		$this->assertGreaterThan( $empty['date_boundaries']['end_date'], $empty['date_boundaries']['start_date'] );
+	}
+
+	public function test_search_constrains_totals_boundaries_and_repeated_date_rows(): void {
+		$date       = current_datetime()->modify( '+7 days' );
+		$search     = 'needle-' . uniqid();
+		$first_id   = $this->seed_event( "{$search} first", $date->format( 'Y-m-d 18:00:00' ), $date->format( 'Y-m-d 20:00:00' ) );
+		$second_id  = $this->seed_event( "{$search} second", $date->format( 'Y-m-d 21:00:00' ), $date->format( 'Y-m-d 23:00:00' ) );
+		$other_date = $date->modify( '+1 day' );
+		$this->seed_event( 'Unrelated search event', $other_date->format( 'Y-m-d 20:00:00' ), $other_date->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => $search,
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 2, $result['total_event_count'] );
+		$this->assertSame( 2, $result['event_count'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertEqualsCanonicalizing( array( $first_id, $second_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_search_with_no_matches_returns_empty_boundaries(): void {
+		$date = current_datetime()->modify( '+8 days' );
+		$this->seed_event( 'Existing event', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => 'absent-' . uniqid(),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 0, $result['total_event_count'] );
+		$this->assertSame( 0, $result['event_count'] );
+		$this->assertSame( 0, $result['max_pages'] );
+		$this->assertSame( array( 'start_date' => '', 'end_date' => '' ), $result['date_boundaries'] );
+		$this->assertSame( array(), $result['paged_date_groups'] );
+	}
+
+	public function test_explicit_past_single_day_retains_requested_boundary_and_count(): void {
+		$date     = current_datetime()->modify( '-2 days' );
+		$event_id = $this->seed_event( 'Exact past window', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'date_start'   => $date->format( 'Y-m-d' ),
+				'date_end'     => $date->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array( $event_id ), $this->result_post_ids( $result ) );
+		$this->assertSame(
+			array(
+				'start_date' => $date->format( 'Y-m-d' ),
+				'end_date'   => $date->format( 'Y-m-d' ),
+			),
+			$result['date_boundaries']
+		);
+	}
+
+	public function test_explicit_multi_day_past_range_uses_past_toggle_only_for_ordering(): void {
+		$first  = current_datetime()->modify( '-5 days' );
+		$second = $first->modify( '+2 days' );
+		$this->seed_event( 'First bounded past event', $first->format( 'Y-m-d 20:00:00' ), $first->format( 'Y-m-d 22:00:00' ) );
+		$this->seed_event( 'Second bounded past event', $second->format( 'Y-m-d 20:00:00' ), $second->format( 'Y-m-d 22:00:00' ) );
+		$this->seed_event( 'Outside bounded past event', $first->modify( '-1 day' )->format( 'Y-m-d 20:00:00' ), $first->modify( '-1 day' )->format( 'Y-m-d 22:00:00' ) );
+
+		$input = array(
+			'date_start'   => $first->format( 'Y-m-d' ),
+			'date_end'     => $second->format( 'Y-m-d' ),
+			'include_html' => false,
+		);
+		$ascending  = $this->abilities->executeGetCalendarPage( $input );
+		$descending = $this->abilities->executeGetCalendarPage( array_merge( $input, array( 'past' => true ) ) );
+
+		$this->assertSame( 2, $ascending['total_event_count'] );
+		$this->assertSame( 2, $ascending['event_count'] );
+		$this->assertSame( array( $first->format( 'Y-m-d' ), $second->format( 'Y-m-d' ) ), array_column( $ascending['paged_date_groups'], 'date' ) );
+		$this->assertSame( 2, $descending['total_event_count'] );
+		$this->assertSame( 2, $descending['event_count'] );
+		$this->assertSame( array( $second->format( 'Y-m-d' ), $first->format( 'Y-m-d' ) ), array_column( $descending['paged_date_groups'], 'date' ) );
+	}
+
+	public function test_explicit_past_search_and_location_scope_keep_rows_and_boundaries_aligned(): void {
+		$location       = wp_insert_term( 'Past search location ' . uniqid(), 'calendar_test_region' );
+		$other_location = wp_insert_term( 'Other past search location ' . uniqid(), 'calendar_test_region' );
+		$this->assertNotWPError( $location );
+		$this->assertNotWPError( $other_location );
+
+		$date      = current_datetime()->modify( '-2 days' );
+		$search    = 'Past location needle ' . uniqid();
+		$target_id = $this->seed_event(
+			$search . ' target',
+			$date->format( 'Y-m-d 18:00:00' ),
+			$date->format( 'Y-m-d 21:00:00' ),
+			0,
+			array( 'calendar_test_region' => (int) $location['term_id'] )
+		);
+		$this->seed_event( $search . ' elsewhere', $date->format( 'Y-m-d 18:00:00' ), $date->format( 'Y-m-d 21:00:00' ), 0, array( 'calendar_test_region' => (int) $other_location['term_id'] ) );
+		$this->seed_event( 'Wrong title', $date->format( 'Y-m-d 18:00:00' ), $date->format( 'Y-m-d 21:00:00' ), 0, array( 'calendar_test_region' => (int) $location['term_id'] ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search'     => $search,
+				'archive_taxonomy' => 'calendar_test_region',
+				'archive_term_id'  => (int) $location['term_id'],
+				'date_start'       => $date->format( 'Y-m-d' ),
+				'date_end'         => $date->format( 'Y-m-d' ),
+				'include_html'     => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array( $target_id ), $this->result_post_ids( $result ) );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+	}
+
+	public function test_explicit_past_no_match_retains_requested_boundary_with_zero_count(): void {
+		$date = current_datetime()->modify( '-2 days' );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => 'Absent past event ' . uniqid(),
+				'date_start'   => $date->format( 'Y-m-d' ),
+				'date_end'     => $date->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame( 0, $result['total_event_count'] );
+		$this->assertSame( 0, $result['event_count'] );
+		$this->assertSame( array(), $result['paged_date_groups'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+	}
+
+	public function test_default_upcoming_still_excludes_completed_events(): void {
+		$past   = current_datetime()->modify( '-2 days' );
+		$future = current_datetime()->modify( '+2 days' );
+		$this->seed_event( 'Completed default event', $past->format( 'Y-m-d 20:00:00' ), $past->format( 'Y-m-d 22:00:00' ) );
+		$future_id = $this->seed_event( 'Upcoming default event', $future->format( 'Y-m-d 20:00:00' ), $future->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage( array( 'include_html' => false ) );
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array( $future_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_geo_constrains_totals_boundaries_and_rows(): void {
+		$near_venue = $this->seed_venue( 'Nearby venue', '32.7765,-79.9311' );
+		$far_venue  = $this->seed_venue( 'Far venue', '40.7128,-74.0060' );
+		$near_date  = current_datetime()->modify( '+9 days' );
+		$far_date   = $near_date->modify( '+1 day' );
+		$near_id    = $this->seed_event( 'Nearby event', $near_date->format( 'Y-m-d 20:00:00' ), $near_date->format( 'Y-m-d 22:00:00' ), $near_venue );
+		$this->seed_event( 'Far event', $far_date->format( 'Y-m-d 20:00:00' ), $far_date->format( 'Y-m-d 22:00:00' ), $far_venue );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'geo_lat'         => '32.7765',
+				'geo_lng'         => '-79.9311',
+				'geo_radius'      => 10,
+				'geo_radius_unit' => 'mi',
+				'include_html'    => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( $near_date->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( array( $near_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_combined_search_geo_taxonomy_archive_and_date_constraints_stay_aligned(): void {
+		$near_venue  = $this->seed_venue( 'Combined nearby venue', '32.7765,-79.9311' );
+		$far_venue   = $this->seed_venue( 'Combined far venue', '40.7128,-74.0060' );
+		$region      = wp_insert_term( 'Combined region ' . uniqid(), 'calendar_test_region' );
+		$other       = wp_insert_term( 'Other region ' . uniqid(), 'calendar_test_region' );
+		$style       = wp_insert_term( 'Combined style ' . uniqid(), 'calendar_test_style' );
+		$other_style = wp_insert_term( 'Other style ' . uniqid(), 'calendar_test_style' );
+		$this->assertNotWPError( $region );
+		$this->assertNotWPError( $other );
+		$this->assertNotWPError( $style );
+		$this->assertNotWPError( $other_style );
+
+		$date   = current_datetime()->modify( '+10 days' );
+		$search = 'combined-' . uniqid();
+		$terms  = array(
+			'calendar_test_region' => (int) $region['term_id'],
+			'calendar_test_style'  => (int) $style['term_id'],
+		);
+		$match_id = $this->seed_event( "{$search} match", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $near_venue, $terms );
+		$this->seed_event( "{$search} far", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $far_venue, $terms );
+		$this->seed_event( "{$search} wrong archive", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $near_venue, array_merge( $terms, array( 'calendar_test_region' => (int) $other['term_id'] ) ) );
+		$this->seed_event( "{$search} wrong filter", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $near_venue, array_merge( $terms, array( 'calendar_test_style' => (int) $other_style['term_id'] ) ) );
+		$this->seed_event( 'Wrong search', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $near_venue, $terms );
+		$outside = $date->modify( '+1 day' );
+		$this->seed_event( "{$search} outside date", $outside->format( 'Y-m-d 20:00:00' ), $outside->format( 'Y-m-d 22:00:00' ), $near_venue, $terms );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search'     => $search,
+				'geo_lat'          => '32.7765',
+				'geo_lng'          => '-79.9311',
+				'geo_radius'       => 10,
+				'geo_radius_unit'  => 'mi',
+				'archive_taxonomy' => 'calendar_test_region',
+				'archive_term_id'  => (int) $region['term_id'],
+				'tax_filter'       => array( 'calendar_test_style' => array( (int) $style['term_id'] ) ),
+				'date_start'       => $date->format( 'Y-m-d' ),
+				'date_end'         => $date->format( 'Y-m-d' ),
+				'include_html'     => false,
+			)
+		);
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array( $match_id ), $this->result_post_ids( $result ) );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $date->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+	}
+
+	public function test_search_pagination_boundaries_do_not_include_unmatched_dates(): void {
+		$global_start = current_datetime()->modify( '+12 days' );
+		$search_start = $global_start->modify( '+10 days' );
+		$search       = 'paged-' . uniqid();
+
+		for ( $day = 0; $day < 5; ++$day ) {
+			$date = $global_start->modify( "+{$day} days" );
+			for ( $event = 0; $event < 4; ++$event ) {
+				$this->seed_event( "Global {$day}-{$event}", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+			}
+		}
+
+		$last_date_ids = array();
+		for ( $day = 0; $day < 6; ++$day ) {
+			$date = $search_start->modify( "+{$day} days" );
+			for ( $event = 0; $event < 4; ++$event ) {
+				$post_id = $this->seed_event( "{$search} {$day}-{$event}", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+				if ( 5 === $day ) {
+					$last_date_ids[] = $post_id;
+				}
+			}
+		}
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => $search,
+				'paged'        => 2,
+				'include_html' => false,
+			)
+		);
+
+		$last_date = $search_start->modify( '+5 days' )->format( 'Y-m-d' );
+		$this->assertSame( 24, $result['total_event_count'] );
+		$this->assertSame( 2, $result['max_pages'] );
+		$this->assertSame( 2, $result['current_page'] );
+		$this->assertSame( $last_date, $result['date_boundaries']['start_date'] );
+		$this->assertSame( $last_date, $result['date_boundaries']['end_date'] );
+		$this->assertSame( 4, $result['event_count'] );
+		$this->assertEqualsCanonicalizing( $last_date_ids, $this->result_post_ids( $result ) );
+	}
+
+	public function test_scope_tokens_isolate_warm_boundary_caches_and_rows(): void {
+		$first_date = current_datetime()->modify( '+30 days' );
+		$second_date = $first_date->modify( '+1 day' );
+		$first_id = $this->seed_event( 'First scoped event', $first_date->format( 'Y-m-d 20:00:00' ), $first_date->format( 'Y-m-d 22:00:00' ) );
+		$second_id = $this->seed_event( 'Second scoped event', $second_date->format( 'Y-m-d 20:00:00' ), $second_date->format( 'Y-m-d 22:00:00' ) );
+
+		$filter = static function ( array $query_args, array $input ) use ( $first_id, $second_id ): array {
+			$allowed = array(
+				'calendar-scope-a' => $first_id,
+				'calendar-scope-b' => $second_id,
+			);
+			if ( isset( $allowed[ $input['scope_token'] ?? '' ] ) ) {
+				$query_args['post__in'] = array( $allowed[ $input['scope_token'] ] );
+			}
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter, 10, 2 );
+		try {
+			$first = $this->abilities->executeGetCalendarPage(
+				array( 'scope_token' => 'calendar-scope-a', 'include_html' => false )
+			);
+			$second = $this->abilities->executeGetCalendarPage(
+				array( 'scope_token' => 'calendar-scope-b', 'include_html' => false )
+			);
+			$first_warm = $this->abilities->executeGetCalendarPage(
+				array( 'scope_token' => 'calendar-scope-a', 'include_html' => false )
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
+		}
+
+		$this->assertSame( 1, $first['total_event_count'] );
+		$this->assertSame( 1, $second['total_event_count'] );
+		$this->assertSame( $first_date->format( 'Y-m-d' ), $first['date_boundaries']['start_date'] );
+		$this->assertSame( $second_date->format( 'Y-m-d' ), $second['date_boundaries']['start_date'] );
+		$this->assertSame( array( $first_id ), $this->result_post_ids( $first ) );
+		$this->assertSame( array( $second_id ), $this->result_post_ids( $second ) );
+		$this->assertSame( $first['total_event_count'], $first_warm['total_event_count'] );
+		$this->assertSame( $first['date_boundaries'], $first_warm['date_boundaries'] );
+		$this->assertSame( $this->result_post_ids( $first ), $this->result_post_ids( $first_warm ) );
+	}
+
+	public function test_scope_token_keeps_pagination_counter_and_deferred_dates_aligned(): void {
+		$start       = current_datetime()->modify( '+45 days' );
+		$allowed_ids = array();
+		for ( $day = 0; $day < 6; ++$day ) {
+			$date = $start->modify( "+{$day} days" );
+			for ( $event = 0; $event < 10; ++$event ) {
+				$allowed_ids[] = $this->seed_event( "Scoped {$day}-{$event}", $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+			}
+		}
+		$unscoped = $start->modify( '-1 day' );
+		$this->seed_event( 'Unscoped earlier event', $unscoped->format( 'Y-m-d 20:00:00' ), $unscoped->format( 'Y-m-d 22:00:00' ) );
+
+		$filter = static function ( array $query_args, array $input ) use ( $allowed_ids ): array {
+			if ( 'pagination-scope' === ( $input['scope_token'] ?? '' ) ) {
+				$query_args['post__in'] = $allowed_ids;
+			}
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter, 10, 2 );
+		try {
+			$result = $this->abilities->executeGetCalendarPage(
+				array(
+					'scope_token' => 'pagination-scope',
+					'progressive' => true,
+					'include_html' => true,
+				)
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
+		}
+
+		$expected_deferred = array();
+		for ( $day = 1; $day < 5; ++$day ) {
+			$expected_deferred[] = $start->modify( "+{$day} days" )->format( 'Y-m-d' );
+		}
+		$this->assertSame( 60, $result['total_event_count'] );
+		$this->assertSame( 2, $result['max_pages'] );
+		$this->assertSame( $start->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $start->modify( '+4 days' )->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( 10, $result['event_count'] );
+		$this->assertSame( $expected_deferred, $result['deferred_dates'] );
+		$this->assertStringContainsString( '10 of 60 Events', $result['html']['counter'] );
+	}
+
+	/**
+	 * Issue #834: in progressive mode the first-day query matches events
+	 * still ongoing from earlier days. Those rows must be grouped into the
+	 * first day's group only — never expanded into standalone continuation
+	 * groups for later dates that also exist as deferred shells (which
+	 * produced duplicate, out-of-order day headings).
+	 */
+	public function test_progressive_page_never_groups_continuations_onto_deferred_dates(): void {
+		// The scope token below isolates this test's boundary caches from
+		// other default-scope tests (same pattern as the scope-token tests).
+		CalendarCache::invalidate();
+
+		$start = current_datetime()->modify( '+10 days' );
+
+		// 48 ordinary events on the first day push the page past the
+		// progressive threshold (50) once the ongoing event's expansion
+		// and the trailing day are counted.
+		for ( $event = 0; $event < 48; ++$event ) {
+			$this->seed_event( "First day filler {$event}", $start->format( 'Y-m-d 20:00:00' ), $start->format( 'Y-m-d 22:00:00' ) );
+		}
+
+		// A genuine multi-day event starting on the first day and spanning
+		// into two further days (within the continuous window).
+		$ongoing_id = $this->seed_event(
+			'Ongoing festival',
+			$start->format( 'Y-m-d 12:00:00' ),
+			$start->modify( '+2 days' )->format( 'Y-m-d 22:00:00' )
+		);
+
+		// A trailing day so the page has multiple dates.
+		$this->seed_event( 'Trailing day event', $start->modify( '+3 days' )->format( 'Y-m-d 20:00:00' ), $start->modify( '+3 days' )->format( 'Y-m-d 22:00:00' ) );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'scope_token'  => 'progressive-834',
+				'progressive'  => true,
+				'include_html' => true,
+			)
+		);
+
+		$grouped_dates = array_column( $result['paged_date_groups'], 'date' );
+		$deferred      = $result['deferred_dates'];
+
+		$this->assertSame( array( $start->format( 'Y-m-d' ) ), $grouped_dates, 'Only the queried first day is grouped — no standalone continuation groups.' );
+		$this->assertNotEmpty( $deferred, 'The page must actually be in progressive mode for this test to be meaningful.' );
+		$this->assertSame(
+			array(),
+			array_intersect( $grouped_dates, $deferred ),
+			'A grouped date must never also exist as a deferred shell (duplicate heading).'
+		);
+
+		$first_group_ids = array_column( $result['paged_date_groups'][0]['events'], 'post_id' );
+		$this->assertContains( $ongoing_id, $first_group_ids, 'The ongoing event renders on the queried first day.' );
+
+		$ongoing_context = null;
+		foreach ( $result['paged_date_groups'][0]['events'] as $event_entry ) {
+			if ( (int) $event_entry['post_id'] === $ongoing_id ) {
+				$ongoing_context = $event_entry['display_context'];
+				break;
+			}
+		}
+		$this->assertNotNull( $ongoing_context );
+		$this->assertTrue( $ongoing_context['is_start_day'] );
+		$this->assertFalse( $ongoing_context['is_continuation'] );
+	}
+
+	public function test_scope_token_preserves_multi_day_boundary_expansion(): void {
+		$start = current_datetime()->modify( '+60 days' );
+		$end   = $start->modify( '+2 days' );
+		$allowed_id = $this->seed_event( 'Scoped multi-day event', $start->format( 'Y-m-d 20:00:00' ), $end->format( 'Y-m-d 22:00:00' ) );
+		$this->seed_event( 'Unscoped middle event', $start->modify( '+1 day' )->format( 'Y-m-d 20:00:00' ), $start->modify( '+1 day' )->format( 'Y-m-d 22:00:00' ) );
+
+		$filter = static function ( array $query_args, array $input ) use ( $allowed_id ): array {
+			if ( 'multi-day-scope' === ( $input['scope_token'] ?? '' ) ) {
+				$query_args['post__in'] = array( $allowed_id );
+			}
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter, 10, 2 );
+		try {
+			$result = $this->abilities->executeGetCalendarPage(
+				array( 'scope_token' => 'multi-day-scope', 'include_html' => false )
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( $start->format( 'Y-m-d' ), $result['date_boundaries']['start_date'] );
+		$this->assertSame( $end->format( 'Y-m-d' ), $result['date_boundaries']['end_date'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array_fill( 0, 3, $allowed_id ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_search_geo_and_consumer_scope_constraints_stay_aligned(): void {
+		$venue  = $this->seed_venue( 'Scoped search venue', '32.7765,-79.9311' );
+		$date   = current_datetime()->modify( '+70 days' );
+		$target = $this->seed_event( 'Scoped needle target', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ), $venue );
+		$this->seed_event( 'Scoped needle excluded', $date->format( 'Y-m-d 21:00:00' ), $date->format( 'Y-m-d 23:00:00' ), $venue );
+
+		$filter = static function ( array $query_args, array $input ) use ( $target ): array {
+			if ( 'search-geo-scope' === ( $input['scope_token'] ?? '' ) ) {
+				$query_args['post__in'] = array( $target );
+			}
+			return $query_args;
+		};
+		add_filter( 'data_machine_events_calendar_query_args', $filter, 10, 2 );
+		try {
+			$result = $this->abilities->executeGetCalendarPage(
+				array(
+					'event_search' => 'Scoped needle',
+					'geo_lat' => '32.7765',
+					'geo_lng' => '-79.9311',
+					'geo_radius' => 10,
+					'scope_token' => 'search-geo-scope',
+					'include_html' => false,
+				)
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $filter, 10 );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertSame( 1, $result['event_count'] );
+		$this->assertSame( array( $target ), $this->result_post_ids( $result ) );
+	}
+
+	public function test_canonical_bucket_sql_aggregates_directly_without_rejoin_or_ordering(): void {
+		$date = current_datetime()->modify( '+80 days' );
+		$this->seed_event( 'Direct aggregate event', $date->format( 'Y-m-d 20:00:00' ), $date->format( 'Y-m-d 22:00:00' ) );
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, ' AS bucket_count' ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		$scope_filter = static function ( array $query_args ): array {
+			return $query_args;
+		};
+
+		add_filter( 'query', $observer );
+		add_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+		try {
+			$result = $this->abilities->executeGetCalendarPage( array( 'include_html' => false ) );
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertCount( 1, $queries );
+		$this->assertStringContainsString( 'COUNT(*) AS bucket_count', $queries[0] );
+		$this->assertStringContainsString( "post_status = 'publish'", $queries[0] );
+		$this->assertStringContainsString( "ed.post_status = 'publish'", $queries[0] );
+		$this->assertStringNotContainsString( 'FROM (SELECT', $queries[0] );
+		$this->assertStringNotContainsString( 'boundary_ed', $queries[0] );
+		$this->assertStringNotContainsString( ' ORDER BY ', strtoupper( $queries[0] ) );
+	}
+
+	public function test_canonical_bucket_sql_deduplicates_taxonomy_joins(): void {
+		$date = current_datetime()->modify( '+81 days' );
+		$term = wp_insert_term( 'Aggregate style ' . uniqid(), 'calendar_test_style' );
+		$this->assertNotWPError( $term );
+		$this->seed_event(
+			'Taxonomy aggregate event',
+			$date->format( 'Y-m-d 20:00:00' ),
+			$date->format( 'Y-m-d 22:00:00' ),
+			0,
+			array( 'calendar_test_style' => (int) $term['term_id'] )
+		);
+
+		$queries  = array();
+		$observer = static function ( string $sql ) use ( &$queries ): string {
+			if ( false !== strpos( $sql, ' AS bucket_count' ) ) {
+				$queries[] = $sql;
+			}
+			return $sql;
+		};
+		$scope_filter = static function ( array $query_args ): array {
+			return $query_args;
+		};
+
+		add_filter( 'query', $observer );
+		add_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+		try {
+			$result = $this->abilities->executeGetCalendarPage(
+				array(
+					'tax_filter'   => array( 'calendar_test_style' => array( (int) $term['term_id'] ) ),
+					'include_html' => false,
+				)
+			);
+		} finally {
+			remove_filter( 'data_machine_events_calendar_query_args', $scope_filter );
+			remove_filter( 'query', $observer );
+		}
+
+		$this->assertSame( 1, $result['total_event_count'] );
+		$this->assertCount( 1, $queries );
+		$this->assertStringContainsString( 'COUNT(*) AS bucket_count', $queries[0] );
+		$this->assertStringContainsString( 'EXISTS (', $queries[0] );
+		$this->assertStringContainsString( 'term_relationships', $queries[0] );
+	}
+
+	public function test_requested_range_preserves_timezone_cutoff_and_multi_day_occurrences(): void {
+		$venue = $this->seed_venue( 'Timezone venue', '32.7765,-79.9311' );
+		update_term_meta( $venue, '_venue_timezone', 'America/New_York' );
+
+		$range_start = current_datetime()->modify( '+82 days' )->setTime( 0, 0 );
+		$range_end   = $range_start->modify( '+2 days' );
+		$search      = 'bounded-' . uniqid();
+
+		$multi_id = $this->seed_event(
+			"{$search} ongoing",
+			$range_start->modify( '-1 day' )->format( 'Y-m-d 20:00:00' ),
+			$range_end->format( 'Y-m-d 22:00:00' ),
+			$venue
+		);
+		$late_id = $this->seed_event(
+			"{$search} late night",
+			$range_start->modify( '+1 day' )->format( 'Y-m-d 04:00:00' ),
+			$range_start->modify( '+1 day' )->format( 'Y-m-d 04:30:00' ),
+			$venue
+		);
+		EventDatesTable::upsert( $late_id, $range_start->modify( '+1 day' )->format( 'Y-m-d 04:00:00' ), null, 'publish' );
+		$this->seed_event( "{$search} outside", $range_end->modify( '+1 day' )->format( 'Y-m-d 20:00:00' ), $range_end->modify( '+1 day' )->format( 'Y-m-d 22:00:00' ), $venue );
+
+		$result = $this->abilities->executeGetCalendarPage(
+			array(
+				'event_search' => $search,
+				'date_start'   => $range_start->format( 'Y-m-d' ),
+				'date_end'     => $range_end->format( 'Y-m-d' ),
+				'include_html' => false,
+			)
+		);
+
+		$this->assertSame(
+			array( $range_start->format( 'Y-m-d' ), $range_start->modify( '+1 day' )->format( 'Y-m-d' ), $range_end->format( 'Y-m-d' ) ),
+			array_column( $result['paged_date_groups'], 'date' )
+		);
+		$this->assertSame( 2, $result['event_count'], 'The bounded row query returns unique event posts.' );
+		$this->assertSame( array_fill( 0, 3, $multi_id ), array_values( array_filter( $this->result_post_ids( $result ), static fn( int $id ): bool => $multi_id === $id ) ) );
+		$this->assertSame( $range_start->format( 'Y-m-d' ), $result['paged_date_groups'][0]['date'] );
+		$this->assertContains( $late_id, array_column( $result['paged_date_groups'][0]['events'], 'post_id' ), 'A 4 AM venue-local event remains grouped under the prior night.' );
+		$this->assertSame( 'America/New_York', $result['paged_date_groups'][0]['events'][0]['event_data']['venueTimezone'] );
+	}
+}

@@ -1,0 +1,550 @@
+{
+    "datamachine/email-reply": {
+        "label": "Reply to Email",
+        "description": "Send a reply to an email, maintaining thread headers",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "to",
+                "subject",
+                "body",
+                "in_reply_to"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "to": {
+                    "type": "string",
+                    "description": "Recipient email address"
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Reply subject (typically Re: original subject)"
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Reply body content"
+                },
+                "in_reply_to": {
+                    "type": "string",
+                    "description": "Message-ID of the email being replied to"
+                },
+                "references": {
+                    "type": "string",
+                    "default": "",
+                    "description": "References header chain for threading"
+                },
+                "cc": {
+                    "type": "string",
+                    "default": ""
+                },
+                "content_type": {
+                    "type": "string",
+                    "default": "text/html"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "logs": {
+                    "type": "array"
+                }
+            }
+        },
+        "execute_callback": "executeReply",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-delete": {
+        "label": "Delete Email",
+        "description": "Delete (expunge) an email by UID from the IMAP server",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "uid"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "uid": {
+                    "type": "integer",
+                    "description": "Message UID to delete"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeDelete",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-move": {
+        "label": "Move Email",
+        "description": "Move an email to a different IMAP folder",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "uid",
+                "destination"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "uid": {
+                    "type": "integer",
+                    "description": "Message UID to move"
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "Target folder (e.g., Archive, Trash, [Gmail]/All Mail)"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeMove",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-flag": {
+        "label": "Flag Email",
+        "description": "Set or clear IMAP flags on an email (Seen, Flagged, etc.)",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "uid",
+                "flag"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "uid": {
+                    "type": "integer",
+                    "description": "Message UID"
+                },
+                "flag": {
+                    "type": "string",
+                    "description": "IMAP flag: Seen, Flagged, Answered, Deleted, Draft"
+                },
+                "action": {
+                    "type": "string",
+                    "default": "set",
+                    "description": "set or clear the flag"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeFlag",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-batch-move": {
+        "label": "Batch Move Emails",
+        "description": "Move all emails matching a search to a destination folder",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "search",
+                "destination"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "search": {
+                    "type": "string",
+                    "description": "IMAP search criteria (e.g., FROM \"github.com\")"
+                },
+                "destination": {
+                    "type": "string",
+                    "description": "Target folder (e.g., [Gmail]/GitHub, Archive)"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                },
+                "max": {
+                    "type": "integer",
+                    "default": 500,
+                    "description": "Maximum messages to move (safety limit)"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "moved_count": {
+                    "type": "integer"
+                },
+                "total_matches": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeBatchMove",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-batch-flag": {
+        "label": "Batch Flag Emails",
+        "description": "Set or clear a flag on all emails matching a search",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "search",
+                "flag"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "search": {
+                    "type": "string",
+                    "description": "IMAP search criteria"
+                },
+                "flag": {
+                    "type": "string",
+                    "description": "Flag: Seen, Flagged, Answered, Deleted, Draft"
+                },
+                "action": {
+                    "type": "string",
+                    "default": "set",
+                    "description": "set or clear"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                },
+                "max": {
+                    "type": "integer",
+                    "default": 500
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "flagged_count": {
+                    "type": "integer"
+                },
+                "total_matches": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeBatchFlag",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-batch-delete": {
+        "label": "Batch Delete Emails",
+        "description": "Delete all emails matching a search",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "search"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "search": {
+                    "type": "string",
+                    "description": "IMAP search criteria"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                },
+                "max": {
+                    "type": "integer",
+                    "default": 100,
+                    "description": "Maximum messages to delete (safety limit, lower default)"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "deleted_count": {
+                    "type": "integer"
+                },
+                "total_matches": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeBatchDelete",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-unsubscribe": {
+        "label": "Unsubscribe from Email",
+        "description": "Unsubscribe from a mailing list using List-Unsubscribe headers",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "uid"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "uid": {
+                    "type": "integer",
+                    "description": "Message UID to unsubscribe from"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeUnsubscribe",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-batch-unsubscribe": {
+        "label": "Batch Unsubscribe",
+        "description": "Unsubscribe from all mailing lists matching a search",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "required": [
+                "search"
+            ],
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                },
+                "search": {
+                    "type": "string",
+                    "description": "IMAP search criteria"
+                },
+                "folder": {
+                    "type": "string",
+                    "default": "INBOX"
+                },
+                "max": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Max unique senders to unsubscribe from (deduped by sender)"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "results": {
+                    "type": "array"
+                },
+                "unsubscribed": {
+                    "type": "integer"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "no_header": {
+                    "type": "integer"
+                }
+            }
+        },
+        "execute_callback": "executeBatchUnsubscribe",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    },
+    "datamachine/email-test-connection": {
+        "label": "Test Email Connection",
+        "description": "Test IMAP connection with stored credentials",
+        "category": "datamachine-email",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "auth_ref": {
+                    "type": "string",
+                    "default": "email_imap:default",
+                    "description": "Non-secret mailbox auth ref"
+                }
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "success": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "mailbox_info": {
+                    "type": "object"
+                },
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "execute_callback": "executeTestConnection",
+        "permission_callback": "checkPermission",
+        "meta": {
+            "show_in_rest": true
+        }
+    }
+}

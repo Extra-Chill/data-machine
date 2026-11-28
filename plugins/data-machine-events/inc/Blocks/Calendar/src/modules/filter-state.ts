@@ -1,0 +1,604 @@
+/**
+ * Centralized filter state management for the Calendar block.
+ *
+ * Source of truth hierarchy:
+ * 1. URL params (explicit, shareable)
+ * 2. localStorage (persistence for taxonomy filters + geo location)
+ *
+ * Archive context is read from DOM data attributes (page-level, not user state).
+ */
+
+/**
+ * Internal dependencies
+ */
+import type {
+	ArchiveContext,
+	DateContext,
+	FlatpickrInstance,
+	GeoContext,
+	StoredGeo,
+	TaxFilters,
+} from '../types';
+
+const STORAGE_KEY = 'data_machine_events_calendar_state';
+const GEO_STORAGE_KEY = 'data_machine_events_geo_state';
+
+class FilterStateManager {
+	private calendar: HTMLElement;
+	private archiveContext: ArchiveContext;
+
+	constructor( calendar: HTMLElement ) {
+		this.calendar = calendar;
+		this.archiveContext = this.readArchiveContext();
+	}
+
+	/**
+	 * Read archive context from calendar data attributes.
+	 */
+	private readArchiveContext(): ArchiveContext {
+		const dataset = this.calendar.dataset;
+		return {
+			taxonomy: dataset.archiveTaxonomy || '',
+			term_id: parseInt( dataset.archiveTermId || '0', 10 ) || 0,
+			term_name: dataset.archiveTermName || '',
+		};
+	}
+
+	/**
+	 * Get archive context for API calls.
+	 */
+	getArchiveContext(): ArchiveContext {
+		return this.archiveContext;
+	}
+
+	/**
+	 * Parse taxonomy filters from URL.
+	 */
+	getTaxFilters(): TaxFilters {
+		const params = new URLSearchParams( window.location.search );
+		const filters: TaxFilters = {};
+
+		params.forEach( ( value, key ) => {
+			const match = key.match( /^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/ );
+			if ( match ) {
+				const taxonomy = match[ 1 ];
+				if ( ! filters[ taxonomy ] ) {
+					filters[ taxonomy ] = [];
+				}
+				const termId = parseInt( value, 10 );
+				if ( termId > 0 && ! filters[ taxonomy ].includes( termId ) ) {
+					filters[ taxonomy ].push( termId );
+				}
+			}
+		} );
+
+		return filters;
+	}
+
+	/**
+	 * Get date context from URL.
+	 */
+	getDateContext(): DateContext {
+		const params = new URLSearchParams( window.location.search );
+		return {
+			date_start: params.get( 'date_start' ) || '',
+			date_end: params.get( 'date_end' ) || '',
+			past: params.get( 'past' ) || '',
+		};
+	}
+
+	/**
+	 * Get geo context from URL, falling back to data attributes, then localStorage.
+	 */
+	getGeoContext(): GeoContext {
+		const params = new URLSearchParams( window.location.search );
+
+		// Priority 1: URL params (shareable links)
+		const urlLat = params.get( 'lat' ) || '';
+		const urlLng = params.get( 'lng' ) || '';
+		if ( urlLat && urlLng ) {
+			return {
+				lat: urlLat,
+				lng: urlLng,
+				radius: parseInt( params.get( 'radius' ) || '25', 10 ) || 25,
+				radius_unit:
+					( params.get(
+						'radius_unit'
+					) as GeoContext[ 'radius_unit' ] ) || 'mi',
+			};
+		}
+
+		// Priority 2: Server-rendered data attributes
+		const dataLat = this.calendar.dataset.geoLat || '';
+		const dataLng = this.calendar.dataset.geoLng || '';
+		if ( dataLat && dataLng ) {
+			return {
+				lat: dataLat,
+				lng: dataLng,
+				radius:
+					parseInt( this.calendar.dataset.geoRadius || '25', 10 ) ||
+					25,
+				radius_unit:
+					( this.calendar.dataset
+						.geoRadiusUnit as GeoContext[ 'radius_unit' ] ) || 'mi',
+			};
+		}
+
+		// Priority 3: localStorage (persisted user preference)
+		return this.getStoredGeo();
+	}
+
+	/**
+	 * Check if geo filter is active.
+	 */
+	hasGeoFilter(): boolean {
+		const geo = this.getGeoContext();
+		return !! ( geo.lat && geo.lng );
+	}
+
+	/**
+	 * Get search query from URL.
+	 */
+	getSearchQuery(): string {
+		const params = new URLSearchParams( window.location.search );
+		return params.get( 'event_search' ) || '';
+	}
+
+	/**
+	 * Get current page from URL.
+	 */
+	getCurrentPage(): number {
+		const params = new URLSearchParams( window.location.search );
+		return parseInt( params.get( 'paged' ) || '1', 10 ) || 1;
+	}
+
+	/**
+	 * Count active taxonomy filters.
+	 */
+	getFilterCount(): number {
+		const filters = this.getTaxFilters();
+		return Object.values( filters ).reduce(
+			( sum, arr ) => sum + arr.length,
+			0
+		);
+	}
+
+	/**
+	 * Check if URL has any taxonomy filter params.
+	 */
+	hasUrlFilters(): boolean {
+		const params = new URLSearchParams( window.location.search );
+		for ( const key of params.keys() ) {
+			if ( key.startsWith( 'tax_filter[' ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Build URLSearchParams from current UI state.
+	 * Reads from: search input, date picker, filter checkboxes, location input.
+	 * @param datePicker
+	 */
+	buildParams(
+		datePicker: FlatpickrInstance | null = null
+	): URLSearchParams {
+		const params = new URLSearchParams();
+
+		const searchInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-search-input'
+		);
+		if ( searchInput?.value ) {
+			params.set( 'event_search', searchInput.value );
+		}
+
+		// #373: optional in-block time-scope preset chips. Read the active
+		// `[data-scope]` chip for this calendar instance and set `scope`.
+		// The "All" chip carries an empty `data-scope`, which means "no
+		// scope" — match the server's ScopeResolver, which treats both ''
+		// and 'current' as unscoped, by omitting the param entirely.
+		const activeScopeChip =
+			this.calendar.querySelector< HTMLButtonElement >(
+				'.data-machine-events-scope-chip-active[data-scope]'
+			);
+		if ( activeScopeChip ) {
+			const scopeSlug = activeScopeChip.dataset.scope || '';
+			if ( scopeSlug && scopeSlug !== 'current' ) {
+				params.set( 'scope', scopeSlug );
+			}
+		} else {
+			const defaultScope = this.calendar.dataset.scope || '';
+			if ( defaultScope && defaultScope !== 'current' ) {
+				params.set( 'scope', defaultScope );
+			}
+		}
+
+		if (
+			datePicker?.selectedDates?.length &&
+			datePicker.selectedDates.length > 0
+		) {
+			const startDate = datePicker.selectedDates[ 0 ];
+			const endDate = datePicker.selectedDates[ 1 ] || startDate;
+
+			params.set( 'date_start', this.formatDate( startDate ) );
+			params.set( 'date_end', this.formatDate( endDate ) );
+
+			const now = new Date();
+			const endOfRange = new Date(
+				endDate.getFullYear(),
+				endDate.getMonth(),
+				endDate.getDate(),
+				23,
+				59,
+				59
+			);
+			if ( endOfRange < now ) {
+				params.set( 'past', '1' );
+			}
+		}
+
+		// Taxonomy filters — read from inline collapsible (or modal for backward compat)
+		const filtersContainer =
+			this.calendar.querySelector< HTMLElement >(
+				'.data-machine-taxonomy-filters-inline'
+			) ||
+			this.calendar.querySelector< HTMLElement >(
+				'.data-machine-taxonomy-modal'
+			);
+		if ( filtersContainer ) {
+			const checkboxes =
+				filtersContainer.querySelectorAll< HTMLInputElement >(
+					'input[type="checkbox"]:checked'
+				);
+			checkboxes.forEach( ( checkbox ) => {
+				const taxonomy = checkbox.dataset.taxonomy;
+				const termId = checkbox.value;
+				if ( taxonomy && termId ) {
+					params.append( `tax_filter[${ taxonomy }][]`, termId );
+				}
+			} );
+		}
+
+		// Geo location — read from location input data attributes
+		const locationInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-location-search'
+		);
+		if ( locationInput ) {
+			const lat = locationInput.dataset.geoLat || '';
+			const lng = locationInput.dataset.geoLng || '';
+			if ( lat && lng ) {
+				params.set( 'lat', lat );
+				params.set( 'lng', lng );
+
+				const radiusSelect =
+					this.calendar.querySelector< HTMLSelectElement >(
+						'.data-machine-events-radius-select'
+					);
+				if ( radiusSelect ) {
+					params.set( 'radius', radiusSelect.value );
+					params.set(
+						'radius_unit',
+						radiusSelect.dataset.radiusUnit || 'mi'
+					);
+				}
+			}
+		}
+
+		return params;
+	}
+
+	/**
+	 * Apply shareable URL state back to controls after history navigation.
+	 * @param params
+	 * @param datePicker
+	 */
+	applyParams(
+		params: URLSearchParams,
+		datePicker: FlatpickrInstance | null = null
+	): void {
+		const searchInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-search-input'
+		);
+		if ( searchInput ) {
+			searchInput.value = params.get( 'event_search' ) || '';
+		}
+
+		const scopeParam = params.get( 'scope' ) || '';
+		const scope = scopeParam === 'current' ? '' : scopeParam;
+		this.calendar
+			.querySelectorAll< HTMLButtonElement >(
+				'.data-machine-events-scope-chip[data-scope]'
+			)
+			.forEach( ( chip ) => {
+				const active = ( chip.dataset.scope || '' ) === scope;
+				chip.classList.toggle(
+					'data-machine-events-scope-chip-active',
+					active
+				);
+				chip.setAttribute( 'aria-pressed', active ? 'true' : 'false' );
+			} );
+
+		const selectedTerms = new Set< string >();
+		for ( const [ key, value ] of params.entries() ) {
+			const match = key.match( /^tax_filter\[([^\]]+)\]\[(?:\d+)?\]$/ );
+			if ( match ) {
+				selectedTerms.add( `${ match[ 1 ] }:${ value }` );
+			}
+		}
+		this.calendar
+			.querySelectorAll< HTMLInputElement >(
+				'input[type="checkbox"][data-taxonomy]'
+			)
+			.forEach( ( checkbox ) => {
+				if ( checkbox.dataset.locked !== 'true' ) {
+					checkbox.checked = selectedTerms.has(
+						`${ checkbox.dataset.taxonomy }:${ checkbox.value }`
+					);
+				}
+			} );
+
+		if ( datePicker ) {
+			const start = params.get( 'date_start' );
+			const end = params.get( 'date_end' );
+			let selectedDates: string | string[] = [];
+			if ( start ) {
+				selectedDates = end ? [ start, end ] : start;
+			}
+			datePicker.setDate( selectedDates, false );
+			this.calendar
+				.querySelector( '.data-machine-events-date-clear-btn' )
+				?.classList.toggle( 'visible', Boolean( start ) );
+		}
+
+		const locationInput = this.calendar.querySelector< HTMLInputElement >(
+			'.data-machine-events-location-search'
+		);
+		if ( locationInput ) {
+			const lat = params.get( 'lat' ) || '';
+			const lng = params.get( 'lng' ) || '';
+			locationInput.dataset.geoLat = lat;
+			locationInput.dataset.geoLng = lng;
+			locationInput.value = lat && lng ? `${ lat }, ${ lng }` : '';
+		}
+
+		const radiusSelect = this.calendar.querySelector< HTMLSelectElement >(
+			'.data-machine-events-radius-select'
+		);
+		if ( radiusSelect && params.get( 'radius' ) ) {
+			radiusSelect.value = params.get( 'radius' )!;
+			radiusSelect.dataset.radiusUnit =
+				params.get( 'radius_unit' ) || 'mi';
+		}
+	}
+
+	/**
+	 * Update URL via History API and save state to localStorage.
+	 * @param params
+	 */
+	updateUrl( params: URLSearchParams ): void {
+		const queryString = params.toString();
+		const newUrl = queryString
+			? `${ window.location.pathname }?${ queryString }`
+			: window.location.pathname;
+		window.history.pushState( {}, '', newUrl );
+
+		this.saveToStorage( params );
+	}
+
+	/**
+	 * Save taxonomy filters to localStorage (not dates or geo — geo has its own storage).
+	 * @param params
+	 */
+	saveToStorage( params: URLSearchParams ): void {
+		if ( ! this.isPersistenceEnabled() ) {
+			return;
+		}
+
+		try {
+			const taxFilters: Record< string, string[] > = {};
+			for ( const [ key, value ] of params.entries() ) {
+				if ( ! key.startsWith( 'tax_filter[' ) ) {
+					continue;
+				}
+
+				if ( ! taxFilters[ key ] ) {
+					taxFilters[ key ] = [];
+				}
+				taxFilters[ key ].push( value );
+			}
+
+			if ( Object.keys( taxFilters ).length > 0 ) {
+				localStorage.setItem(
+					STORAGE_KEY,
+					JSON.stringify( taxFilters )
+				);
+			} else {
+				localStorage.removeItem( STORAGE_KEY );
+			}
+		} catch {
+			// localStorage unavailable
+		}
+	}
+
+	/**
+	 * Save geo state to localStorage.
+	 * @param geo
+	 */
+	saveGeoToStorage( geo: StoredGeo ): void {
+		try {
+			if ( geo.lat && geo.lng ) {
+				localStorage.setItem( GEO_STORAGE_KEY, JSON.stringify( geo ) );
+			} else {
+				localStorage.removeItem( GEO_STORAGE_KEY );
+			}
+		} catch {
+			// localStorage unavailable
+		}
+	}
+
+	/**
+	 * Get stored geo state from localStorage.
+	 */
+	getStoredGeo(): StoredGeo {
+		try {
+			const stored = localStorage.getItem( GEO_STORAGE_KEY );
+			if ( stored ) {
+				return JSON.parse( stored ) as StoredGeo;
+			}
+		} catch {
+			// localStorage unavailable or corrupted
+		}
+		return { lat: '', lng: '', radius: 25, radius_unit: 'mi', label: '' };
+	}
+
+	/**
+	 * Clear geo state from localStorage.
+	 */
+	clearGeoStorage(): void {
+		try {
+			localStorage.removeItem( GEO_STORAGE_KEY );
+		} catch {
+			// localStorage unavailable
+		}
+	}
+
+	/**
+	 * Restore taxonomy filters with a replacement navigation.
+	 *
+	 * The initial HTML was rendered before stored filters were known, so changing
+	 * history in place would leave the URL and results contradictory. A replace
+	 * navigation gives the server one authoritative filtered request without
+	 * adding a duplicate history entry.
+	 * @param navigate
+	 */
+	restoreFromStorage(
+		navigate: ( url: string ) => void = ( url ) =>
+			window.location.replace( url )
+	): boolean {
+		if ( this.hasUrlFilters() || ! this.isPersistenceEnabled() ) {
+			return false;
+		}
+
+		try {
+			const stored = localStorage.getItem( STORAGE_KEY );
+			if ( ! stored ) {
+				return false;
+			}
+
+			const taxFilters: Record< string, string[] > = JSON.parse( stored );
+			const params = new URLSearchParams( window.location.search );
+
+			Object.entries( taxFilters ).forEach( ( [ key, values ] ) => {
+				if (
+					/^tax_filter\[[^\]]+\]\[\]$/.test( key ) &&
+					Array.isArray( values )
+				) {
+					values.forEach( ( value ) => {
+						if ( /^\d+$/.test( value ) && Number( value ) > 0 ) {
+							params.append( key, value );
+						}
+					} );
+				}
+			} );
+
+			if ( params.toString() !== window.location.search.slice( 1 ) ) {
+				params.delete( 'paged' );
+				const queryString = params.toString();
+				const newUrl = queryString
+					? `${ window.location.pathname }?${ queryString }${ window.location.hash }`
+					: `${ window.location.pathname }${ window.location.hash }`;
+				navigate( newUrl );
+				return true;
+			}
+		} catch {
+			// localStorage unavailable or corrupted
+		}
+
+		return false;
+	}
+
+	/**
+	 * Clear localStorage.
+	 */
+	clearStorage(): void {
+		if ( ! this.isPersistenceEnabled() ) {
+			return;
+		}
+
+		localStorage.removeItem( STORAGE_KEY );
+	}
+
+	private isPersistenceEnabled(): boolean {
+		return (
+			this.calendar.dataset.filterPersistence === '1' &&
+			! this.calendar.dataset.scopeToken
+		);
+	}
+
+	/**
+	 * Update filter count badge on the filter button.
+	 */
+	updateFilterCountBadge(): void {
+		const filterBtn = this.calendar.querySelector< HTMLElement >(
+			'.data-machine-taxonomy-toggle, .data-machine-taxonomy-filter-btn, .data-machine-taxonomy-modal-trigger, .data-machine-events-filter-btn'
+		);
+		const countBadge = filterBtn?.querySelector< HTMLElement >(
+			'.data-machine-filter-count'
+		);
+
+		if ( ! filterBtn || ! countBadge ) {
+			return;
+		}
+
+		const count = this.getFilterCount();
+
+		if ( count > 0 ) {
+			filterBtn.hidden = false;
+			countBadge.textContent = String( count );
+			countBadge.classList.add( 'visible' );
+			filterBtn.classList.add( 'data-machine-filters-active' );
+			return;
+		}
+
+		countBadge.textContent = '';
+		countBadge.classList.remove( 'visible' );
+		filterBtn.classList.remove( 'data-machine-filters-active' );
+
+		if ( filterBtn.dataset.hideWhenInactive === '1' ) {
+			filterBtn.hidden = true;
+		}
+	}
+
+	/**
+	 * Format date as YYYY-MM-DD.
+	 * @param date
+	 */
+	private formatDate( date: Date ): string {
+		const year = date.getFullYear();
+		const month = String( date.getMonth() + 1 ).padStart( 2, '0' );
+		const day = String( date.getDate() ).padStart( 2, '0' );
+		return `${ year }-${ month }-${ day }`;
+	}
+}
+
+const instances = new WeakMap< HTMLElement, FilterStateManager >();
+
+/**
+ * Get or create FilterStateManager instance for a calendar element.
+ * @param calendar
+ */
+export function getFilterState( calendar: HTMLElement ): FilterStateManager {
+	if ( ! instances.has( calendar ) ) {
+		instances.set( calendar, new FilterStateManager( calendar ) );
+	}
+	return instances.get( calendar )!;
+}
+
+/**
+ * Destroy FilterStateManager instance for a calendar element.
+ * @param calendar
+ */
+export function destroyFilterState( calendar: HTMLElement ): void {
+	instances.delete( calendar );
+}

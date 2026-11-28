@@ -1,0 +1,669 @@
+<?php
+/**
+ * Geocoding Abilities
+ *
+ * Provides abilities for address geocoding, batch venue geocoding, and venue data auditing.
+ * Consolidates all Nominatim geocoding into the Abilities API as the universal primitive.
+ *
+ * Abilities:
+ * - data-machine-events/geocode-address  — Geocode an arbitrary address string
+ * - data-machine-events/geocode-venues   — Batch geocode venues missing coordinates
+ * - data-machine-events/audit-venues     — Audit venue data quality and geocoding coverage
+ *
+ * @package DataMachineEvents\Abilities
+ */
+
+namespace DataMachineEvents\Abilities;
+
+use DataMachineEvents\Core\DateTimeParser;
+use DataMachineEvents\Core\NominatimClient;
+use DataMachineEvents\Core\Venue_Taxonomy;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class GeocodingAbilities {
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( ! self::$registered ) {
+			$this->registerAbilities();
+			self::$registered = true;
+		}
+	}
+
+	private function registerAbilities(): void {
+		$register_callback = function () {
+			$this->registerGeocodeAddressAbility();
+			$this->registerGeocodeSearchAbility();
+			$this->registerGeocodeVenuesAbility();
+			$this->registerAuditVenuesAbility();
+		};
+
+		add_action( 'wp_abilities_api_init', $register_callback );
+	}
+
+	// -------------------------------------------------------------------------
+	// Ability: geocode-address
+	// -------------------------------------------------------------------------
+
+	private function registerGeocodeAddressAbility(): void {
+		wp_register_ability(
+			'data-machine-events/geocode-address',
+			array(
+				'label'               => __( 'Geocode Address', 'data-machine-events' ),
+				'description'         => __( 'Geocode an address string to lat/lng coordinates via OpenStreetMap Nominatim. Results are cached for 30 days.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'query' ),
+					'properties' => array(
+						'query' => array(
+							'type'        => 'string',
+							'description' => 'Address string to geocode (e.g., "1505 Town Creek Dr, Austin, TX 78741")',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'lat'          => array( 'type' => 'string' ),
+						'lng'          => array( 'type' => 'string' ),
+						'display_name' => array( 'type' => 'string' ),
+						'cached'       => array( 'type' => 'boolean' ),
+						'error'        => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGeocodeAddress' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute geocode-address ability.
+	 *
+	 * @param array $input Input with 'query' string.
+	 * @return array|\WP_Error Result with lat, lng, display_name, cached.
+	 */
+	public function executeGeocodeAddress( array $input ): array|\WP_Error {
+		$query = trim( $input['query'] ?? '' );
+
+		if ( empty( $query ) || strlen( $query ) < 3 ) {
+			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
+		}
+
+		// Sanitize before handing to the shared client. NominatimClient owns
+		// the cache key derivation + 30d transient TTL so the warm cache
+		// stays bit-compatible with pre-refactor entries.
+		$query = sanitize_text_field( $query );
+
+		// display_name in the cached payload is the user-supplied query
+		// (back-compat with the original behavior); preserve that contract
+		// by overriding NominatimClient's display_name (which echoes
+		// Nominatim's longer response value).
+		$result = NominatimClient::geocodeOne( $query );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$result['display_name'] = substr( $query, 0, 500 );
+
+		return $result;
+	}
+
+	// -------------------------------------------------------------------------
+	// Ability: geocode-search
+	// -------------------------------------------------------------------------
+
+	private function registerGeocodeSearchAbility(): void {
+		wp_register_ability(
+			'data-machine-events/geocode-search',
+			array(
+				'label'               => __( 'Geocode Search', 'data-machine-events' ),
+				'description'         => __( 'Search for addresses via Nominatim and return multiple results with full address details. Used for autocomplete UIs.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'required'   => array( 'query' ),
+					'properties' => array(
+						'query'        => array(
+							'type'        => 'string',
+							'description' => 'Search query (address, city, or place name)',
+						),
+						'limit'        => array(
+							'type'        => 'integer',
+							'description' => 'Max results to return (default: 5, max: 10)',
+						),
+						'countrycodes' => array(
+							'type'        => 'string',
+							'description' => 'Comma-separated country codes to restrict results (e.g., "us" or "us,ca")',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'success' => array( 'type' => 'boolean' ),
+						'results' => array(
+							'type'        => 'array',
+							'description' => 'Array of Nominatim results with lat, lon, display_name, address details',
+						),
+						'error'   => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGeocodeSearch' ),
+				'permission_callback' => '__return_true',
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute geocode-search ability.
+	 *
+	 * Multi-result Nominatim search with address details.
+	 * Unlike geocode-address (single result, cached, for backend),
+	 * this returns multiple results for UI autocomplete.
+	 *
+	 * @param array $input Input with 'query', optional 'limit' and 'countrycodes'.
+	 * @return array|\WP_Error Results array.
+	 */
+	public function executeGeocodeSearch( array $input ): array|\WP_Error {
+		$query = trim( $input['query'] ?? '' );
+
+		if ( empty( $query ) || strlen( $query ) < 3 ) {
+			return new \WP_Error( 'invalid_query', 'Query must be at least 3 characters.', array( 'status' => 400 ) );
+		}
+
+		$query = sanitize_text_field( $query );
+		$query = substr( $query, 0, 500 );
+		$limit = min( max( 1, (int) ( $input['limit'] ?? 5 ) ), 10 );
+
+		$countrycodes = '';
+		if ( ! empty( $input['countrycodes'] ) ) {
+			$countrycodes = sanitize_text_field( $input['countrycodes'] );
+		}
+
+		$data = NominatimClient::searchAddress( $query, $limit, $countrycodes );
+
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
+
+		return array(
+			'success' => true,
+			'results' => $data,
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// Ability: geocode-venues
+	// -------------------------------------------------------------------------
+
+	private function registerGeocodeVenuesAbility(): void {
+		wp_register_ability(
+			'data-machine-events/geocode-venues',
+			array(
+				'label'               => __( 'Geocode Venues', 'data-machine-events' ),
+				'description'         => __( 'Batch geocode venues that have an address but are missing coordinates. Respects Nominatim rate limits.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'venue_id'       => array(
+							'type'        => 'integer',
+							'description' => 'Geocode a specific venue by term ID (optional, omit for all)',
+						),
+						'force'          => array(
+							'type'        => 'boolean',
+							'description' => 'Re-geocode even if coordinates already exist (default: false)',
+						),
+						'dry_run'        => array(
+							'type'        => 'boolean',
+							'description' => 'Show what would be geocoded without doing it (default: false)',
+						),
+						'limit'          => array(
+							'type'        => 'integer',
+							'description' => 'Max venues to process in one batch (default: 50)',
+						),
+						'timezones_only' => array(
+							'type'        => 'boolean',
+							'description' => 'Only derive missing venue timezones (from existing coordinates, country, and state). Does not call Nominatim. (default: false)',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'processed' => array( 'type' => 'integer' ),
+						'success'   => array( 'type' => 'integer' ),
+						'failed'    => array( 'type' => 'integer' ),
+						'skipped'   => array( 'type' => 'integer' ),
+						'results'   => array( 'type' => 'array' ),
+						'message'   => array( 'type' => 'string' ),
+						'error'     => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeGeocodeVenues' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute geocode-venues ability.
+	 *
+	 * @param array $input Input with optional venue_id, force, dry_run, limit.
+	 * @return array|\WP_Error Batch results.
+	 */
+	public function executeGeocodeVenues( array $input ): array|\WP_Error {
+		$venue_id       = $input['venue_id'] ?? null;
+		$force          = (bool) ( $input['force'] ?? false );
+		$dry_run        = (bool) ( $input['dry_run'] ?? false );
+		$limit          = (int) ( $input['limit'] ?? 50 );
+		$timezones_only = (bool) ( $input['timezones_only'] ?? false );
+
+		if ( $limit <= 0 ) {
+			$limit = 50;
+		}
+
+		// Single venue mode.
+		if ( $venue_id ) {
+			$term = get_term( (int) $venue_id, 'venue' );
+			if ( ! $term || is_wp_error( $term ) ) {
+				return new \WP_Error( 'venue_not_found', "Venue term ID {$venue_id} not found.", array( 'status' => 404 ) );
+			}
+			$venues = array( $term );
+		} else {
+			$venues = get_terms(
+				array(
+					'taxonomy'   => 'venue',
+					'hide_empty' => false,
+					'number'     => 0,
+				)
+			);
+
+			if ( is_wp_error( $venues ) ) {
+				return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
+			}
+		}
+
+		if ( $timezones_only ) {
+			return $this->deriveTimezones( $venues, $force, $dry_run, $limit );
+		}
+
+		$results   = array();
+		$success   = 0;
+		$failed    = 0;
+		$skipped   = 0;
+		$processed = 0;
+
+		foreach ( $venues as $venue ) {
+			if ( $processed >= $limit ) {
+				break;
+			}
+
+			$address = get_term_meta( $venue->term_id, '_venue_address', true );
+			$coords  = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+			$city    = get_term_meta( $venue->term_id, '_venue_city', true );
+
+			// Skip venues with no address data at all.
+			if ( empty( $address ) && empty( $city ) ) {
+				++$skipped;
+				continue;
+			}
+
+			// Skip venues that already have coordinates (unless forced).
+			if ( ! empty( $coords ) && ! $force ) {
+				++$skipped;
+				continue;
+			}
+
+			$venue_result = array(
+				'term_id' => $venue->term_id,
+				'name'    => html_entity_decode( $venue->name ),
+				'address' => $address,
+				'city'    => $city,
+			);
+
+			if ( $dry_run ) {
+				$venue_result['action'] = 'would_geocode';
+				$results[]              = $venue_result;
+				++$processed;
+				continue;
+			}
+
+			$geocoded = Venue_Taxonomy::maybe_geocode_venue( $venue->term_id, $force );
+
+			if ( $geocoded ) {
+				$new_coords                  = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+				$venue_result['action']      = 'geocoded';
+				$venue_result['coordinates'] = $new_coords;
+				++$success;
+			} else {
+				$venue_result['action'] = 'failed';
+				++$failed;
+			}
+
+			$results[] = $venue_result;
+			++$processed;
+
+			// Rate limit — respect Nominatim's usage policy.
+			if ( $processed < $limit ) {
+				NominatimClient::sleepForRateLimit();
+			}
+		}
+
+		$message_parts = array();
+		if ( $dry_run ) {
+			$message_parts[] = "Dry run: {$processed} venues would be geocoded";
+		} else {
+			if ( $success > 0 ) {
+				$message_parts[] = "{$success} geocoded";
+			}
+			if ( $failed > 0 ) {
+				$message_parts[] = "{$failed} failed";
+			}
+			if ( $skipped > 0 ) {
+				$message_parts[] = "{$skipped} skipped";
+			}
+		}
+
+		return array(
+			'processed' => $processed,
+			'success'   => $success,
+			'failed'    => $failed,
+			'skipped'   => $skipped,
+			'results'   => $results,
+			'message'   => implode( ', ', $message_parts ) . '.',
+		);
+	}
+
+	/**
+	 * Derive missing venue timezones without calling Nominatim.
+	 *
+	 * Uses VenueTimezoneResolver: GeoNames when configured, otherwise offline
+	 * country / US-state / nearest-zone rules. Backfill path for #766.
+	 *
+	 * @param \WP_Term[] $venues  Candidate venues.
+	 * @param bool       $force   Re-derive even when a timezone exists.
+	 * @param bool       $dry_run Report without writing.
+	 * @param int        $limit   Max venues to process.
+	 * @return array
+	 */
+	private function deriveTimezones( array $venues, bool $force, bool $dry_run, int $limit ): array {
+		$results   = array();
+		$success   = 0;
+		$failed    = 0;
+		$skipped   = 0;
+		$processed = 0;
+		$estimated = 0;
+
+		foreach ( $venues as $venue ) {
+			if ( $processed >= $limit ) {
+				break;
+			}
+
+			$term_id  = (int) $venue->term_id;
+			$existing = (string) get_term_meta( $term_id, '_venue_timezone', true );
+			if ( DateTimeParser::isValidTimezone( $existing ) && ! $force ) {
+				++$skipped;
+				continue;
+			}
+
+			$coords  = (string) get_term_meta( $term_id, '_venue_coordinates', true );
+			$country = (string) get_term_meta( $term_id, '_venue_country', true );
+			$state   = (string) get_term_meta( $term_id, '_venue_state', true );
+
+			if ( '' === $coords && '' === $country && '' === $state ) {
+				++$skipped;
+				continue;
+			}
+
+			$venue_result = array(
+				'term_id' => $term_id,
+				'name'    => html_entity_decode( $venue->name ),
+				'address' => (string) get_term_meta( $term_id, '_venue_address', true ),
+				'city'    => (string) get_term_meta( $term_id, '_venue_city', true ),
+			);
+
+			$resolved = \DataMachineEvents\Core\VenueTimezoneResolver::resolve( $coords, $country, $state );
+			++$processed;
+
+			if ( ! $resolved ) {
+				$venue_result['action'] = 'failed';
+				$results[]              = $venue_result;
+				++$failed;
+				continue;
+			}
+
+			$venue_result['timezone'] = $resolved['timezone'];
+			$venue_result['source']   = $resolved['source'];
+			if ( ! \DataMachineEvents\Core\VenueTimezoneResolver::isExactSource( $resolved['source'] ) ) {
+				++$estimated;
+			}
+
+			if ( $dry_run ) {
+				$venue_result['action'] = 'would_derive';
+				$results[]              = $venue_result;
+				continue;
+			}
+
+			$write = \DataMachineEvents\Core\VenueProfileMutations::updateSystem( $term_id, array( 'timezone' => $resolved['timezone'] ) );
+			if ( is_wp_error( $write ) || empty( $write['success'] ) ) {
+				$venue_result['action'] = 'failed';
+				++$failed;
+			} else {
+				$venue_result['action'] = 'derived';
+				++$success;
+			}
+
+			$results[] = $venue_result;
+		}
+
+		$message_parts = array();
+		if ( $dry_run ) {
+			$message_parts[] = "Dry run: {$processed} venue timezones would be derived";
+		} else {
+			if ( $success > 0 ) {
+				$message_parts[] = "{$success} derived";
+			}
+			if ( $failed > 0 ) {
+				$message_parts[] = "{$failed} failed";
+			}
+			if ( $skipped > 0 ) {
+				$message_parts[] = "{$skipped} skipped";
+			}
+		}
+		if ( $estimated > 0 ) {
+			$message_parts[] = "{$estimated} estimated by nearest zone (review recommended)";
+		}
+
+		return array(
+			'processed' => $processed,
+			'success'   => $success,
+			'failed'    => $failed,
+			'skipped'   => $skipped,
+			'results'   => $results,
+			'message'   => implode( ', ', $message_parts ) . '.',
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// Ability: audit-venues
+	// -------------------------------------------------------------------------
+
+	private function registerAuditVenuesAbility(): void {
+		wp_register_ability(
+			'data-machine-events/audit-venues',
+			array(
+				'label'               => __( 'Audit Venues', 'data-machine-events' ),
+				'description'         => __( 'Audit venue data quality: geocoding coverage, missing addresses, missing timezones. Returns a comprehensive data quality report.', 'data-machine-events' ),
+				'category'            => 'datamachine-events-venues',
+				'input_schema'        => array(
+					'type'       => 'object',
+					'properties' => array(
+						'format' => array(
+							'type'        => 'string',
+							'description' => 'Output format: "summary" (counts only) or "detailed" (includes venue lists). Default: summary.',
+							'enum'        => array( 'summary', 'detailed' ),
+						),
+						'limit'  => array(
+							'type'        => 'integer',
+							'description' => 'Max venues to list per category in detailed mode (default: 25)',
+						),
+					),
+				),
+				'output_schema'       => array(
+					'type'       => 'object',
+					'properties' => array(
+						'total_venues'          => array( 'type' => 'integer' ),
+						'geocoded'              => array( 'type' => 'object' ),
+						'missing_coordinates'   => array( 'type' => 'object' ),
+						'missing_address'       => array( 'type' => 'object' ),
+						'has_address_no_coords' => array( 'type' => 'object' ),
+						'missing_timezone'      => array( 'type' => 'object' ),
+						'coverage_percent'      => array( 'type' => 'number' ),
+						'message'               => array( 'type' => 'string' ),
+						'error'                 => array( 'type' => 'string' ),
+					),
+				),
+				'execute_callback'    => array( $this, 'executeAuditVenues' ),
+				'permission_callback' => AbilityPermissions::canWrite(),
+				'meta'                => array( 'show_in_rest' => true ),
+			)
+		);
+	}
+
+	/**
+	 * Execute audit-venues ability.
+	 *
+	 * @param array $input Input with optional format and limit.
+	 * @return array|\WP_Error Audit results.
+	 */
+	public function executeAuditVenues( array $input ): array|\WP_Error {
+		$format = $input['format'] ?? 'summary';
+		$limit  = (int) ( $input['limit'] ?? 25 );
+
+		if ( $limit <= 0 ) {
+			$limit = 25;
+		}
+
+		$venues = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'number'     => 0,
+			)
+		);
+
+		if ( is_wp_error( $venues ) ) {
+			return new \WP_Error( 'query_failed', 'Failed to query venues: ' . $venues->get_error_message(), array( 'status' => 500 ) );
+		}
+
+		$total                = count( $venues );
+		$geocoded_list        = array();
+		$missing_coords_list  = array();
+		$missing_address_list = array();
+		$has_addr_no_coords   = array();
+		$missing_tz_list      = array();
+
+		foreach ( $venues as $venue ) {
+			$address  = get_term_meta( $venue->term_id, '_venue_address', true );
+			$city     = get_term_meta( $venue->term_id, '_venue_city', true );
+			$coords   = get_term_meta( $venue->term_id, '_venue_coordinates', true );
+			$timezone = get_term_meta( $venue->term_id, '_venue_timezone', true );
+
+			$venue_info = array(
+				'term_id'     => $venue->term_id,
+				'name'        => html_entity_decode( $venue->name ),
+				'event_count' => $venue->count,
+			);
+
+			if ( ! empty( $coords ) ) {
+				$geocoded_list[] = $venue_info;
+			} else {
+				$venue_info['address'] = $address;
+				$venue_info['city']    = $city;
+				$missing_coords_list[] = $venue_info;
+
+				if ( ! empty( $address ) || ! empty( $city ) ) {
+					$has_addr_no_coords[] = $venue_info;
+				}
+			}
+
+			if ( empty( $address ) && empty( $city ) ) {
+				$missing_address_list[] = $venue_info;
+			}
+
+			if ( ! empty( $coords ) && empty( $timezone ) ) {
+				$missing_tz_list[] = $venue_info;
+			}
+		}
+
+		// Sort by event count (most impactful venues first).
+		$sort_by_events = fn( $a, $b ) => $b['event_count'] <=> $a['event_count'];
+		usort( $missing_coords_list, $sort_by_events );
+		usort( $missing_address_list, $sort_by_events );
+		usort( $has_addr_no_coords, $sort_by_events );
+		usort( $missing_tz_list, $sort_by_events );
+
+		$geocoded_count   = count( $geocoded_list );
+		$coverage_percent = $total > 0 ? round( ( $geocoded_count / $total ) * 100, 1 ) : 0;
+
+		$result = array(
+			'total_venues'          => $total,
+			'coverage_percent'      => $coverage_percent,
+			'geocoded'              => array(
+				'count' => $geocoded_count,
+			),
+			'missing_coordinates'   => array(
+				'count' => count( $missing_coords_list ),
+			),
+			'missing_address'       => array(
+				'count' => count( $missing_address_list ),
+			),
+			'has_address_no_coords' => array(
+				'count' => count( $has_addr_no_coords ),
+			),
+			'missing_timezone'      => array(
+				'count' => count( $missing_tz_list ),
+			),
+		);
+
+		// Add venue lists in detailed mode.
+		if ( 'detailed' === $format ) {
+			$result['missing_coordinates']['venues']   = array_slice( $missing_coords_list, 0, $limit );
+			$result['missing_address']['venues']       = array_slice( $missing_address_list, 0, $limit );
+			$result['has_address_no_coords']['venues'] = array_slice( $has_addr_no_coords, 0, $limit );
+			$result['missing_timezone']['venues']      = array_slice( $missing_tz_list, 0, $limit );
+		}
+
+		// Build summary message.
+		$message = sprintf(
+			'%d/%d venues geocoded (%.1f%% coverage). %d missing address, %d have address but no coords, %d missing timezone.',
+			$geocoded_count,
+			$total,
+			$coverage_percent,
+			count( $missing_address_list ),
+			count( $has_addr_no_coords ),
+			count( $missing_tz_list )
+		);
+
+		if ( $coverage_percent >= 95 ) {
+			$message .= ' Coverage target met.';
+		} else {
+			$message .= sprintf( ' Need %d more to reach 95%% coverage.', (int) ceil( $total * 0.95 ) - $geocoded_count );
+		}
+
+		$result['message'] = $message;
+
+		return $result;
+	}
+}

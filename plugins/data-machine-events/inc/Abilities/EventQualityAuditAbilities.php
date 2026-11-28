@@ -1,0 +1,509 @@
+<?php
+// phpcs:disable Universal.Operators.DisallowShortTernary.Found,PSR2.Files.EndFileNewline.TooMany -- Existing callback contracts, trusted identifiers, and renderer boundaries are reviewed and intentional.
+// phpcs:disable WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Reviewed legacy SQL identifiers and trusted renderer output; dynamic values remain prepared and fields escaped.
+/**
+ * Event Quality Audit Abilities
+ *
+ * Unified event quality audit focused on operator-facing diagnostics:
+ * missing venue, missing start date, missing start time, probable duplicate
+ * clusters, and culprit flow summaries.
+ *
+ * @package DataMachineEvents\Abilities
+ */
+
+namespace DataMachineEvents\Abilities;
+
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use DataMachineEvents\Core\AffiliateRedirectShape;
+use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventSpanGuard;
+use DataMachineEvents\Core\TextNormalization;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class EventQualityAuditAbilities {
+
+	private const DEFAULT_LIMIT          = 25;
+	private const DEFAULT_DAYS_AHEAD     = 90;
+	private const DEFAULT_MAX_SPAN_HOURS = 48;
+
+	private static bool $registered = false;
+
+	public function __construct() {
+		if ( ! self::$registered ) {
+			$this->registerAbility();
+			self::$registered = true;
+		}
+	}
+
+	private function registerAbility(): void {
+		$register_callback = function () {
+			wp_register_ability(
+				'data-machine-events/event-quality-audit',
+				array(
+					'label'               => __( 'Event Quality Audit', 'data-machine-events' ),
+					'description'         => __( 'Unified event quality audit with flow-aware diagnostics.', 'data-machine-events' ),
+					'category'            => 'datamachine-events-events',
+					'input_schema'        => array(
+						'type'       => 'object',
+						'properties' => array(
+							'scope'            => array(
+								'type'        => 'string',
+								'enum'        => array( 'upcoming', 'all', 'past' ),
+								'description' => 'Which events to audit.',
+							),
+							'days_ahead'       => array(
+								'type'        => 'integer',
+								'description' => 'Days to look ahead for upcoming scope.',
+							),
+							'flow_id'          => array(
+								'type'        => 'integer',
+								'description' => 'Optional flow ID filter.',
+							),
+							'location_term_id' => array(
+								'type'        => 'integer',
+								'description' => 'Optional location term ID filter.',
+							),
+							'issue'            => array(
+								'type'        => 'string',
+								'enum'        => array( 'all', 'missing_start_date', 'missing_start_time', 'missing_venue', 'duplicates', 'corrupted_affiliate_redirect', 'long_span_no_occurrences', 'entity_title' ),
+								'description' => 'Optional issue filter.',
+							),
+							'max_span_hours'   => array(
+								'type'        => 'integer',
+								'description' => 'Threshold in hours for the long_span_no_occurrences rule (published upcoming occurrence with no occurrenceDates spanning more than this).',
+							),
+							'limit'            => array(
+								'type'        => 'integer',
+								'description' => 'Max rows to return per category.',
+							),
+						),
+					),
+					'output_schema'       => array(
+						'type'       => 'object',
+						'properties' => array(
+							'total_scanned'                => array( 'type' => 'integer' ),
+							'scope'                        => array( 'type' => 'string' ),
+							'missing_start_date'           => array( 'type' => 'object' ),
+							'missing_start_time'           => array( 'type' => 'object' ),
+							'missing_venue'                => array( 'type' => 'object' ),
+							'probable_duplicates'          => array( 'type' => 'object' ),
+							'corrupted_affiliate_redirect' => array( 'type' => 'object' ),
+							'long_span_no_occurrences'     => array( 'type' => 'object' ),
+							'entity_title'                 => array( 'type' => 'object' ),
+							'culprit_flows'                => array( 'type' => 'array' ),
+							'message'                      => array( 'type' => 'string' ),
+						),
+					),
+					'execute_callback'    => array( $this, 'executeAudit' ),
+					'permission_callback' => function () {
+						return current_user_can( 'manage_options' );
+					},
+					'meta'                => array( 'show_in_rest' => true ),
+				)
+			);
+		};
+
+		add_action( 'wp_abilities_api_init', $register_callback );
+	}
+
+	public function executeAudit( array $input ): array|\WP_Error {
+		$scope          = $input['scope'] ?? 'upcoming';
+		$days_ahead     = (int) ( $input['days_ahead'] ?? self::DEFAULT_DAYS_AHEAD );
+		$flow_id        = (int) ( $input['flow_id'] ?? 0 );
+		$location       = (int) ( $input['location_term_id'] ?? 0 );
+		$issue          = $input['issue'] ?? 'all';
+		$limit          = (int) ( $input['limit'] ?? self::DEFAULT_LIMIT );
+		$max_span_hours = (int) ( $input['max_span_hours'] ?? self::DEFAULT_MAX_SPAN_HOURS );
+
+		if ( $days_ahead <= 0 ) {
+			$days_ahead = self::DEFAULT_DAYS_AHEAD;
+		}
+
+		if ( $limit <= 0 ) {
+			$limit = self::DEFAULT_LIMIT;
+		}
+
+		if ( $max_span_hours <= 0 ) {
+			$max_span_hours = self::DEFAULT_MAX_SPAN_HOURS;
+		}
+
+		$events = $this->queryEvents( $scope, $days_ahead, $flow_id, $location );
+
+		$missing_start_date  = array();
+		$missing_start_time  = array();
+		$missing_venue       = array();
+		$duplicate_groups    = array();
+		$corrupted_redirects = array();
+		$long_span_events    = array();
+		$entity_title_events = array();
+		$culprit_flow_counts = array();
+		$by_duplicate_key    = array();
+
+		foreach ( $events as $event ) {
+			$block_attrs = $this->extractBlockAttributes( $event->ID );
+			$venue_name  = $this->getVenueName( $event->ID );
+			$flow_id     = (int) get_post_meta( $event->ID, '_datamachine_post_flow_id', true );
+
+			$info = array(
+				'id'        => $event->ID,
+				'title'     => $event->post_title,
+				'startDate' => $block_attrs['startDate'] ?? '',
+				'startTime' => $block_attrs['startTime'] ?? '',
+				'venue'     => $venue_name,
+				'flow_id'   => $flow_id,
+				'flow_name' => $this->getFlowName( $flow_id ),
+			);
+
+			if ( empty( $info['startDate'] ) ) {
+				$missing_start_date[] = $info;
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			if ( empty( $info['startTime'] ) ) {
+				$missing_start_time[] = $info;
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			if ( empty( $venue_name ) ) {
+				$missing_venue[] = $info;
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			// Affiliate wrappers whose redirect parameter is not a parseable
+			// absolute URL — shape-based detection covering the whole
+			// punctuation-stripping corruption class (issue #823).
+			foreach ( array( 'ticketUrl', 'organizerUrl' ) as $url_attr ) {
+				$attr_url = (string) ( $block_attrs[ $url_attr ] ?? '' );
+				if ( '' === $attr_url ) {
+					continue;
+				}
+
+				$corrupted = AffiliateRedirectShape::find_corrupted_redirect( $attr_url );
+				if ( null === $corrupted ) {
+					continue;
+				}
+
+				$corrupted_redirects[] = array(
+					'id'        => $event->ID,
+					'title'     => $event->post_title,
+					'attribute' => $url_attr,
+					'param'     => $corrupted['param'],
+					'value'     => $corrupted['value'],
+					'flow_id'   => $flow_id,
+					'flow_name' => $info['flow_name'],
+				);
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			$duplicate_key = $this->buildDuplicateClusterKey( $event->post_title, $venue_name, $info['startDate'], $info['startTime'] );
+			if ( ! empty( $duplicate_key ) ) {
+				$by_duplicate_key[ $duplicate_key ][] = $info;
+			}
+
+			// Entity-title rule (#844): post_title must hold decoded UTF-8.
+			// An entity reference in the stored title means an ingestion or
+			// editorial write bypassed the decode contract; JSON consumers,
+			// search, and plain-text surfaces see the raw entity.
+			if ( TextNormalization::contains_entities( (string) $event->post_title ) ) {
+				$entity_title_events[] = array(
+					'id'        => $event->ID,
+					'title'     => $event->post_title,
+					'venue'     => $venue_name,
+					'flow_id'   => $flow_id,
+					'flow_name' => $info['flow_name'],
+				);
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+
+			// Long-span rule (#199): a published upcoming occurrence spanning
+			// more than the threshold with no occurrenceDates is almost always
+			// a fabricated series range (the series' final end stamped onto a
+			// single occurrence), not a real multi-day event.
+			$long_span = $this->detectLongSpanWithoutOccurrences( $block_attrs, $max_span_hours );
+			if ( null !== $long_span ) {
+				$long_span_events[] = array_merge(
+					array(
+						'id'        => $event->ID,
+						'title'     => $event->post_title,
+						'venue'     => $venue_name,
+						'flow_id'   => $flow_id,
+						'flow_name' => $info['flow_name'],
+					),
+					$long_span
+				);
+				$this->incrementFlowCount( $culprit_flow_counts, $flow_id, $info['flow_name'] );
+			}
+		}
+
+		foreach ( $by_duplicate_key as $group ) {
+			if ( count( $group ) < 2 ) {
+				continue;
+			}
+
+			$duplicate_groups[] = array(
+				'count'  => count( $group ),
+				'date'   => $group[0]['startDate'],
+				'title'  => $group[0]['title'] ?? '',
+				'venue'  => $group[0]['venue'],
+				'events' => $group,
+			);
+
+			foreach ( $group as $item ) {
+				$this->incrementFlowCount( $culprit_flow_counts, (int) $item['flow_id'], $item['flow_name'] );
+			}
+		}
+
+		usort(
+			$duplicate_groups,
+			static fn( $a, $b ) => ( $b['count'] <=> $a['count'] ) ?: strcmp( (string) $a['date'], (string) $b['date'] )
+		);
+
+		usort(
+			$culprit_flow_counts,
+			static fn( $a, $b ) => ( $b['count'] <=> $a['count'] ) ?: strcmp( (string) $a['flow_name'], (string) $b['flow_name'] )
+		);
+
+		$message_parts = array();
+		if ( ! empty( $missing_start_date ) && ( 'all' === $issue || 'missing_start_date' === $issue ) ) {
+			$message_parts[] = count( $missing_start_date ) . ' missing start date';
+		}
+		if ( ! empty( $missing_start_time ) && ( 'all' === $issue || 'missing_start_time' === $issue ) ) {
+			$message_parts[] = count( $missing_start_time ) . ' missing start time';
+		}
+		if ( ! empty( $missing_venue ) && ( 'all' === $issue || 'missing_venue' === $issue ) ) {
+			$message_parts[] = count( $missing_venue ) . ' missing venue';
+		}
+		if ( ! empty( $duplicate_groups ) && ( 'all' === $issue || 'duplicates' === $issue ) ) {
+			$message_parts[] = count( $duplicate_groups ) . ' probable duplicate groups';
+		}
+		if ( ! empty( $corrupted_redirects ) && ( 'all' === $issue || 'corrupted_affiliate_redirect' === $issue ) ) {
+			$message_parts[] = count( $corrupted_redirects ) . ' corrupted affiliate redirect params';
+		}
+		if ( ! empty( $long_span_events ) && ( 'all' === $issue || 'long_span_no_occurrences' === $issue ) ) {
+			$message_parts[] = sprintf(
+				'%d occurrence(s) spanning more than %d hours with no occurrenceDates',
+				count( $long_span_events ),
+				$max_span_hours
+			);
+		}
+		if ( ! empty( $entity_title_events ) && ( 'all' === $issue || 'entity_title' === $issue ) ) {
+			$message_parts[] = count( $entity_title_events ) . ' event title(s) containing HTML entities';
+		}
+
+		$missing_start_date_result = ( 'all' === $issue || 'missing_start_date' === $issue )
+			? array(
+				'count'  => count( $missing_start_date ),
+				'events' => array_slice( $missing_start_date, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
+		$missing_start_time_result = ( 'all' === $issue || 'missing_start_time' === $issue )
+			? array(
+				'count'  => count( $missing_start_time ),
+				'events' => array_slice( $missing_start_time, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
+		$missing_venue_result = ( 'all' === $issue || 'missing_venue' === $issue )
+			? array(
+				'count'  => count( $missing_venue ),
+				'events' => array_slice( $missing_venue, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
+		$duplicate_result = ( 'all' === $issue || 'duplicates' === $issue )
+			? array(
+				'count'  => count( $duplicate_groups ),
+				'groups' => array_slice( $duplicate_groups, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'groups' => array(),
+			);
+
+		$corrupted_redirect_result = ( 'all' === $issue || 'corrupted_affiliate_redirect' === $issue )
+			? array(
+				'count'  => count( $corrupted_redirects ),
+				'events' => array_slice( $corrupted_redirects, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
+		$long_span_result = ( 'all' === $issue || 'long_span_no_occurrences' === $issue )
+			? array(
+				'count'          => count( $long_span_events ),
+				'max_span_hours' => $max_span_hours,
+				'events'         => array_slice( $long_span_events, 0, $limit ),
+			)
+			: array(
+				'count'          => 0,
+				'max_span_hours' => $max_span_hours,
+				'events'         => array(),
+			);
+
+		$entity_title_result = ( 'all' === $issue || 'entity_title' === $issue )
+			? array(
+				'count'  => count( $entity_title_events ),
+				'events' => array_slice( $entity_title_events, 0, $limit ),
+			)
+			: array(
+				'count'  => 0,
+				'events' => array(),
+			);
+
+		return array(
+			'total_scanned'                => count( $events ),
+			'scope'                        => $scope,
+			'missing_start_date'           => $missing_start_date_result,
+			'missing_start_time'           => $missing_start_time_result,
+			'missing_venue'                => $missing_venue_result,
+			'probable_duplicates'          => $duplicate_result,
+			'corrupted_affiliate_redirect' => $corrupted_redirect_result,
+			'long_span_no_occurrences'     => $long_span_result,
+			'entity_title'                 => $entity_title_result,
+			'culprit_flows'                => array_slice( $culprit_flow_counts, 0, $limit ),
+			'message'                      => empty( $message_parts )
+				? 'No major quality issues found.'
+				: 'Found issues: ' . implode( ', ', $message_parts ) . '.',
+		);
+	}
+
+	private function queryEvents( string $scope, int $days_ahead, int $flow_id = 0, int $location_term_id = 0 ): array {
+		$input = array(
+			'scope' => $scope,
+			'order' => 'ASC',
+		);
+
+		if ( 'upcoming' === $scope && $days_ahead > 0 ) {
+			$input['days_ahead'] = $days_ahead;
+		}
+
+		if ( $flow_id > 0 ) {
+			$input['meta_query'] = array(
+				array(
+					'key'     => '_datamachine_post_flow_id',
+					'value'   => (string) $flow_id,
+					'compare' => '=',
+				),
+			);
+		}
+
+		if ( $location_term_id > 0 ) {
+			$input['tax_filters'] = array( 'location' => array( $location_term_id ) );
+		}
+
+		$ability = new EventDateQueryAbilities();
+		$result  = $ability->executeQueryEvents( $input );
+
+		return is_array( $result['posts'] ) ? $result['posts'] : array();
+	}
+
+	private function extractBlockAttributes( int $post_id ): array {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return array();
+		}
+
+		$blocks = parse_blocks( $post->post_content );
+		foreach ( $blocks as $block ) {
+			if ( Event_Post_Type::EVENT_DETAILS_BLOCK_NAME === ( $block['blockName'] ?? '' ) ) {
+				return $block['attrs'];
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Detect a long-span occurrence with no occurrenceDates (issue #199).
+	 *
+	 * Span derivation is shared with the sync/repair path via
+	 * EventSpanGuard::span_hours_from_block_attrs(). Returns null unless the
+	 * block has a measurable span exceeding the threshold and no
+	 * occurrenceDates.
+	 *
+	 * @param array $block_attrs    Event Details block attributes.
+	 * @param int   $max_span_hours Threshold in hours.
+	 * @return array{start_datetime:string,end_datetime:string,span_hours:int}|null
+	 */
+	private function detectLongSpanWithoutOccurrences( array $block_attrs, int $max_span_hours ): ?array {
+		if ( ! empty( $block_attrs['occurrenceDates'] ) ) {
+			return null;
+		}
+
+		$span_hours = EventSpanGuard::span_hours_from_block_attrs( $block_attrs );
+		if ( null === $span_hours || $span_hours <= $max_span_hours ) {
+			return null;
+		}
+
+		$start_date = (string) ( $block_attrs['startDate'] ?? '' );
+		$end_date   = (string) ( $block_attrs['endDate'] ?? '' );
+		$start_time = (string) ( $block_attrs['startTime'] ?? '' );
+		$end_time   = (string) ( $block_attrs['endTime'] ?? '' );
+
+		return array(
+			'start_datetime' => $start_date . ' ' . ( '' !== $start_time ? $start_time : '00:00:00' ),
+			'end_datetime'   => $end_date . ' ' . ( '' !== $end_time ? $end_time : '23:59:59' ),
+			'span_hours'     => $span_hours,
+		);
+	}
+
+	private function getVenueName( int $post_id ): string {
+		$venue_terms = wp_get_post_terms( $post_id, 'venue', array( 'fields' => 'names' ) );
+		return ( ! is_wp_error( $venue_terms ) && ! empty( $venue_terms ) ) ? (string) $venue_terms[0] : '';
+	}
+
+	private function getFlowName( int $flow_id ): string {
+		if ( $flow_id <= 0 ) {
+			return '';
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'datamachine_flows';
+		$name  = $wpdb->get_var( $wpdb->prepare( 'SELECT flow_name FROM %i WHERE flow_id = %d', $table, $flow_id ) );
+
+		return is_string( $name ) ? $name : '';
+	}
+
+	private function buildDuplicateClusterKey( string $title, string $venue, string $start_date, string $start_time ): string {
+		if ( '' === $start_date || '' === $venue ) {
+			return '';
+		}
+
+		if ( ! EventIdentifierGenerator::hasSpecificTitleSignal( $title ) && EventIdentifierGenerator::isLowConfidenceTitle( $title ) ) {
+			return '';
+		}
+
+		$start = EventIdentifierGenerator::normalizeStartDateTime( $start_date, $start_time );
+
+		return md5( strtolower( $start ) . '|' . strtolower( $venue ) . '|' . strtolower( trim( wp_strip_all_tags( $title ) ) ) );
+	}
+
+	private function incrementFlowCount( array &$counts, int $flow_id, string $flow_name ): void {
+		$key = (string) $flow_id;
+		if ( ! isset( $counts[ $key ] ) ) {
+			$counts[ $key ] = array(
+				'flow_id'   => $flow_id,
+				'flow_name' => $flow_name,
+				'count'     => 0,
+			);
+		}
+
+		++$counts[ $key ]['count'];
+	}
+}

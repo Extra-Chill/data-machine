@@ -1,0 +1,345 @@
+<?php
+/**
+ * Event Flyer Handler
+ *
+ * Extracts event data from flyer/poster images using vision model capabilities.
+ * Uses the Files handler patterns for image access and builds dynamic tool
+ * parameters based on which fields are pre-filled vs AI-extracted.
+ *
+ * @package DataMachineEvents\Steps\EventImport\Handlers\EventFlyer
+ */
+
+namespace DataMachineEvents\Steps\EventImport\Handlers\EventFlyer;
+
+use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\FreshCandidateCollector;
+use DataMachineEvents\Steps\EventImport\Handlers\EventImportHandler;
+use DataMachineEvents\Steps\EventImport\Handlers\VenueFieldsTrait;
+use DataMachineEvents\Utilities\EventIdentifierGenerator;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class EventFlyer extends EventImportHandler {
+
+	use HandlerRegistrationTrait;
+	use VenueFieldsTrait;
+
+	public function __construct() {
+		parent::__construct( 'event_flyer' );
+
+		self::registerHandler(
+			'event_flyer',
+			'event_import',
+			self::class,
+			__( 'Event Flyer', 'data-machine-events' ),
+			__( 'Extract event data from flyer/poster images using AI vision', 'data-machine-events' ),
+			false,
+			null,
+			EventFlyerSettings::class,
+			null
+		);
+	}
+
+	protected function getSourceInventoryCapabilities(): array {
+		return array(
+			'can_enumerate'    => true,
+			'stable_ids'       => true,
+			'has_total_count'  => true,
+			'inventory_source' => 'uploaded_files',
+		);
+	}
+
+	protected function executeFetch( array $config, ExecutionContext $context ): array {
+		$context->log( 'info', 'EventFlyer: Starting import' );
+
+		$image_file = $this->getNextUnprocessedImage( $context );
+
+		if ( ! $image_file ) {
+			$context->log( 'info', 'EventFlyer: No unprocessed flyer images available' );
+			return array();
+		}
+
+		if ( ! file_exists( $image_file['persistent_path'] ) ) {
+			$context->log( 'error', 'EventFlyer: Image file not found', array( 'path' => $image_file['persistent_path'] ) );
+			return array();
+		}
+
+		$context->log(
+			'info',
+			'EventFlyer: Processing flyer image',
+			array(
+				'file' => $image_file['original_name'],
+				'path' => $image_file['persistent_path'],
+			)
+		);
+
+		$file_identifier = $image_file['persistent_path'];
+
+		$ai_fields = $this->buildAIExtractionFields( $config );
+
+		$event_data = $this->mergeConfigWithDefaults( $config );
+
+		if ( ! empty( $event_data['title'] ) && $this->shouldSkipEventTitle( $event_data['title'] ) ) {
+			return array();
+		}
+
+		if ( empty( $event_data['title'] ) || empty( $event_data['startDate'] ) ) {
+			$context->log(
+				'warning',
+				'EventFlyer: Requires AI processing for missing fields',
+				array(
+					'ai_fields_needed' => array_keys( $ai_fields ),
+				)
+			);
+		}
+
+		$event_identifier = EventIdentifierGenerator::generate(
+			$event_data['title'] ? $event_data['title'] : 'pending-extraction',
+			$event_data['startDate'] ? $event_data['startDate'] : '',
+			$event_data['venue'] ? $event_data['venue'] : '',
+			$event_data['startTime'] ? $event_data['startTime'] : '',
+			$event_data['venueTimezone'] ?? ''
+		);
+
+		$venue_metadata = $this->extractVenueMetadata( $event_data );
+		$engine_data    = $this->buildEventEngineData( $event_data, $venue_metadata );
+
+		// Add image context to engine data for vision processing.
+		$engine_data['image_file_path'] = $image_file['persistent_path'];
+		$upload_dir                     = wp_upload_dir();
+		$engine_data['image_url']       = str_replace( $upload_dir['basedir'], $upload_dir['baseurl'], $image_file['persistent_path'] );
+
+		$this->stripVenueMetadataFromEvent( $event_data );
+
+		return array(
+			'title'    => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
+			'content'  => wp_json_encode(
+				$this->buildPacketContent( $event_data, $venue_metadata, $image_file['original_name'], $ai_fields ),
+				JSON_PRETTY_PRINT
+			),
+			'metadata' => array(
+				'source_type'      => 'event_flyer',
+				'pipeline_id'      => $context->getPipelineId(),
+				'flow_id'          => $context->getFlowId(),
+				'original_title'   => $event_data['title'] ? $event_data['title'] : $image_file['original_name'],
+				'event_identifier' => $event_identifier,
+				'item_identifier'  => $file_identifier,
+				'import_timestamp' => time(),
+				'image_file_path'  => $image_file['persistent_path'],
+				'_engine_data'     => $engine_data,
+			),
+		);
+	}
+
+	private function getNextUnprocessedImage( ExecutionContext $context ): ?array {
+		$storage         = $this->getFileStorage();
+		$storage_context = $context->getFileContext();
+
+		$repo_files = $storage->get_all_files( $storage_context );
+
+		if ( empty( $repo_files ) ) {
+			return null;
+		}
+
+		// A job that carries its own image (e.g. a public event submission)
+		// must process exactly that file, never another file in the shared
+		// bucket. Scheduled flyer flows have no job image and still enumerate.
+		$repo_files = $this->selectCandidateFiles( $repo_files, $context->getImagePath() );
+		if ( empty( $repo_files ) ) {
+			$context->log( 'error', 'EventFlyer: Job image is not in the flow file bucket', array( 'path' => $context->getImagePath() ) );
+			return null;
+		}
+
+		$image_extensions = array( 'jpg', 'jpeg', 'png', 'gif', 'webp' );
+
+		// Selection-time prefilter via Data Machine core primitive.
+		// FreshCandidateCollector skips already-processed and currently-claimed
+		// images consistently with FetchHandler's authoritative dedup. Authoritative
+		// dedup/claim/cap still runs in FetchHandler::get_fetch_data() after this.
+		$collector = new FreshCandidateCollector( $context, 1 );
+
+		foreach ( $repo_files as $file ) {
+			$extension = strtolower( pathinfo( $file['filename'], PATHINFO_EXTENSION ) );
+
+			if ( ! in_array( $extension, $image_extensions, true ) ) {
+				continue;
+			}
+
+			$file_identifier = $file['path'];
+			$image           = array(
+				'original_name'   => $file['filename'],
+				'persistent_path' => $file['path'],
+				'size'            => $file['size'],
+				'mime_type'       => $this->getMimeType( $file['path'] ),
+				'uploaded_at'     => $this->formatUploadedAt( $file['modified'] ),
+			);
+
+			$collector->offer( $file_identifier, $image );
+
+			if ( $collector->isFull() ) {
+				break;
+			}
+		}
+
+		$collector->markExhausted();
+
+		$accepted = $collector->getAccepted();
+		return $accepted[0] ?? null;
+	}
+
+	/**
+	 * Narrow bucket files to the job's own image when the job carries one.
+	 *
+	 * @param array       $repo_files Files from FileStorage::get_all_files().
+	 * @param string|null $job_image  Job-scoped image path from engine data.
+	 * @return array Exactly the job's file when present; an empty array when the
+	 *               job names a file that is not in the bucket; otherwise all files.
+	 */
+	private function selectCandidateFiles( array $repo_files, ?string $job_image ): array {
+		if ( null === $job_image || '' === $job_image ) {
+			return $repo_files;
+		}
+
+		$target = realpath( $job_image );
+		$target = false === $target ? $job_image : $target;
+
+		foreach ( $repo_files as $file ) {
+			$path     = (string) ( $file['path'] ?? '' );
+			$resolved = realpath( $path );
+			if ( ( false === $resolved ? $path : $resolved ) === $target ) {
+				return array( $file );
+			}
+		}
+
+		return array();
+	}
+
+	private function getMimeType( string $file_path ): string {
+		$file_info = wp_check_filetype( $file_path );
+		$mime      = $file_info['type'];
+		return $mime ? $mime : 'application/octet-stream';
+	}
+
+	/**
+	 * Format FileStorage's ISO-8601 'modified' value as a GMT MySQL datetime.
+	 *
+	 * @param string $modified ISO-8601 modification time from FileStorage::get_all_files().
+	 * @return string GMT datetime, or the current time when the value cannot be parsed.
+	 */
+	private function formatUploadedAt( string $modified ): string {
+		$timestamp = strtotime( $modified );
+		if ( false === $timestamp ) {
+			$timestamp = time();
+		}
+
+		return gmdate( 'Y-m-d H:i:s', $timestamp );
+	}
+
+	/**
+	 * Build AI extraction fields for parameters the AI should extract.
+	 *
+	 * AI extraction fields use camelCase (venueAddress) for tool parameter format.
+	 * Config uses snake_case (venue_address) for form fields.
+	 * This method maps between them when checking if a field is pre-filled.
+	 */
+	private function buildAIExtractionFields( array $config ): array {
+		$all_fields = EventFlyerSettings::get_ai_extraction_fields();
+		$ai_fields  = array();
+
+		$camel_to_snake_map = array(
+			'venue'        => 'venue_name',
+			'venueAddress' => 'venue_address',
+			'venueCity'    => 'venue_city',
+			'venueState'   => 'venue_state',
+			'venueZip'     => 'venue_zip',
+			'venueCountry' => 'venue_country',
+			'venuePhone'   => 'venue_phone',
+			'venueWebsite' => 'venue_website',
+		);
+
+		foreach ( $all_fields as $field => $description ) {
+			$config_key = $camel_to_snake_map[ $field ] ?? $field;
+
+			if ( empty( $config[ $config_key ] ) ) {
+				$ai_fields[ $field ] = array(
+					'type'        => 'string',
+					'description' => $description,
+				);
+			}
+		}
+
+		return $ai_fields;
+	}
+
+	/**
+	 * Build the data packet body the AI step reads next to the flyer image.
+	 *
+	 * The AI step gets the flyer as a file message and this packet as JSON.
+	 * The packet is the only place the handler can tell the model how to
+	 * read the flyer, so the extraction rules (doors vs. show time, explicit
+	 * end times) travel with it. See #922.
+	 *
+	 * @param array  $event_data     Event fields already known from config.
+	 * @param array  $venue_metadata Venue metadata from config.
+	 * @param string $source_file    Original flyer file name.
+	 * @param array  $ai_fields      Fields the AI still has to extract.
+	 * @return array Packet body.
+	 */
+	private function buildPacketContent( array $event_data, array $venue_metadata, string $source_file, array $ai_fields ): array {
+		return array(
+			'event'                => $event_data,
+			'venue_metadata'       => $venue_metadata,
+			'import_source'        => 'event_flyer',
+			'source_file'          => $source_file,
+			'extraction_rules'     => self::get_vision_prompt(),
+			'ai_extraction_fields' => $ai_fields,
+		);
+	}
+
+	/**
+	 * Merge config with defaults and convert venue fields to camelCase event data format.
+	 *
+	 * Handler config uses snake_case (venue_address), but event data uses camelCase (venueAddress).
+	 */
+	private function mergeConfigWithDefaults( array $config ): array {
+		$defaults = EventFlyerSettings::get_defaults();
+
+		$event_data = array();
+		foreach ( $defaults as $field => $default ) {
+			$event_data[ $field ] = ! empty( $config[ $field ] ) ? $config[ $field ] : $default;
+		}
+
+		$venue_event_data = self::map_venue_config_to_event_data( $config );
+		$event_data       = array_merge( $event_data, $venue_event_data );
+
+		return $event_data;
+	}
+
+	public static function get_vision_prompt(): string {
+		return 'Extract event information from this promotional flyer, poster, or event graphic.
+
+Look for and extract:
+- Event title or headliner (usually the largest, most prominent text)
+- Date and time information (parse into standard formats)
+- Venue name and address
+- Ticket prices (advance, door, VIP tiers if shown)
+- Supporting acts, opening bands, or additional performers
+- Ticket purchase URLs if visible
+- Any age restrictions (21+, All Ages, etc.)
+
+Time rules:
+- If the flyer lists separate DOORS and SHOW times, the SHOW time is the event start time. The doors time is never the start time and never the end time.
+- When a doors time is shown, include it in the description (e.g. "Doors: 8 PM") — there is no dedicated doors field.
+- If the flyer shows only a doors time, use that doors time as the start time.
+- Set an end time only when the flyer states an explicit end or time range (e.g. "8PM–11PM", "until 2AM"). A doors/show pair is not a start/end range.
+
+Format guidelines:
+- Dates should be in YYYY-MM-DD format
+- Times should be in HH:MM 24-hour format
+- If information is not clearly visible, leave the field empty
+- Do not guess or infer information that is not present on the flyer';
+	}
+}

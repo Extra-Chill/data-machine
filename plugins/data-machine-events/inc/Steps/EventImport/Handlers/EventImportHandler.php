@@ -1,0 +1,327 @@
+<?php
+/**
+ * Base class for event import handlers providing shared sanitization,
+ * venue metadata extraction, and coordinate parsing utilities.
+ *
+ * @package DataMachineEvents\Steps\EventImport\Handlers
+ */
+
+namespace DataMachineEvents\Steps\EventImport\Handlers;
+
+use DataMachine\Core\ExecutionContext;
+use DataMachine\Core\Steps\Fetch\Handlers\FetchHandler;
+use DataMachineEvents\Core\DateTimeParser;
+use DataMachineEvents\Core\PriceFormatter;
+use DataMachineEvents\Core\VenueParameterProvider;
+use DataMachineEvents\Core\VenueSourceAliases;
+use DataMachineEvents\Steps\EventImport\EventEngineData;
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+abstract class EventImportHandler extends FetchHandler {
+
+	protected function getGlobalExcludedTitleKeywords(): array {
+		return array(
+			'closed',
+		);
+	}
+
+	public function shouldSkipEventTitle( string $title ): bool {
+		if ( empty( $title ) ) {
+			return false;
+		}
+
+		foreach ( $this->getGlobalExcludedTitleKeywords() as $keyword ) {
+			$keyword = trim( (string) $keyword );
+			if ( '' === $keyword ) {
+				continue;
+			}
+
+			if ( mb_stripos( $title, $keyword ) !== false ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public function __construct( string $handler_type ) {
+		parent::__construct( $handler_type );
+		add_filter( 'datamachine_source_inventory_capabilities', array( $this, 'filterSourceInventoryCapabilities' ), 10, 2 );
+	}
+
+	/**
+	 * Add handler-owned source inventory facts to matching source descriptors.
+	 *
+	 * @param array<string,mixed> $capabilities Existing capabilities.
+	 * @param array<string,mixed> $source       Source descriptor.
+	 * @return array<string,mixed>
+	 */
+	public function filterSourceInventoryCapabilities( array $capabilities, array $source ): array {
+		if ( ! $this->sourceMatchesHandler( $source ) ) {
+			return $capabilities;
+		}
+
+		return array_merge( $this->getSourceInventoryCapabilities(), $capabilities );
+	}
+
+	/**
+	 * Handler-owned source inventory facts.
+	 *
+	 * Concrete handlers override this when their source has known inventory,
+	 * count, cursor, or bounded-discovery behavior.
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function getSourceInventoryCapabilities(): array {
+		return array();
+	}
+
+	/**
+	 * Whether a generic source descriptor refers to this handler.
+	 *
+	 * @param array<string,mixed> $source Source descriptor.
+	 */
+	private function sourceMatchesHandler( array $source ): bool {
+		foreach ( array( 'handler', 'handler_type', 'provider', 'source_type', 'kind' ) as $key ) {
+			if ( $this->handler_type === $this->normalizeSourceKey( (string) ( $source[ $key ] ?? '' ) ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function normalizeSourceKey( string $value ): string {
+		$value = strtolower( trim( $value ) );
+		$value = preg_replace( '/[^a-z0-9_\-]+/', '_', $value );
+		$value = str_replace( '-', '_', (string) $value );
+
+		return trim( $value, '_' );
+	}
+
+	/**
+	 * Event import handlers default to unlimited items per run.
+	 *
+	 * Structured event scrapers produce clean, deduped data that is
+	 * cheap to process. The base FetchHandler default of 1 is too
+	 * conservative for event import — it causes most fetched events
+	 * to be discarded after dedup. Individual flows can still set
+	 * max_items in their handler config to override.
+	 *
+	 * @return int 0 = unlimited.
+	 */
+	protected function getDefaultMaxItems(): int {
+		return 0;
+	}
+
+	protected function sanitizeText( string $text ): string {
+		return sanitize_text_field( trim( $text ) );
+	}
+
+	protected function sanitizeUrl( string $url ): string {
+		$url = trim( $url );
+
+		if ( ! empty( $url ) && ! preg_match( '#^https?://#i', $url ) ) {
+			$url = 'https://' . $url;
+		}
+
+		return filter_var( $url, FILTER_VALIDATE_URL ) ? $url : '';
+	}
+
+	protected function cleanHtml( string $html ): string {
+		if ( empty( $html ) ) {
+			return '';
+		}
+		return html_entity_decode( strip_tags( $html, '<a><br><p>' ) );
+	}
+
+	/**
+	 * @return array Venue metadata extracted from event data
+	 */
+	public function extractVenueMetadata( array $event ): array {
+		return VenueParameterProvider::extractFromEventData( $event );
+	}
+
+	/**
+	 * Rewrite a standardized event to its aliased canonical venue.
+	 *
+	 * Call right after mapping, before building event identity, the AI
+	 * packet, or engine data, so a source's known-wrong venue never reaches
+	 * the model or the stored event (#878).
+	 *
+	 * @param array $event Standardized event data.
+	 * @return array Event data, rewritten when a venue source alias resolves.
+	 */
+	public function applyVenueSourceAliases( array $event ): array {
+		return VenueSourceAliases::canonicalize_event( $event );
+	}
+
+	public function stripVenueMetadataFromEvent( array &$event ): void {
+		VenueParameterProvider::stripFromEventData( $event );
+	}
+
+	/**
+	 * Check if event start date is in the past
+	 *
+	 * @param string $start_date Event start date (Y-m-d format expected)
+	 * @return bool True if event is in the past, false otherwise
+	 */
+	public function isPastEvent( string $start_date ): bool {
+		if ( empty( $start_date ) ) {
+			return false;
+		}
+		return strtotime( $start_date ) < strtotime( 'today' );
+	}
+
+	/**
+	 * Called by FetchHandler::dedup() after marking an item as processed.
+	 *
+	 * Stores item context (item_identifier + source_type) in engine data so the
+	 * fetch disposition tools (reject_source / defer_item) can find and mark
+	 * items correctly.
+	 *
+	 * @param ExecutionContext $context Execution context.
+	 * @param array            $item    The item that was just marked as processed.
+	 */
+	protected function onItemProcessed( ExecutionContext $context, array $item ): void {
+		$item_identifier = $item['metadata']['item_identifier'] ?? '';
+		if ( empty( $item_identifier ) ) {
+			return;
+		}
+
+		$job_id = $context->getJobId();
+		if ( $job_id ) {
+			EventEngineData::storeItemContext( (int) $job_id, $item_identifier, $this->handler_type );
+		}
+	}
+
+	/**
+	 * Parse UTC datetime and convert to target timezone.
+	 *
+	 * @param string $datetime UTC datetime string
+	 * @param string $timezone Target IANA timezone
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	protected function parseDateTimeUtc( string $datetime, string $timezone ): array {
+		return DateTimeParser::parseUtc( $datetime, $timezone );
+	}
+
+	/**
+	 * Parse local datetime already in venue timezone.
+	 *
+	 * @param string $date Date string
+	 * @param string $time Time string
+	 * @param string $timezone IANA timezone identifier
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	protected function parseDateTimeLocal( string $date, string $time, string $timezone ): array {
+		return DateTimeParser::parseLocal( $date, $time, $timezone );
+	}
+
+	/**
+	 * Parse ISO 8601 datetime with embedded timezone.
+	 *
+	 * @param string $datetime ISO 8601 string
+	 * @return array{date: string, time: string, timezone: string, offset: string}
+	 */
+	protected function parseDateTimeIso( string $datetime ): array {
+		return DateTimeParser::parseIso( $datetime );
+	}
+
+	/**
+	 * Format a price range as a display string.
+	 *
+	 * @param float|null $min Minimum price
+	 * @param float|null $max Maximum price (optional)
+	 * @return string Formatted price or empty if invalid
+	 */
+	protected function formatPriceRange( ?float $min, ?float $max = null ): string {
+		return PriceFormatter::formatRange( $min, $max );
+	}
+
+	/**
+	 * Format structured price data into a display string.
+	 *
+	 * @param float|null $min Minimum price.
+	 * @param float|null $max Maximum price.
+	 * @param string     $currency ISO currency code.
+	 * @param bool|null  $is_free Explicit free flag.
+	 * @return string
+	 */
+	protected function formatStructuredPrice( ?float $min = null, ?float $max = null, string $currency = 'USD', ?bool $is_free = null ): string {
+		return PriceFormatter::formatStructured( $min, $max, $currency, $is_free );
+	}
+
+	/**
+	 * Store event context (venue + core fields) in engine data.
+	 *
+	 * Call this after standardizing event data. Stores venue metadata
+	 * and core fields (dates, ticketUrl, price) so the AI cannot override them.
+	 *
+	 * @deprecated Use buildEventEngineData() and pass as metadata['_engine_data'] for batch fan-out.
+	 *
+	 * @param ExecutionContext $context Execution context
+	 * @param array $event_data Standardized event data
+	 * @since 0.8.32
+	 */
+	protected function storeEventContext( ExecutionContext $context, array $event_data ): void {
+		$job_id = $context->getJobId();
+		if ( ! $job_id ) {
+			return;
+		}
+
+		$venue_metadata = $this->extractVenueMetadata( $event_data );
+		EventEngineData::storeVenueContext( $job_id, $event_data, $venue_metadata );
+		EventEngineData::storeEventCoreFields( $job_id, $event_data );
+	}
+
+	/**
+	 * Build per-item engine data for batch fan-out.
+	 *
+	 * Returns the combined venue context and core event fields as an array.
+	 * Pass this as metadata['_engine_data'] in the handler's return value
+	 * so PipelineBatchScheduler seeds it into each child job's engine data.
+	 *
+	 * @param array $event_data Standardized event data (with venue fields).
+	 * @param array $venue_metadata Extracted venue metadata.
+	 * @return array Engine data payload.
+	 * @since 0.14.0
+	 */
+	protected function buildEventEngineData( array $event_data, array $venue_metadata ): array {
+		return EventEngineData::buildEngineData( $event_data, $venue_metadata );
+	}
+
+	/**
+	 * @return array{lat: float, lng: float}|false
+	 */
+	protected function parseCoordinates( string $location ): array|false {
+		$location = trim( $location );
+		$coords   = explode( ',', $location );
+
+		if ( count( $coords ) !== 2 ) {
+			return false;
+		}
+
+		$lat = trim( $coords[0] );
+		$lng = trim( $coords[1] );
+
+		if ( ! is_numeric( $lat ) || ! is_numeric( $lng ) ) {
+			return false;
+		}
+
+		$lat = floatval( $lat );
+		$lng = floatval( $lng );
+
+		if ( $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180 ) {
+			return false;
+		}
+
+		return array(
+			'lat' => $lat,
+			'lng' => $lng,
+		);
+	}
+}

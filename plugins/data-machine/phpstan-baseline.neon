@@ -1,0 +1,227 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Call to function function_exists\(\) with ''datamachine_assign…''\|''datamachine…''\|''datamachine_drop…''\|''datamachine_migrate…''\|''datamachine_strip…'' will always evaluate to true\.$#'
+			identifier: function.alreadyNarrowedType
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Call to function in_array\(\) with arguments ''datamachine_assign…''\|''datamachine…''\|''datamachine_drop…''\|''datamachine_migrate…''\|''datamachine_strip…'', array\{\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Comparison operation "\>" between \*NEVER\* and 1 results in an error\.$#'
+			identifier: greater.invalid
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Empty array passed to foreach\.$#'
+			identifier: foreach.emptyArray
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Offset ''datamachine_db_version'' does not exist on array\{\}\.$#'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Offset ''priority'' on null on left side of \?\? does not exist\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 8
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between false and false will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 7
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between null and null will always evaluate to false\.$#'
+			identifier: notIdentical.alwaysFalse
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''0\.84\.0\-test'' and ''0\.79\.0\-stale'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''0\.84\.0\-test'' and ''0\.84\.0\-test'' will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between ''0\.84\.0\-test'' and ''99\.99\.0\-future'' will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between 0 and 0 will always evaluate to true\.$#'
+			identifier: identical.alwaysTrue
+			count: 4
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between 0 and 21 will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 4
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between 5 and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: tests/migration-runtime-smoke.php
+
+		# WP_Agent_Access_Grant is shadowed during analysis by bare test doubles in
+		# tests/*-smoke.php, so the real agents-api class shape (constructor, role,
+		# role_meets(), ROLE_* constants, to_array()) is invisible to PHPStan.
+		# Tracked as a smoke-stub cleanup; these are not real defects.
+		-
+			message: '#Parameter \#1 \$callback of function array_map expects \(callable\(array\)#'
+			path: inc/Abilities/AgentAbilities.php
+		-
+			message: '#Call to function method_exists\(\) with ZipArchive and ''setMtimeName''#'
+			path: inc/Abilities/AgentAbilities.php
+		-
+			message: '#Negated boolean expression is always true\.#'
+			path: inc/Abilities/AgentAbilities.php
+		-
+			message: '#resolve_import_auth_refs\(\) should return#'
+			path: inc/Abilities/AgentAbilities.php
+
+		# Pre-existing GD int-typing gaps, unrelated to
+		# Extra-Chill/data-machine-events#853's glyph-fallback fix. PHPStan's
+		# GD function stubs (imagecreatetruecolor, imagecolorallocate*,
+		# imagettfbbox) are typed more strictly than this file's plumbing
+		# (0-255 clamped ints, non-false return guarantees) ever enforced.
+		# Confirmed pre-existing by running this exact PHPStan config against
+		# the unmodified file on main before this PR: identical 23 findings,
+		# same messages, same relative positions. Baselined per this
+		# project's own documented convention (phpstan.neon.dist) for
+		# touching a file with prior debt at level 7 — not something this PR
+		# introduced or should be scope-creeped into fixing.
+		-
+			message: '#^Cannot access offset 0 on array\|false\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Cannot access offset 4 on array\|false\.$#'
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 4
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) should return int but returns int\<0, max\>\|false\.$#'
+			identifier: return.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Negated boolean expression is always false\.$#'
+			identifier: booleanNot.alwaysFalse
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#1 \$width of function imagecreatetruecolor expects int\<1, max\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$height of function imagecreatetruecolor expects int\<1, max\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#2 \$red of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#3 \$green of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of function imagecolorallocate expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of function imagecolorallocatealpha expects int\<0, 255\>, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#4 \$blue of method DataMachine\\Abilities\\Media\\GDRenderer\:\:color\(\) expects int, float\|int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Parameter \#5 \$alpha of function imagecolorallocatealpha expects int\<0, 127\>, int\<1, max\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php
+
+		-
+			message: '#^Property DataMachine\\Abilities\\Media\\GDRenderer\:\:\$colors \(array\<string, int\>\) does not accept array\<string, bool\|int\>\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: inc/Abilities/Media/GDRenderer.php

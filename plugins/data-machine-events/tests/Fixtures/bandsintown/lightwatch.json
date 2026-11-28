@@ -1,0 +1,56 @@
+[
+  {
+    "id": "108946366",
+    "title": "",
+    "datetime": "2026-10-29T13:00:00",
+    "starts_at": "2026-10-29T13:00:00",
+    "ends_at": "2026-10-29T14:00:00",
+    "artist": {
+      "name": "Lightwatch"
+    },
+    "lineup": [
+      "Lightwatch"
+    ],
+    "venue": {
+      "name": "DeBary Family Music And Records",
+      "street_address": "132 S Charles Richard Beall Blvd",
+      "city": "Debary",
+      "region": "FL",
+      "postal_code": "32713",
+      "country": "United States",
+      "latitude": "28.880195",
+      "longitude": "-81.3103289"
+    },
+    "offers": [],
+    "url": "https://www.bandsintown.com/e/108946366"
+  },
+  {
+    "id": "108764928",
+    "title": "Boogieman Halloween Festival 2026",
+    "datetime": "2026-10-31T19:00:00",
+    "starts_at": "2026-10-31T19:00:00",
+    "ends_at": "2026-10-31T23:30:00",
+    "venue": {
+      "name": "The Royal American",
+      "street_address": "970 Morrison Dr,",
+      "city": "Charleston",
+      "region": "SC",
+      "postal_code": "29403",
+      "country": "United States",
+      "latitude": "32.806726",
+      "longitude": "-79.94198279999999"
+    },
+    "lineup": [
+      "Lightwatch",
+      "Harvey Street",
+      "Dillon Basse",
+      "The Saint Cecilia",
+      "The Inspector Cluzo",
+      "Juice",
+      "Tobacco Road",
+      "The Ocho"
+    ],
+    "offers": [],
+    "url": "https://www.bandsintown.com/e/108764928"
+  }
+]

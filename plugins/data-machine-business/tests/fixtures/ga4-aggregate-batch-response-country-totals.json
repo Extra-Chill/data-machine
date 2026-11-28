@@ -1,0 +1,90 @@
+{
+  "kind": "analyticsData#batchRunReports",
+  "reports": [
+    {
+      "dimensionHeaders": [
+        {
+          "name": "country"
+        }
+      ],
+      "metricHeaders": [
+        {
+          "name": "sessions",
+          "type": "TYPE_INTEGER"
+        }
+      ],
+      "rows": [
+        {
+          "dimensionValues": [
+            {
+              "value": "United States"
+            }
+          ],
+          "metricValues": [
+            {
+              "value": "13170"
+            }
+          ]
+        },
+        {
+          "dimensionValues": [
+            {
+              "value": "Japan"
+            }
+          ],
+          "metricValues": [
+            {
+              "value": "12953"
+            }
+          ]
+        }
+      ],
+      "totals": [
+        {
+          "dimensionValues": [
+            {
+              "value": "RESERVED_TOTAL"
+            }
+          ],
+          "metricValues": [
+            {
+              "value": "30683"
+            }
+          ]
+        }
+      ],
+      "rowCount": 137,
+      "metadata": {
+        "currencyCode": "USD",
+        "timeZone": "America/New_York"
+      },
+      "propertyQuota": {
+        "tokensPerDay": {
+          "consumed": 1,
+          "remaining": 199966
+        },
+        "tokensPerHour": {
+          "consumed": 1,
+          "remaining": 39988
+        },
+        "concurrentRequests": {
+          "consumed": 0,
+          "remaining": 10
+        },
+        "serverErrorsPerProjectPerHour": {
+          "consumed": 0,
+          "remaining": 10
+        },
+        "potentiallyThresholdedRequestsPerHour": {
+          "consumed": 0,
+          "remaining": 120
+        },
+        "tokensPerProjectPerHour": {
+          "consumed": 1,
+          "remaining": 13987
+        }
+      },
+      "kind": "analyticsData#runReport"
+    }
+  ]
+}
