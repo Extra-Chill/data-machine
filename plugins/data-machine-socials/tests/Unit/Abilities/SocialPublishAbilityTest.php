@@ -7,7 +7,9 @@
 
 namespace DataMachineSocials\Tests\Unit\Abilities;
 
+use DataMachine\Abilities\AuthAbilities;
 use DataMachineSocials\Abilities\SocialPublishAbility;
+use DataMachineSocials\Handlers\Facebook\FacebookAuth;
 use WP_UnitTestCase;
 
 final class SocialPublishAbilityTest extends WP_UnitTestCase {
@@ -95,6 +97,72 @@ final class SocialPublishAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'social_publish_provider_unavailable', $result['error']['code'] );
 		$this->assertSame( 'provider_not_configured', $result['error']['details']['providers'][0]['status'] );
 		$this->assertArrayNotHasKey( 'submit', $ability->requests );
+	}
+
+	/** @dataProvider refreshOutcomes */
+	public function test_provider_status_attempts_refresh_before_reading_authentication( ?string $token, string $expected ): void {
+		$provider = new class( $token ) {
+			public array $calls = array();
+
+			public function __construct( private ?string $token ) {}
+
+			public function get_valid_access_token(): ?string {
+				$this->calls[] = 'token';
+				return $this->token;
+			}
+
+			public function is_authenticated(): bool {
+				$this->calls[] = 'authenticated';
+				return null !== $this->token && in_array( 'token', $this->calls, true );
+			}
+		};
+
+		$this->assertSame( $expected, $this->statusForProvider( 'instagram', $provider ) );
+		$this->assertSame( null === $token ? array( 'token' ) : array( 'token', 'authenticated' ), $provider->calls );
+	}
+
+	public function refreshOutcomes(): array {
+		return array(
+			'expired token refreshed' => array( 'refreshed-token', 'ready' ),
+			'expired token rejected'  => array( null, 'provider_not_authenticated' ),
+		);
+	}
+
+	/** @dataProvider providersWithoutTokenLifecycle */
+	public function test_provider_status_preserves_authentication_without_token_lifecycle( bool $authenticated, string $expected ): void {
+		$provider = new class( $authenticated ) {
+			public function __construct( private bool $authenticated ) {}
+
+			public function is_authenticated(): bool {
+				return $this->authenticated;
+			}
+		};
+
+		$this->assertSame( $expected, $this->statusForProvider( 'instagram', $provider ) );
+	}
+
+	public function providersWithoutTokenLifecycle(): array {
+		return array(
+			'connected'    => array( true, 'ready' ),
+			'disconnected' => array( false, 'provider_not_authenticated' ),
+		);
+	}
+
+	public function test_provider_status_accepts_facebook_user_and_page_credentials(): void {
+		$provider = new class() extends FacebookAuth {
+			public function is_configured(): bool {
+				return true;
+			}
+
+			public function get_account(): array {
+				return array(
+					'user_access_token' => 'user-token',
+					'page_access_token' => 'page-token',
+				);
+			}
+		};
+
+		$this->assertSame( 'ready', $this->statusForProvider( 'facebook', $provider ) );
 	}
 
 	public function test_scheduler_failure_is_retryable_and_stable(): void {
@@ -201,6 +269,27 @@ final class SocialPublishAbilityTest extends WP_UnitTestCase {
 		$this->assertSame( 'delivered', $result['delivery']['status'] );
 		$this->assertSame( 'ig-123', $result['delivery']['deliveries'][0]['platform_post_id'] );
 		$this->assertStringNotContainsString( 'private_data', wp_json_encode( $result ) );
+	}
+
+	private function statusForProvider( string $channel, object $provider ): string {
+		$filter = static function ( array $providers ) use ( $channel, $provider ): array {
+			$providers[ $channel ] = $provider;
+			return $providers;
+		};
+		add_filter( 'datamachine_auth_providers', $filter, PHP_INT_MAX );
+		AuthAbilities::clearCache();
+
+		try {
+			$ability = new class() extends SocialPublishAbility {
+				public function providerStatus( string $channel ): string {
+					return parent::providerStatus( $channel );
+				}
+			};
+			return $ability->providerStatus( $channel );
+		} finally {
+			remove_filter( 'datamachine_auth_providers', $filter, PHP_INT_MAX );
+			AuthAbilities::clearCache();
+		}
 	}
 
 	private function ability( array $responses, array $providers = array() ): TestableSocialPublishAbility {
