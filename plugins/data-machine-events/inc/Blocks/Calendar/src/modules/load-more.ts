@@ -16,6 +16,7 @@ import { renderDateGroup } from './date-group-renderer';
 import { renderEventCard } from './event-renderer';
 import { renderGapSeparator } from './gap-renderer';
 import { getFilterState } from './filter-state';
+import { emitQueryChanged } from './query-changed';
 
 interface LoadMoreState {
 	button: HTMLButtonElement;
@@ -221,7 +222,8 @@ function createClickHandler(
 
 		try {
 			const nextPage = currentPage + 1;
-			const data = await fetchPage( calendar, nextPage );
+			const params = buildPageRequest( calendar, nextPage );
+			const data = await requestCalendarData( params );
 
 			if ( instances.get( calendar )?.button !== button ) {
 				return;
@@ -249,6 +251,7 @@ function createClickHandler(
 			if ( serverCurrent >= serverTotal ) {
 				button.hidden = true;
 			}
+			emitQueryChanged( calendar, 'pagination', params, data );
 		} catch ( err ) {
 			// Surface the error inline; let the user retry. The
 			// existing `.data-machine-events-error` styles apply.
@@ -271,10 +274,10 @@ function createClickHandler(
 /*  Fetch                                                              */
 /* ------------------------------------------------------------------ */
 
-async function fetchPage(
+function buildPageRequest(
 	calendar: HTMLElement,
 	pageNumber: number
-): Promise< CalendarDataResponse > {
+): URLSearchParams {
 	const filterState = getFilterState( calendar );
 	const archiveContext: Partial< ArchiveContext > =
 		filterState.getArchiveContext();
@@ -299,7 +302,7 @@ async function fetchPage(
 	if ( calendar.dataset.scopeToken ) {
 		params.set( 'scope_token', calendar.dataset.scopeToken );
 	}
-	return requestCalendarData( params );
+	return params;
 }
 
 /* ------------------------------------------------------------------ */

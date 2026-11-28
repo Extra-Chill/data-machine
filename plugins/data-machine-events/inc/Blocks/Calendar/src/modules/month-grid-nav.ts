@@ -15,6 +15,7 @@
  */
 import { buildCalendarRequest, requestCalendarData } from './api-client';
 import { renderMonthGridResponse } from './month-grid-response-renderer';
+import { emitQueryChanged, type CalendarRequestOptions } from './query-changed';
 
 import type { ArchiveContext, GeoContext } from '../types';
 
@@ -87,7 +88,13 @@ class MonthGridController {
 			return;
 		}
 		event.preventDefault();
-		void this.navigateToMonth( month );
+		void this.navigateToMonth(
+			month,
+			undefined,
+			true,
+			false,
+			{ trigger: 'pagination' }
+		);
 	};
 
 	private readonly handlePopState = (): void => {
@@ -106,15 +113,10 @@ class MonthGridController {
 	 * in grid mode.
 	 * @param params
 	 * @param requestOptions
-	 * @param requestOptions.signal
-	 * @param requestOptions.shouldApply
 	 */
 	async handleFilterChange(
 		params: URLSearchParams,
-		requestOptions: {
-			signal?: AbortSignal;
-			shouldApply?: () => boolean;
-		} = {}
+		requestOptions: CalendarRequestOptions = {}
 	): Promise< boolean > {
 		return this.navigateToMonth(
 			this.getCurrentMonth(),
@@ -133,18 +135,13 @@ class MonthGridController {
 	 * @param pushHistory
 	 * @param syncGeoState
 	 * @param requestOptions
-	 * @param requestOptions.signal
-	 * @param requestOptions.shouldApply
 	 */
 	async navigateToMonth(
 		month: string,
 		source: URLSearchParams = new URLSearchParams( window.location.search ),
 		pushHistory = true,
 		syncGeoState = false,
-		requestOptions: {
-			signal?: AbortSignal;
-			shouldApply?: () => boolean;
-		} = {}
+		requestOptions: CalendarRequestOptions = {}
 	): Promise< boolean > {
 		const requestId = ++this.requestSequence;
 		const publicParams = this.buildPublicParams( source, month );
@@ -225,6 +222,9 @@ class MonthGridController {
 					detail: { month },
 				} )
 			);
+			if ( requestOptions.trigger ) {
+				emitQueryChanged( this.calendar, requestOptions.trigger, params, data );
+			}
 			return true;
 		} catch ( error ) {
 			if (

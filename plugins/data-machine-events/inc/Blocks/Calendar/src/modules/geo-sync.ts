@@ -61,7 +61,8 @@ interface GeoSyncState {
 	onGridUpdate?: (
 		geo: GeoContext,
 		signal: AbortSignal,
-		isCurrent: () => boolean
+		isCurrent: () => boolean,
+		trigger: 'geo' | undefined
 	) => Promise< boolean >;
 	debounceTimer: ReturnType< typeof setTimeout > | null;
 	abortController: AbortController | null;
@@ -87,7 +88,8 @@ export function initGeoSync(
 	onGridUpdate?: (
 		geo: GeoContext,
 		signal: AbortSignal,
-		isCurrent: () => boolean
+		isCurrent: () => boolean,
+		trigger: 'geo' | undefined
 	) => Promise< boolean >
 ): void {
 	if ( instances.has( calendar ) || ! syncId ) {
@@ -164,11 +166,11 @@ export function updateCalendarGeo(
 	if ( state ) {
 		state.currentGeo = geo;
 		invalidateActiveRequest( state );
-		startGeoRequest( calendar, state, geo );
+		startGeoRequest( calendar, state, geo, 'geo' );
 		return;
 	}
 
-	void fetchAndUpdate( calendar, geo );
+	void fetchAndUpdate( calendar, geo, 'geo' );
 }
 
 /* ------------------------------------------------------------------ */
@@ -215,7 +217,11 @@ function createBoundsHandler( calendar: HTMLElement ): ( e: Event ) => void {
 
 			state.currentGeo = geo;
 
-			startGeoRequest( calendar, state, geo );
+			const trigger =
+				detail.authority === 'server' || detail.authority === 'external'
+					? undefined
+					: 'geo';
+			startGeoRequest( calendar, state, geo, trigger );
 		}, 300 );
 	};
 }
@@ -223,13 +229,15 @@ function createBoundsHandler( calendar: HTMLElement ): ( e: Event ) => void {
 function startGeoRequest(
 	calendar: HTMLElement,
 	state: GeoSyncState,
-	geo: GeoContext
+	geo: GeoContext,
+	trigger: 'geo' | undefined
 ): void {
 	state.abortController = new AbortController();
 	const requestGeneration = ++state.requestGeneration;
 	void fetchAndUpdate(
 		calendar,
 		geo,
+		trigger,
 		state,
 		requestGeneration,
 		state.abortController.signal
@@ -246,6 +254,7 @@ function invalidateActiveRequest( state: GeoSyncState ): void {
  * Fetch calendar data via REST API and update the DOM.
  * @param calendar
  * @param geo
+ * @param trigger
  * @param state
  * @param requestGeneration
  * @param signal
@@ -253,6 +262,7 @@ function invalidateActiveRequest( state: GeoSyncState ): void {
 async function fetchAndUpdate(
 	calendar: HTMLElement,
 	geo: GeoContext,
+	trigger: 'geo' | undefined,
 	state?: GeoSyncState,
 	requestGeneration?: number,
 	signal?: AbortSignal
@@ -268,7 +278,12 @@ async function fetchAndUpdate(
 	}
 	const filterState = getFilterState( calendar );
 	if ( state?.onGridUpdate ) {
-		const updated = await state.onGridUpdate( geo, signal!, isCurrent );
+		const updated = await state.onGridUpdate(
+			geo,
+			signal!,
+			isCurrent,
+			trigger
+		);
 		if ( updated && isCurrent() ) {
 			filterState.saveGeoToStorage( {
 				lat: geo.lat,
@@ -310,6 +325,7 @@ async function fetchAndUpdate(
 	await fetchCalendarEvents( calendar, params, archiveContext, {
 		signal,
 		shouldApply: isCurrent,
+		trigger,
 	} );
 }
 
