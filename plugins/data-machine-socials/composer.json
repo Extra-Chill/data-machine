@@ -5,7 +5,7 @@
   "license": "GPL-2.0-or-later",
   "require": {
     "php": ">=8.2",
-    "abraham/twitteroauth": "^8.1"
+    "abraham/twitteroauth": "^9.1"
   },
   "autoload": {
     "psr-4": {
