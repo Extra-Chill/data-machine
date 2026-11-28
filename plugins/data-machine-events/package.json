@@ -8,11 +8,11 @@
     "lint:js": "eslint inc/Blocks/*/src"
   },
   "dependencies": {
-    "@wordpress/block-editor": "^16.0.0",
-    "@wordpress/blocks": "^15.24.0",
-    "@wordpress/components": "^37.0.0",
-    "@wordpress/element": "^6.40.0",
-    "@wordpress/i18n": "^6.24.0",
+    "@wordpress/block-editor": "^20.1.0",
+    "@wordpress/blocks": "^17.2.0",
+    "@wordpress/components": "^45.0.0",
+    "@wordpress/element": "^10.2.0",
+    "@wordpress/i18n": "^7.2.0",
     "flatpickr": "^4.6.13",
     "leaflet": "1.9.4",
     "leaflet.markercluster": "^1.5.3"
@@ -20,12 +20,12 @@
   "devDependencies": {
     "@types/leaflet": "^1.9.17",
     "@types/leaflet.markercluster": "^1.5.6",
-    "@wordpress/eslint-plugin": "^26.0.0",
-    "@wordpress/scripts": "^35.0.0",
+    "@wordpress/eslint-plugin": "^28.2.0",
+    "@wordpress/scripts": "^37.2.0",
     "eslint": "^10.0.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "typescript": "^5.3.0"
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "^7.0.2"
   },
   "overrides": {
     "js-yaml@4": "^4.3.2",
