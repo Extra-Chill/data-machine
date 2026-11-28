@@ -7,22 +7,16 @@
  * (instead of triggering a full page reload like list mode does).
  *
  * Why a dedicated controller instead of folding it into frontend.ts:
- * keeps grid-mode-only behaviour out of the list-mode path, and
- * isolates the data-only REST format (`format=data`) consumer so the
- * legacy HTML-string envelope stays the contract for list mode.
+ * keeps grid-mode navigation out of the list-mode path.
  */
 
 /**
  * Internal dependencies
  */
-import { buildCalendarRequest } from './api-client';
+import { buildCalendarRequest, requestCalendarData } from './api-client';
 import { renderMonthGridResponse } from './month-grid-response-renderer';
 
-import type {
-	ArchiveContext,
-	CalendarDataResponse,
-	GeoContext,
-} from '../types';
+import type { ArchiveContext, GeoContext } from '../types';
 
 const controllers = new WeakMap< HTMLElement, MonthGridController >();
 
@@ -164,15 +158,8 @@ class MonthGridController {
 			archiveContext,
 			geoContext,
 			source: publicParams,
-			overrides: {
-				// `format=data` activates the data-only REST envelope
-				// (phase 1 of #298). Grid mode is the first consumer.
-			},
 		} );
 
-		// Force grid-specific params. These can't go through
-		// `overrides` because they aren't in the CalendarRequest type.
-		params.set( 'format', 'data' );
 		params.set( 'month', month );
 
 		// #160: re-send the opaque scope token so a consumer's server-side
@@ -202,25 +189,10 @@ class MonthGridController {
 		}
 
 		try {
-			const apiUrl = `/wp-json/datamachine/v1/events/calendar?${ params.toString() }`;
-			const response = await fetch( apiUrl, {
-				method: 'GET',
-				signal: requestOptions.signal,
-				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-					'X-Requested-With': 'XMLHttpRequest',
-				},
-			} );
-
-			if ( ! response.ok ) {
-				throw new Error( `HTTP ${ response.status }` );
-			}
-
-			const data = ( await response.json() ) as CalendarDataResponse;
-			if ( ! data?.success ) {
-				throw new Error( 'Calendar response not successful' );
-			}
+			const data = await requestCalendarData(
+				params,
+				requestOptions.signal
+			);
 			if (
 				requestId !== this.requestSequence ||
 				requestOptions.signal?.aborted ||

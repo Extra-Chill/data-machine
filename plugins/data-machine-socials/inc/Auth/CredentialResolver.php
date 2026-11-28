@@ -96,7 +96,7 @@ final class CredentialResolver {
 	 *
 	 * @param string               $platform              Provider key.
 	 * @param string               $label                 Human-readable platform label for errors.
-	 * @param bool                 $require_authenticated When true, enforce is_authenticated().
+	 * @param bool                 $require_authenticated Enforce is_authenticated() for providers without a token lifecycle.
 	 * @param class-string<T>|null $expected_class        Expected provider class, if any.
 	 * @return ($expected_class is null ? array{provider: object, token: string}|\WP_Error : array{provider: T, token: string}|\WP_Error)
 	 */
@@ -120,7 +120,7 @@ final class CredentialResolver {
 		$token = self::accessToken( $provider );
 
 		if ( '' === $token ) {
-			return self::error( $label . ' access token is missing or expired. Re-authorize in WP Admin > Data Machine > Settings.' );
+			return self::missingToken( $label );
 		}
 
 		return array(
@@ -136,7 +136,7 @@ final class CredentialResolver {
 	 *
 	 * @param string               $platform              Provider key.
 	 * @param string               $label                 Human-readable platform label for errors.
-	 * @param bool                 $require_authenticated When true, enforce is_authenticated().
+	 * @param bool                 $require_authenticated Enforce is_authenticated() for providers without a token lifecycle.
 	 * @param class-string<T>|null $expected_class        Expected provider class, if any.
 	 * @return ($expected_class is null ? array{provider: object, token: string, config: array<string, mixed>}|\WP_Error : array{provider: T, token: string, config: array<string, mixed>}|\WP_Error)
 	 */
@@ -182,6 +182,25 @@ final class CredentialResolver {
 			'token'    => $authenticated ? self::accessToken( $provider ) : '',
 			'config'   => self::config( $provider ),
 		);
+	}
+
+	/**
+	 * Check publish authentication for a registered, configured provider.
+	 *
+	 * Refresh before reading connection state so expiry does not block recovery.
+	 * A failed token lookup prevents publishing even if the stored connection
+	 * state still looks authenticated.
+	 *
+	 * @param object $provider Auth provider.
+	 * @param string $label    Human-readable platform label for errors.
+	 * @return object The ready provider, or a missing_auth WP_Error.
+	 */
+	public static function authenticateForPublish( object $provider, string $label ): object {
+		if ( method_exists( $provider, 'get_valid_access_token' ) && '' === self::accessToken( $provider ) ) {
+			return self::missingToken( $label );
+		}
+
+		return self::check( $provider, $label, true, null );
 	}
 
 	/**
@@ -250,6 +269,11 @@ final class CredentialResolver {
 		}
 
 		return $provider;
+	}
+
+	/** Report that the provider could not supply a usable access token. */
+	private static function missingToken( string $label ): \WP_Error {
+		return self::error( $label . ' access token is missing or expired. Re-authorize in WP Admin > Data Machine > Settings.' );
 	}
 
 	/**

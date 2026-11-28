@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directories:
+      - /plugins/data-machine
+      - /plugins/data-machine-socials
+      - /plugins/data-machine-events
+    schedule:
+      interval: weekly
+    groups:
+      npm-dependencies:
+        patterns:
+          - '*'
+  - package-ecosystem: composer
+    directories:
+      - /plugins/data-machine
+      - /plugins/data-machine-socials
+    schedule:
+      interval: weekly
+    groups:
+      composer-dependencies:
+        patterns:
+          - '*'

@@ -135,7 +135,6 @@ function response(): CalendarDataResponse {
 			has_past: false,
 			has_future: true,
 		},
-		empty_html: '',
 	};
 }
 
@@ -151,12 +150,6 @@ describe( 'month-grid response rendering', () => {
 		const calendar = document.querySelector< HTMLElement >(
 			'.data-machine-events-calendar'
 		)!;
-		const updated = jest.fn();
-		calendar.addEventListener(
-			'data-machine-calendar-content-updated',
-			updated
-		);
-
 		renderMonthGridResponse(
 			calendar,
 			'2026-08',
@@ -195,7 +188,6 @@ describe( 'month-grid response rendering', () => {
 			},
 			status: 'EventRescheduled',
 		} );
-		expect( updated ).toHaveBeenCalledTimes( 1 );
 	} );
 
 	it( 'renders the canonical recovery state for empty mobile results', () => {
@@ -214,12 +206,6 @@ describe( 'month-grid response rendering', () => {
 		data.counter.showing_count = 0;
 		data.counter.total_count = 0;
 		data.pagination.total_pages = 1;
-		data.empty_html = `
-				<div class="data-machine-events-no-events">
-					<p>No events found.</p>
-					<button type="button" class="data-machine-events-no-events-today-link">Show events from Today</button>
-				</div>`;
-
 		renderMonthGridResponse(
 			calendar,
 			'2026-08',

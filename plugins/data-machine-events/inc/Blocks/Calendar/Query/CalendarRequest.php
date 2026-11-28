@@ -112,15 +112,6 @@ final class CalendarRequest {
 	private string $geo_radius_unit;
 
 	/**
-	 * Response format selector. Empty string = legacy HTML-string envelope.
-	 * `'data'` = structured data-only envelope (phase 1 of refactor #298).
-	 *
-	 * Only REST callers populate this. The block render path (fromQueryArgs)
-	 * always leaves it empty because server-render only ever produces HTML.
-	 */
-	private string $format;
-
-	/**
 	 * @param array<string,int[]> $tax_filter
 	 */
 	private function __construct(
@@ -137,7 +128,6 @@ final class CalendarRequest {
 		string $geo_lng,
 		int $geo_radius,
 		string $geo_radius_unit,
-		string $format = '',
 		string $month = '',
 		string $scope_token = '',
 		string $venue_tier = ''
@@ -155,7 +145,6 @@ final class CalendarRequest {
 		$this->geo_lng          = $geo_lng;
 		$this->geo_radius       = $geo_radius;
 		$this->geo_radius_unit  = $geo_radius_unit;
-		$this->format           = $format;
 		$this->month            = $month;
 		$this->scope_token      = $scope_token;
 		$this->venue_tier       = $venue_tier;
@@ -215,7 +204,6 @@ final class CalendarRequest {
 			$geo_lng,
 			$geo_radius,
 			$geo_radius_unit,
-			'', // format is REST-only.
 			$month,
 			$scope_token,
 			$venue_tier
@@ -253,14 +241,6 @@ final class CalendarRequest {
 		$archive_taxonomy = sanitize_key( (string) ( $request->get_param( 'archive_taxonomy' ) ?? '' ) );
 		$archive_term_id  = absint( $request->get_param( 'archive_term_id' ) ?? 0 );
 
-		// Phase 1 of refactor #298: `format=data` opts into the structured
-		// data-only envelope. Any other value (including the absent param)
-		// falls back to the legacy HTML-string envelope. We whitelist `'data'`
-		// explicitly so future format names (`v2`, `summary`, etc.) can be
-		// added without silently activating.
-		$format_raw = sanitize_key( (string) ( $request->get_param( 'format' ) ?? '' ) );
-		$format     = ( 'data' === $format_raw ) ? 'data' : '';
-
 		$month = self::sanitize_month( (string) ( $request->get_param( 'month' ) ?? '' ) );
 
 		$scope_token = sanitize_text_field( (string) ( $request->get_param( 'scope_token' ) ?? '' ) );
@@ -281,7 +261,6 @@ final class CalendarRequest {
 			$geo_lng,
 			$geo_radius,
 			$geo_radius_unit,
-			$format,
 			$month,
 			$scope_token,
 			$venue_tier
@@ -292,22 +271,11 @@ final class CalendarRequest {
 	 * Serialize to the args dict consumed by
 	 * `CalendarAbilities::executeGetCalendarPage()`.
 	 *
-	 * - `include_html` follows the response format: the HTML envelope path
-	 *   needs server-rendered strings, the data envelope path does not.
-	 *   Skipping HTML rendering on the data path saves the `ob_start()`
-	 *   template runs in CalendarAbilities::renderHtml().
-	 * - `progressive` is also gated on the HTML path. Progressive rendering
-	 *   is a server-render concern (only emit the first day's events as
-	 *   real DOM, defer the rest as shells) — irrelevant once the client
-	 *   owns rendering from data.
-	 * - `include_gaps` stays true regardless: gap detection is a data
-	 *   transformation, the data envelope exposes the `gaps_detected` map
-	 *   so the client can render time-gap separators itself.
+	 * The controller disables HTML and progressive rendering for REST.
 	 *
 	 * @return array<string,mixed>
 	 */
 	public function toAbilitiesArgs(): array {
-		$is_data_format = ( 'data' === $this->format );
 
 		return array(
 			'paged'            => $this->paged,
@@ -323,9 +291,9 @@ final class CalendarRequest {
 			'geo_lng'          => $this->geo_lng,
 			'geo_radius'       => $this->geo_radius,
 			'geo_radius_unit'  => $this->geo_radius_unit,
-			'include_html'     => ! $is_data_format,
+			'include_html'     => true,
 			'include_gaps'     => true,
-			'progressive'      => ! $is_data_format,
+			'progressive'      => true,
 			'month'            => $this->month,
 			// Opaque passthrough — reaches the
 			// data_machine_events_calendar_query_args filter $input so a
@@ -394,18 +362,6 @@ final class CalendarRequest {
 
 	public function geoRadiusUnit(): string {
 		return $this->geo_radius_unit;
-	}
-
-	/**
-	 * Response format. Empty string for the legacy HTML envelope, `'data'`
-	 * for the structured data-only envelope (phase 1 of refactor #298).
-	 *
-	 * Used by the REST controller to branch into the data envelope builder
-	 * AND fed into the full-response cache key so HTML and data responses
-	 * never share a cache bucket.
-	 */
-	public function format(): string {
-		return $this->format;
 	}
 
 	/**

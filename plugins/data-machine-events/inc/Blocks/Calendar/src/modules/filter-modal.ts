@@ -320,7 +320,7 @@ async function loadFilters(
 			throw new Error( 'API returned unsuccessful response' );
 		}
 
-		container.innerHTML = '';
+		container.replaceChildren();
 		renderTaxonomies(
 			container,
 			data.taxonomies,
@@ -378,8 +378,10 @@ function renderFilterError(
 	container.querySelector( '.data-machine-filter-error' )?.remove();
 	const error = document.createElement( 'div' );
 	error.className = 'data-machine-filter-error';
-	error.innerHTML =
-		'<p>Could not refresh filters. Previous options are still available.</p>';
+	const message = document.createElement( 'p' );
+	message.textContent =
+		'Could not refresh filters. Previous options are still available.';
+	error.append( message );
 	const retry = document.createElement( 'button' );
 	retry.type = 'button';
 	retry.className = 'data-machine-filter-retry';

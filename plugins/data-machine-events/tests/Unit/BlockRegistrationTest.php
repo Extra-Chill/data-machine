@@ -70,7 +70,27 @@ class BlockRegistrationTest extends WP_UnitTestCase {
 		$this->assertSame( 'data-machine-events', $block->category, 'Block should use the plugin category' );
 	}
 
+	public function test_built_block_assets_exist_at_registered_paths() {
+		foreach ( array( 'Calendar', 'EventDetails', 'EventsMap' ) as $block ) {
+			$block_path = DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/' . $block . '/';
+			$metadata   = json_decode( file_get_contents( $block_path . 'block.json' ), true );
+
+			foreach ( array( 'editorScript', 'viewScript', 'viewStyle' ) as $field ) {
+				$this->assertStringStartsWith( 'file:./build/', $metadata[ $field ] );
+				$asset_path = $block_path . substr( $metadata[ $field ], strlen( 'file:./' ) );
+				$this->assertFileExists( $asset_path );
+
+				if ( str_ends_with( $asset_path, '.js' ) ) {
+					$this->assertFileExists( substr( $asset_path, 0, -3 ) . '.asset.php' );
+				}
+			}
+		}
+	}
+
 	public function test_leaflet_assets_are_served_by_the_plugin() {
+		$this->assertFileExists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/build/leaflet.css' );
+		$this->assertFileExists( DATA_MACHINE_EVENTS_PLUGIN_DIR . 'inc/Blocks/EventDetails/build/leaflet.js' );
+
 		$leaflet_style  = wp_styles()->registered['leaflet'] ?? null;
 		$leaflet_script = wp_scripts()->registered['leaflet'] ?? null;
 

@@ -75,7 +75,7 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_returns_missing_auth_when_provider_is_unauthenticated(): void {
-		$this->stubRedditProvider( false, 'reddit-token' );
+		$this->stubRedditProvider( false, null );
 		$requests = 0;
 		add_filter(
 			'pre_http_request',
@@ -509,11 +509,11 @@ class FetchRedditAbilityTest extends WP_UnitTestCase {
 		);
 	}
 
-	private function stubRedditProvider( bool $authenticated, string $token ): void {
+	private function stubRedditProvider( bool $authenticated, ?string $token ): void {
 		$this->removeRedditProviderStub();
 
 		$provider = new class( $authenticated, $token ) {
-			public function __construct( private bool $authenticated, private string $token ) {}
+			public function __construct( private bool $authenticated, private ?string $token ) {}
 
 			public function is_authenticated(): bool {
 				return $this->authenticated;

@@ -29,7 +29,7 @@ const mockFetch = jest.fn();
 function successfulResponse(): Promise< Response > {
 	return Promise.resolve( {
 		ok: true,
-		json: async () => ( { success: true } ),
+		json: async () => ( { success: true, events: [], grouping: {} } ),
 	} as Response );
 }
 
@@ -51,7 +51,11 @@ function deferredResponse(): {
 		resolve: () => {
 			resolvePromise( {
 				ok: true,
-				json: async () => ( { success: true } ),
+				json: async () => ( {
+					success: true,
+					events: [],
+					grouping: {},
+				} ),
 			} as Response );
 		},
 	};
@@ -114,7 +118,7 @@ describe( 'month-grid state synchronization', () => {
 		expect( request.get( 'archive_taxonomy' ) ).toBe( 'location' );
 		expect( request.get( 'archive_term_id' ) ).toBe( '12' );
 		expect( request.get( 'month' ) ).toBe( '2026-08' );
-		expect( request.get( 'format' ) ).toBe( 'data' );
+		expect( request.has( 'format' ) ).toBe( false );
 
 		expect( window.location.search ).toContain( 'event_search=new+search' );
 		expect( window.location.search ).toContain( 'month=2026-08' );
@@ -150,6 +154,7 @@ describe( 'month-grid state synchronization', () => {
 				'.data-machine-month-grid__nav-next'
 			)!
 			.click();
+		await Promise.resolve();
 		await Promise.resolve();
 		await Promise.resolve();
 		expect( requestedParams( 2 ).get( 'lat' ) ).toBeNull();
