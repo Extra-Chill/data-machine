@@ -178,6 +178,12 @@ final class ProviderModules {
 				}
 			),
 			new ProviderModule(
+				'github',
+				$fetch_handlers,
+				array( 'handler:github' ),
+				static fn() => new \DataMachineBusiness\Handlers\GitHub\GitHubFetch()
+			),
+			new ProviderModule(
 				'bing-webmaster',
 				array_merge( $abilities, $tools ),
 				array( 'datamachine/bing-webmaster', 'tool:bing_webmaster' ),

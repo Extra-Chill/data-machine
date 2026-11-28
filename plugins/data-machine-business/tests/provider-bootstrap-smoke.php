@@ -111,6 +111,7 @@ $expected_ids   = array(
 	'google-search-console',
 	'slack',
 	'discord',
+	'github',
 	'bing-webmaster',
 	'amazon-affiliate',
 	'media-hygiene',
