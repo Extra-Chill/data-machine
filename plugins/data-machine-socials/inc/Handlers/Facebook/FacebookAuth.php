@@ -216,6 +216,11 @@ class FacebookAuth extends \DataMachine\Core\OAuth\BaseOAuth2Provider {
 		);
 	}
 
+	/** Bridge the standard OAuth2 token lookup to Facebook's user token storage. */
+	public function get_valid_access_token(): ?string {
+		return $this->get_valid_user_access_token();
+	}
+
 	/**
 	* Get a valid user access token, refreshing if close to expiry.
 	*

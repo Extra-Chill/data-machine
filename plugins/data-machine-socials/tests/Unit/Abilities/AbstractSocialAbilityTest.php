@@ -45,7 +45,7 @@ final class AbstractSocialAbilityTest extends WP_UnitTestCase {
 	}
 
 	public function test_resolve_access_token_returns_missing_auth_when_unauthenticated(): void {
-		$this->stubProvider( false, 'example-token' );
+		$this->stubProvider( false, null );
 
 		$result = $this->ability()->token( 'example', 'Example' );
 
