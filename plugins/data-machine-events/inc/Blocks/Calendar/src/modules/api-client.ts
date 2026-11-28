@@ -17,6 +17,7 @@ import type {
 } from '../types';
 
 import { renderCalendarResponse } from './calendar-response-renderer';
+import { emitQueryChanged, type CalendarRequestOptions } from './query-changed';
 
 /* ------------------------------------------------------------------ */
 /*  Calendar REST request builder — single source of truth             */
@@ -151,10 +152,7 @@ export async function fetchCalendarEvents(
 	calendar: HTMLElement,
 	params: URLSearchParams,
 	archiveContext: Partial< ArchiveContext > = {},
-	options: {
-		signal?: AbortSignal;
-		shouldApply?: () => boolean;
-	} = {}
+	options: CalendarRequestOptions = {}
 ): Promise< CalendarDataResponse | null > {
 	const content = calendar.querySelector( '.data-machine-events-content' );
 	if ( ! content ) {
@@ -185,6 +183,9 @@ export async function fetchCalendarEvents(
 			return null;
 		}
 		renderCalendarResponse( calendar, data, params );
+		if ( options.trigger ) {
+			emitQueryChanged( calendar, options.trigger, params, data );
+		}
 		return data;
 	} catch ( error ) {
 		if ( shouldApply() && ( error as Error ).name !== 'AbortError' ) {

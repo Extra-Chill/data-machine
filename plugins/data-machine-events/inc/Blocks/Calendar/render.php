@@ -284,6 +284,26 @@ $wrapper_attributes = get_block_wrapper_attributes(
 
 $display_mode_attr = sprintf( ' data-display-mode="%s"', esc_attr( $display_mode ) );
 
+// Hydration can report the initial query without duplicating the server request.
+$initial_query = array(
+	'query'        => array(
+		'scope'        => $scope,
+		'date_start'   => $date_start,
+		'date_end'     => $date_end,
+		'has_search'   => '' !== $search_query,
+		'event_search' => $search_query,
+		'tax_filter'   => (object) $tax_filters,
+		'paged'        => $request->paged(),
+		'month'        => $is_month_grid_mode ? $visible_month : '',
+		'past'         => $show_past,
+	),
+	'archive'      => $archive_context['taxonomy'] && $archive_context['term_id'] ? array(
+		'taxonomy' => $archive_context['taxonomy'],
+		'term_id'  => $archive_context['term_id'],
+	) : null,
+	'result_count' => (int) $total_event_count,
+);
+
 $archive_data_attrs = '';
 if ( ! empty( $archive_context['taxonomy'] ) ) {
 	$archive_data_attrs = sprintf(
@@ -339,7 +359,7 @@ $map_sync_attr              = '' !== $map_sync_id
 	? sprintf( ' data-map-sync-id="%s"', esc_attr( $map_sync_id ) )
 	: '';
 ?>
-<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $filter_persistence_attr; ?><?php echo $map_sync_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute fragments are escaped when assembled; wrapper attributes come from WordPress core. ?>>
+<div data-instance-id="<?php echo esc_attr( $instance_id ); ?>" data-initial-query="<?php echo esc_attr( (string) wp_json_encode( $initial_query ) ); ?>"<?php echo $archive_data_attrs; ?><?php echo $geo_data_attrs; ?><?php echo $scope_data_attr; ?><?php echo $scope_token_data_attr; ?><?php echo $filter_persistence_attr; ?><?php echo $map_sync_attr; ?><?php echo $display_mode_attr; ?> <?php echo $wrapper_attributes; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute fragments are escaped when assembled; wrapper attributes come from WordPress core. ?>>
 	<?php
 	\DataMachineEvents\Blocks\Calendar\Template_Loader::include_template(
 		'filter-bar',

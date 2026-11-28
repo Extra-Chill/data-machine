@@ -13,7 +13,8 @@ jest.mock( './modules/date-picker', () => ( {
 	getDatePicker: jest.fn( () => mockPicker ),
 } ) );
 jest.mock( './modules/filter-modal', () => ( {
-	initFilterModal: jest.fn( ( _calendar, _apply, reset ) => {
+	initFilterModal: jest.fn( ( _calendar, apply, reset ) => {
+		mockApplyCallback = apply;
 		mockResetCallback = reset;
 	} ),
 	destroyFilterModal: jest.fn(),
@@ -37,7 +38,9 @@ jest.mock( './modules/load-more', () => ( {
 	destroyLoadMore: jest.fn(),
 } ) );
 jest.mock( './modules/scope-presets', () => ( {
-	initScopePresets: jest.fn(),
+	initScopePresets: jest.fn( ( _calendar, change ) => {
+		mockScopeCallback = change;
+	} ),
 } ) );
 jest.mock( './modules/month-grid-response-renderer', () => ( {
 	renderMonthGridResponse: jest.fn(
@@ -65,7 +68,17 @@ import { initCalendarInstance } from './frontend';
 import { initCarousel } from './modules/carousel';
 
 import type { FlatpickrInstance } from './types';
+import type { CalendarQueryChangedDetail } from './modules/query-changed';
 
+const queryEvent = 'data-machine-calendar-query-changed';
+const queryListener = jest.fn();
+
+function queryDetails(): CalendarQueryChangedDetail[] {
+	return queryListener.mock.calls.map( ( [ event ] ) => event.detail );
+}
+
+let mockApplyCallback: () => void;
+let mockScopeCallback: () => void;
 let mockResetCallback: ( params: URLSearchParams ) => void;
 let mockDateChangeCallback: () => void;
 let mockNavigationCallback: (
@@ -85,7 +98,12 @@ const mockInitCarousel = initCarousel as jest.Mock;
 function successfulResponse(): Promise< Response > {
 	return Promise.resolve( {
 		ok: true,
-		json: async () => ( { success: true, events: [], grouping: {} } ),
+		json: async () => ( {
+			success: true,
+			events: [],
+			grouping: {},
+			counter: { total_count: 7 },
+		} ),
 	} as Response );
 }
 
@@ -154,6 +172,8 @@ describe( 'calendar frontend month-grid integration', () => {
 	beforeEach( () => {
 		window.history.replaceState( {}, '', '/events/' );
 		document.body.innerHTML = calendarMarkup();
+		queryListener.mockClear();
+		document.body.addEventListener( queryEvent, queryListener );
 		mockFetch.mockReset();
 		mockFetch.mockImplementation( successfulResponse );
 		global.fetch = mockFetch;
@@ -164,6 +184,56 @@ describe( 'calendar frontend month-grid integration', () => {
 			new Date( 2026, 7, 12 ),
 		];
 	} );
+
+	afterEach( () => {
+		document.body.removeEventListener( queryEvent, queryListener );
+		jest.useRealTimers();
+	} );
+
+	it( 'reports the initial snapshot once without fetching', () => {
+		const calendar = document.querySelector< HTMLElement >(
+			'.data-machine-events-calendar'
+		)!;
+		const snapshot = {
+			query: {
+				scope: 'tonight',
+				date_start: '',
+				date_end: '',
+				has_search: false,
+				event_search: '',
+				tax_filter: {},
+				paged: 1,
+				month: '2026-08',
+				past: false,
+			},
+			archive: { taxonomy: 'location', term_id: 12 },
+			result_count: 11,
+		};
+		calendar.dataset.initialQuery = JSON.stringify( snapshot );
+		initCalendarInstance( calendar );
+		initCalendarInstance( calendar );
+
+		expect( mockFetch ).not.toHaveBeenCalled();
+		expect( queryDetails() ).toEqual( [
+			{ trigger: 'initial', ...snapshot },
+		] );
+	} );
+
+	it.each( [ 'scope', 'taxonomy_filter' ] )(
+		'reports %s after its controls apply',
+		async ( trigger ) => {
+			const calendar = document.querySelector< HTMLElement >(
+				'.data-machine-events-calendar'
+			)!;
+			initCalendarInstance( calendar );
+			( trigger === 'scope' ? mockScopeCallback : mockApplyCallback )();
+			await flush();
+
+			expect( queryDetails() ).toEqual( [
+				expect.objectContaining( { trigger, result_count: 7 } ),
+			] );
+		}
+	);
 
 	it( 'marks single-day scopes as vertical lists without carousel controls', () => {
 		document.body.innerHTML = calendarMarkup(
@@ -222,6 +292,24 @@ describe( 'calendar frontend month-grid integration', () => {
 		expect( request.get( 'scope' ) ).toBe( 'tonight' );
 		expect( request.get( 'archive_taxonomy' ) ).toBe( 'location' );
 		expect( request.get( 'scope_token' ) ).toBe( 'opaque-token' );
+		expect( queryDetails() ).toEqual( [
+			{
+				trigger: 'search',
+				query: {
+					scope: 'tonight',
+					date_start: '2026-08-10',
+					date_end: '2026-08-12',
+					has_search: true,
+					event_search: 'new search',
+					tax_filter: { venue: [ 42 ] },
+					paged: 1,
+					month: '2026-08',
+					past: false,
+				},
+				archive: { taxonomy: 'location', term_id: 12 },
+				result_count: 7,
+			},
+		] );
 		expect(
 			calendar.querySelector( '.data-machine-events-content' )!
 				.textContent
@@ -241,6 +329,9 @@ describe( 'calendar frontend month-grid integration', () => {
 		const request = requestedParams( 0 );
 		expect( request.get( 'date_start' ) ).toBe( '2026-08-10' );
 		expect( request.get( 'date_end' ) ).toBe( '2026-08-12' );
+		expect( queryDetails().map( ( detail ) => detail.trigger ) ).toEqual( [
+			'date_range',
+		] );
 	} );
 
 	it( 'keeps reset, month navigation, and popstate on the controller path', async () => {
@@ -270,6 +361,10 @@ describe( 'calendar frontend month-grid integration', () => {
 		await flush();
 		expect( requestedParams( 2 ).get( 'event_search' ) ).toBe( 'back' );
 		expect( requestedParams( 2 ).get( 'month' ) ).toBe( '2026-07' );
+		expect( queryDetails().map( ( detail ) => detail.trigger ) ).toEqual( [
+			'clear',
+			'pagination',
+		] );
 	} );
 
 	it( 'routes Today recovery through the grid controller and synchronizes controls', async () => {
@@ -319,7 +414,12 @@ describe( 'calendar frontend month-grid integration', () => {
 				detail: {
 					syncId: 'map-a',
 					generation: 1,
-					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
+					bounds: {
+						swLat: 32,
+						swLng: -80,
+						neLat: 33,
+						neLng: -79,
+					},
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },
 					authority: 'user-interaction',
@@ -345,6 +445,9 @@ describe( 'calendar frontend month-grid integration', () => {
 		expect( mockRenderMonthGridResponse ).toHaveBeenCalledTimes( 1 );
 		expect( window.location.search ).toContain( 'event_search=new+search' );
 		expect( window.location.search ).not.toContain( 'lat=' );
+		expect( queryDetails().map( ( detail ) => detail.trigger ) ).toEqual( [
+			'search',
+		] );
 	} );
 
 	it( 'renders list-mode geo updates from structured data', async () => {
@@ -371,7 +474,12 @@ describe( 'calendar frontend month-grid integration', () => {
 				detail: {
 					syncId: 'map-a',
 					generation: 1,
-					bounds: { swLat: 32, swLng: -80, neLat: 33, neLng: -79 },
+					bounds: {
+						swLat: 32,
+						swLng: -80,
+						neLat: 33,
+						neLng: -79,
+					},
 					zoom: 10,
 					center: { lat: 32.78, lng: -79.93 },
 					authority: 'user-interaction',
@@ -382,6 +490,13 @@ describe( 'calendar frontend month-grid integration', () => {
 		await flush();
 
 		expect( requestedParams( 0 ).has( 'format' ) ).toBe( false );
+		expect( queryDetails() ).toEqual( [
+			expect.objectContaining( {
+				trigger: 'geo',
+				archive: { taxonomy: 'location', term_id: 12 },
+				result_count: 0,
+			} ),
+		] );
 		expect(
 			calendar.querySelector( '.data-machine-events-content' )!
 				.textContent

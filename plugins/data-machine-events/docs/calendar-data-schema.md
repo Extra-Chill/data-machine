@@ -23,3 +23,16 @@ An empty result contains no events or ordered dates; the frontend renders the em
 The same schema is used for list updates, date-range and taxonomy changes, Load More, deferred-day loading and month navigation. Pass `month=YYYY-MM` to scope to an entire month instead of using day-based pagination. Pass `date_start` and `date_end` with the same value to request one day's events. The block keeps shareable calendar URLs separate from the REST request URL.
 
 The full-response cache is keyed by query scope and schema version. Version 7 replaces the legacy envelope and removes the `empty_html` and `badges_html` fields from the earlier data format. TypeScript response types live in `inc/Blocks/Calendar/src/types.ts`.
+
+## Calendar query-changed event
+
+The calendar root dispatches a bubbling `data-machine-calendar-query-changed` `CustomEvent` after applying a successful user-initiated query. It also emits `initial` once when the server-rendered calendar is initialized, without making another request. To receive `initial`, register the listener before block initialization. Day loading, lazy rendering, history restoration, and failed or superseded requests do not emit this event. The existing content-updated event is unchanged.
+
+| `detail` field | Contract |
+| --- | --- |
+| `trigger` | `search`, `date_range`, `scope`, `taxonomy_filter`, `clear`, `pagination`, `geo`, or `initial`. `clear` covers a filter reset or removal of a date range. `pagination` covers Load More and month navigation. |
+| `query` | Snapshot of the calendar query: `scope`, `date_start` and `date_end` (`YYYY-MM-DD`), `has_search` (boolean), `event_search` (the search term), `tax_filter` (object mapping taxonomy slugs to arrays of numeric term IDs), `paged` (positive integer, default `1`), `month` (`YYYY-MM`), and `past` (boolean). Unset strings are empty; unset taxonomy filters are `{}`. |
+| `archive` | `{ taxonomy, term_id }`, with a numeric term ID, or `null` outside an archive. |
+| `result_count` | Total matches for this query, not the number added to the page. Uses the response counter total, falling back to the pagination total, then the response event count if neither total is available. The initial event uses the server-rendered total. |
+
+The event includes the search term as entered for the query. Consumers should handle it as user input. The event does not expose coordinates or opaque scope tokens, and the block does not forward the event data anywhere.

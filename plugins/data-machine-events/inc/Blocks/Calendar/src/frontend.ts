@@ -42,7 +42,13 @@ import {
 	fetchCalendarEvents,
 } from './modules/api-client';
 
+import {
+	emitInitialQuery,
+	type CalendarRequestOptions,
+} from './modules/query-changed';
 import type { FlatpickrInstance } from './types';
+
+type QueryTrigger = CalendarRequestOptions[ 'trigger' ];
 
 function isMonthGridMode( calendar: HTMLElement ): boolean {
 	return calendar.getAttribute( 'data-display-mode' ) === 'month-grid';
@@ -133,18 +139,21 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 		}
 	}
 
-	initDatePicker( calendar, function () {
-		handleFilterChange( calendar );
+	initDatePicker( calendar, function ( selectedDates ) {
+		handleFilterChange(
+			calendar,
+			selectedDates?.length === 0 ? 'clear' : 'date_range'
+		);
 	} );
 
 	initFilterModal(
 		calendar,
 		function () {
-			handleFilterChange( calendar );
+			handleFilterChange( calendar, 'taxonomy_filter' );
 		},
 		function ( params: URLSearchParams ) {
 			applyFilterParams( calendar, params );
-			updateCalendar( calendar, params );
+			updateCalendar( calendar, params, 'clear' );
 		}
 	);
 
@@ -164,7 +173,9 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 				const controller = getMonthGridController( calendar );
 				if ( todayMonth && controller ) {
 					void controller
-						.navigateToMonth( todayMonth, params )
+						.navigateToMonth( todayMonth, params, true, false, {
+							trigger: 'scope',
+						} )
 						.then( function ( updated ) {
 							if ( updated ) {
 								currentFilterState.updateFilterCountBadge();
@@ -178,7 +189,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 				navigateToUrl( params );
 			} else {
 				applyFilterParams( calendar, params );
-				updateCalendar( calendar, params );
+				updateCalendar( calendar, params, 'scope' );
 			}
 		}
 	);
@@ -189,7 +200,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 	// `showScopePresets` attribute rendered the chip group. Reuses the same
 	// filter-change flow as search/date so there is one re-fetch path.
 	initScopePresets( calendar, function () {
-		handleFilterChange( calendar );
+		handleFilterChange( calendar, 'scope' );
 	} );
 
 	// Auto-detect map block on page and enable geo sync.
@@ -199,7 +210,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 			initGeoSync(
 				calendar,
 				mapSyncId,
-				async function ( geo, signal, isCurrent ) {
+				async function ( geo, signal, isCurrent, trigger ) {
 					const params = getFilterState( calendar ).buildParams(
 						getDatePicker( calendar )
 					);
@@ -216,7 +227,8 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 						? controller.handleFilterChange( params, {
 								signal,
 								shouldApply: isCurrent,
-						  } )
+								trigger,
+							} )
 						: false;
 				}
 			);
@@ -241,6 +253,7 @@ export function initCalendarInstance( calendar: HTMLElement ): void {
 	}
 
 	filterState.updateFilterCountBadge();
+	emitInitialQuery( calendar );
 }
 
 function applyFilterParams(
@@ -269,7 +282,7 @@ function initSearchInput( calendar: HTMLElement ): void {
 	searchInput.addEventListener( 'input', function () {
 		clearTimeout( searchTimeout );
 		searchTimeout = setTimeout( function () {
-			handleFilterChange( calendar );
+			handleFilterChange( calendar, 'search' );
 		}, 500 );
 	} );
 
@@ -278,7 +291,8 @@ function initSearchInput( calendar: HTMLElement ): void {
 	);
 	if ( searchBtn ) {
 		searchBtn.addEventListener( 'click', function () {
-			handleFilterChange( calendar );
+			clearTimeout( searchTimeout );
+			handleFilterChange( calendar, 'search' );
 			searchInput.focus();
 		} );
 	}
@@ -287,8 +301,12 @@ function initSearchInput( calendar: HTMLElement ): void {
 /**
  * Fetch results for the current controls without leaving the calendar page.
  * @param calendar
+ * @param trigger
  */
-function handleFilterChange( calendar: HTMLElement ): void {
+function handleFilterChange(
+	calendar: HTMLElement,
+	trigger: QueryTrigger
+): void {
 	const filterState = getFilterState( calendar );
 	const datePicker: FlatpickrInstance | null = getDatePicker( calendar );
 	const params = filterState.buildParams( datePicker );
@@ -312,15 +330,16 @@ function handleFilterChange( calendar: HTMLElement ): void {
 
 	filterState.saveToStorage( params );
 
-	updateCalendar( calendar, params );
+	updateCalendar( calendar, params, trigger );
 }
 
 function updateCalendar(
 	calendar: HTMLElement,
 	params: URLSearchParams,
+	trigger: QueryTrigger,
 	pushHistory = true
 ): void {
-	if ( handleMonthGridChange( calendar, params ) ) {
+	if ( handleMonthGridChange( calendar, params, trigger ) ) {
 		return;
 	}
 	const state = getFilterState( calendar );
@@ -336,16 +355,19 @@ function updateCalendar(
 	) {
 		state.updateUrl( params );
 	}
-	void fetchCalendarEvents( calendar, request ).then( ( data ) => {
-		if ( data ) {
-			state.updateFilterCountBadge();
+	void fetchCalendarEvents( calendar, request, {}, { trigger } ).then(
+		( data ) => {
+			if ( data ) {
+				state.updateFilterCountBadge();
+			}
 		}
-	} );
+	);
 }
 
 function handleMonthGridChange(
 	calendar: HTMLElement,
-	params: URLSearchParams
+	params: URLSearchParams,
+	trigger: QueryTrigger
 ): boolean {
 	if ( ! isMonthGridMode( calendar ) ) {
 		return false;
@@ -354,11 +376,13 @@ function handleMonthGridChange(
 	if ( ! controller ) {
 		return false;
 	}
-	void controller.handleFilterChange( params ).then( function ( updated ) {
-		if ( updated ) {
-			getFilterState( calendar ).updateFilterCountBadge();
-		}
-	} );
+	void controller
+		.handleFilterChange( params, { trigger } )
+		.then( function ( updated ) {
+			if ( updated ) {
+				getFilterState( calendar ).updateFilterCountBadge();
+			}
+		} );
 	return true;
 }
 
@@ -406,7 +430,7 @@ window.addEventListener( 'popstate', function () {
 				! isMonthGridMode( calendar )
 			) {
 				applyFilterParams( calendar, params );
-				updateCalendar( calendar, params, false );
+				updateCalendar( calendar, params, undefined, false );
 			}
 		} );
 } );
