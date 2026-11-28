@@ -1,0 +1,33 @@
+{
+  "name": "data-machine-events-calendar-block",
+  "version": "0.12.1",
+  "main": "index.js",
+  "scripts": {
+    "build": "wp-scripts build",
+    "lint:js": "eslint src",
+    "start": "wp-scripts start",
+    "test": "wp-scripts test-unit-js"
+  },
+  "keywords": [
+    "wordpress",
+    "block",
+    "events",
+    "calendar"
+  ],
+  "author": "Chris Huber",
+  "license": "GPL-2.0-or-later",
+  "description": "Events calendar block for Data Machine Events plugin",
+  "devDependencies": {
+    "@wordpress/eslint-plugin": "^25.7.0",
+    "@wordpress/scripts": "31.1.0",
+    "eslint": "^9.0.0"
+  },
+  "dependencies": {
+    "@wordpress/i18n": "^6.24.0",
+    "flatpickr": "^4.6.13"
+  },
+  "overrides": {
+    "rimraf": "^4.4.1",
+    "glob": "^9.3.5"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "collection": {
+    "id": "news-collection",
+    "typeName": "blog",
+    "fullUrl": "/news"
+  },
+  "items": [
+    {
+      "id": "post-1",
+      "recordType": 1,
+      "title": "Calendar Announcement",
+      "fullUrl": "/news/calendar-announcement"
+    }
+  ],
+  "pagination": {
+    "nextPage": false
+  }
+}

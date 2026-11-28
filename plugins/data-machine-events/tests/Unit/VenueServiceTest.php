@@ -1,0 +1,172 @@
+<?php
+/**
+ * VenueService Tests
+ *
+ * Tests venue CRUD operations and normalization.
+ *
+ * @package DataMachineEvents\Tests\Unit
+ * @since 0.9.16
+ */
+
+namespace DataMachineEvents\Tests\Unit;
+
+use WP_UnitTestCase;
+use DataMachineEvents\Core\VenueService;
+use DataMachineEvents\Core\Venue_Taxonomy;
+
+class VenueServiceTest extends WP_UnitTestCase {
+	/** @var int[] */
+	private array $existing_venue_ids = array();
+
+	public function setUp(): void {
+		parent::setUp();
+		global $wpdb;
+		$wpdb->query( 'COMMIT' );
+		$wpdb->query( 'SET autocommit = 1' );
+
+		// Ensure venue taxonomy is registered
+		if ( ! taxonomy_exists( 'venue' ) ) {
+			Venue_Taxonomy::register();
+		}
+		$existing_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $existing_ids );
+		$this->existing_venue_ids = array_map( 'intval', $existing_ids );
+	}
+
+	public function tearDown(): void {
+		global $wpdb;
+		$current_ids = get_terms(
+			array(
+				'taxonomy'   => 'venue',
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			)
+		);
+		$this->assertNotWPError( $current_ids );
+		foreach ( array_diff( array_map( 'intval', $current_ids ), $this->existing_venue_ids ) as $term_id ) {
+			wp_delete_term( $term_id, 'venue' );
+		}
+		$wpdb->query( 'SET autocommit = 0' );
+		$wpdb->query( 'START TRANSACTION' );
+		parent::tearDown();
+	}
+
+	public function test_normalize_venue_data_sanitizes_name() {
+		$raw_data = array(
+			'name' => '  Test Venue  ',
+		);
+
+		$normalized = VenueService::normalize_venue_data( $raw_data );
+
+		$this->assertEquals( 'Test Venue', $normalized['name'] );
+	}
+
+	public function test_normalize_venue_data_includes_meta_fields() {
+		$raw_data = array(
+			'name'          => 'Test Venue',
+			'address'       => '123 Main St',
+			'city'          => 'Denver',
+			'state'         => 'CO',
+			'zip'           => '80202',
+			'country'       => 'USA',
+			'phone'         => '555-1234',
+			'website'       => 'https://venue.com',
+			'ticketing_url' => 'https://tickets.example.com/venue',
+		);
+
+		$normalized = VenueService::normalize_venue_data( $raw_data );
+
+		$this->assertEquals( 'Test Venue', $normalized['name'] );
+		$this->assertEquals( '123 Main St', $normalized['address'] );
+		$this->assertEquals( 'Denver', $normalized['city'] );
+		$this->assertEquals( 'CO', $normalized['state'] );
+		$this->assertEquals( '80202', $normalized['zip'] );
+		$this->assertSame( 'https://venue.com', $normalized['website'] );
+		$this->assertSame( 'https://tickets.example.com/venue', $normalized['ticketing_url'] );
+	}
+
+	public function test_normalize_venue_data_handles_missing_fields() {
+		$raw_data = array(
+			'name' => 'Minimal Venue',
+		);
+
+		$normalized = VenueService::normalize_venue_data( $raw_data );
+
+		$this->assertEquals( 'Minimal Venue', $normalized['name'] );
+		$this->assertEquals( '', $normalized['address'] ?? '' );
+	}
+
+	public function test_ticketing_url_detection_matches_only_host_or_subdomain(): void {
+		$this->assertTrue( VenueService::is_ticketing_url( 'https://www.eventbrite.com/o/example' ) );
+		$this->assertTrue( VenueService::is_ticketing_url( 'https://tickets.ticketmaster.com/event/123' ) );
+		$this->assertFalse( VenueService::is_ticketing_url( 'https://not-eventbrite.com/venue' ) );
+		$this->assertFalse( VenueService::is_ticketing_url( 'https://venue.example/events/' ) );
+	}
+
+	public function test_get_or_create_venue_creates_new_venue() {
+		$venue_data = array(
+			'name'    => 'New Test Venue ' . uniqid(),
+			'address' => '456 Test St',
+			'city'    => 'Boulder',
+		);
+
+		$term_id = VenueService::get_or_create_venue( $venue_data );
+
+		$this->assertIsInt( $term_id );
+		$this->assertGreaterThan( 0, $term_id );
+
+		// Verify term exists
+		$term = get_term( $term_id, 'venue' );
+		$this->assertNotNull( $term );
+		$this->assertEquals( $venue_data['name'], $term->name );
+	}
+
+	public function test_get_or_create_venue_returns_existing_venue() {
+		$venue_name = 'Existing Venue ' . uniqid();
+		$venue_data = array( 'name' => $venue_name );
+
+		// Create first
+		$first_id = VenueService::get_or_create_venue( $venue_data );
+
+		// Get or create again
+		$second_id = VenueService::get_or_create_venue( $venue_data );
+
+		$this->assertEquals( $first_id, $second_id );
+	}
+
+	public function test_get_or_create_venue_returns_error_for_empty_name() {
+		$venue_data = array( 'name' => '' );
+
+		$result = VenueService::get_or_create_venue( $venue_data );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 'empty_venue_name', $result->get_error_code() );
+	}
+
+	public function test_get_or_create_venue_saves_metadata() {
+		$venue_data = array(
+			'name'     => 'Metadata Test Venue ' . uniqid(),
+			'address'  => '789 Meta St',
+			'city'     => 'Fort Collins',
+			'state'    => 'CO',
+			'timezone' => 'America/Denver',
+		);
+
+		$term_id = VenueService::get_or_create_venue( $venue_data );
+
+		$this->assertIsInt( $term_id );
+
+		// Check metadata was saved
+		$saved_address = get_term_meta( $term_id, '_venue_address', true );
+		$this->assertEquals( '789 Meta St', $saved_address );
+
+		$saved_city = get_term_meta( $term_id, '_venue_city', true );
+		$this->assertEquals( 'Fort Collins', $saved_city );
+	}
+}

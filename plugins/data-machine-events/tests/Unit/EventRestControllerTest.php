@@ -1,0 +1,344 @@
+<?php
+/**
+ * Event REST Controller Tests
+ *
+ * Tests for Calendar REST API endpoints.
+ *
+ * @package DataMachineEvents\Tests\Unit
+ * @since 0.9.16
+ */
+
+namespace DataMachineEvents\Tests\Unit;
+
+use WP_UnitTestCase;
+use WP_REST_Request;
+use WP_REST_Server;
+use DataMachineEvents\Core\Event_Post_Type;
+use DataMachineEvents\Core\EventDatesTable;
+use DataMachineEvents\Core\Venue_Taxonomy;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
+use DataMachineEvents\Blocks\Calendar\Cache\CalendarGenerationFence;
+use DataMachineEvents\Abilities\EventDateQueryAbilities;
+use const DataMachineEvents\Api\API_NAMESPACE;
+
+class EventRestControllerTest extends WP_UnitTestCase {
+
+	protected $server;
+	private int $original_user_id;
+
+	public function setUp(): void {
+		// Create the table before WP_UnitTestCase rewrites CREATE TABLE as temporary.
+		if ( ! EventDatesTable::table_exists() ) {
+			EventDatesTable::create_table();
+		}
+
+		parent::setUp();
+		wp_cache_flush();
+		delete_option( CalendarGenerationFence::OPTION );
+		delete_option( CalendarCache::GENERATION_OPTION );
+		wp_cache_flush();
+		CalendarCache::get_generation();
+		$this->original_user_id = get_current_user_id();
+		wp_set_current_user( 0 );
+
+		global $wp_rest_server;
+		$this->server = $wp_rest_server = new WP_REST_Server();
+		do_action( 'rest_api_init' );
+
+		// Ensure post type and taxonomies are registered
+		if ( ! post_type_exists( 'data_machine_events' ) ) {
+			Event_Post_Type::register();
+		}
+		if ( ! taxonomy_exists( 'venue' ) ) {
+			Venue_Taxonomy::register();
+		}
+	}
+
+	public function tearDown(): void {
+		global $wp_rest_server;
+		$wp_rest_server = null;
+		wp_set_current_user( $this->original_user_id );
+		parent::tearDown();
+	}
+
+	private function calendar_request(): WP_REST_Request {
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/calendar' );
+		$request->set_header( 'X-Requested-With', 'XMLHttpRequest' );
+		return $request;
+	}
+
+	public function test_calendar_endpoint_registered() {
+		$routes = $this->server->get_routes();
+
+		$this->assertArrayHasKey(
+			'/' . API_NAMESPACE . '/events/calendar',
+			$routes,
+			'Calendar endpoint should be registered'
+		);
+	}
+
+	public function test_venues_endpoint_registered() {
+		$routes = $this->server->get_routes();
+
+		$has_venues_endpoint = false;
+		foreach ( array_keys( $routes ) as $route ) {
+			if ( strpos( $route, '/' . API_NAMESPACE . '/events/venues' ) !== false ) {
+				$has_venues_endpoint = true;
+				break;
+			}
+		}
+
+		$this->assertTrue( $has_venues_endpoint, 'Venues endpoint should be registered' );
+	}
+
+	public function test_filters_endpoint_registered() {
+		$routes = $this->server->get_routes();
+
+		$this->assertArrayHasKey(
+			'/' . API_NAMESPACE . '/events/filters',
+			$routes,
+			'Filters endpoint should be registered'
+		);
+	}
+
+	public function test_calendar_endpoint_returns_events() {
+		// Create a test event
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'REST Test Event ' . uniqid(),
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+
+		// Set event datetime in the future (table is the query source of truth).
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		$generation = CalendarCache::get_generation();
+		CalendarCache::invalidate();
+		$this->assertNotSame( $generation, CalendarCache::get_generation() );
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$this->assertContains( $post_id, $direct['posts'] );
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertSame( array( $post_id ), array_column( $data['events'], 'id' ) );
+
+		// Cleanup
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_calendar_endpoint_filters_by_search() {
+		$unique_term = 'UniqueSearchTerm' . uniqid();
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => "Event with $unique_term",
+				'post_type'   => 'data_machine_events',
+				'post_status' => 'publish',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		$generation = CalendarCache::get_generation();
+		CalendarCache::invalidate();
+		$this->assertNotSame( $generation, CalendarCache::get_generation() );
+		$this->assertNotNull( EventDatesTable::get( $post_id ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$this->assertContains( $post_id, $direct['posts'] );
+
+		$request = $this->calendar_request();
+		$request->set_param( 'event_search', $unique_term );
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( array( $post_id ), array_column( $response->get_data()['events'], 'id' ) );
+
+		// Cleanup
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_calendar_endpoint_accepts_date_range() {
+		$request = $this->calendar_request();
+		$date    = current_datetime()->modify( '+1 month' );
+		$request->set_param( 'date_start', $date->format( 'Y-m-01' ) );
+		$request->set_param( 'date_end', $date->format( 'Y-m-t' ) );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+	}
+
+	public function test_calendar_endpoint_accepts_pagination() {
+		$request = $this->calendar_request();
+		$request->set_param( 'paged', 1 );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+	}
+
+	public function test_calendar_data_response_uses_canonical_empty_state(): void {
+		$request = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$request->set_param( 'month', '2999-12' );
+		$response = $this->server->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION, $data['schema']['version'] );
+		$this->assertSame( array(), $data['grouping']['ordered_dates'] );
+		$this->assertStringContainsString( 'data-machine-events-no-events', $data['empty_html'] );
+		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
+	}
+
+	/**
+	 * Ticketmaster compliance (issue #816): `format=data` must never surface
+	 * the affiliate ticket URL. `ticket.url` is emptied and `ticket.is_affiliate`
+	 * is true instead; clients gate on `event.id` for the redirect ref.
+	 */
+	public function test_calendar_data_response_empties_affiliate_ticket_url() {
+		$affiliate_url = 'https://ticketmaster.evyy.net/c/1191134/264167/4272?u=' . rawurlencode( 'https://www.ticketmaster.com/event/Z7r9jZ1A7JFo-' ) . '&utm_medium=affiliate';
+		$post_id       = wp_insert_post(
+			array(
+				'post_title'   => 'Affiliate Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $affiliate_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$data     = $response->get_data();
+
+		$this->assertSame( 200, $response->get_status() );
+		$event = $data['events'][0];
+		$this->assertSame( $post_id, $event['id'] );
+		$this->assertSame( '', $event['ticket']['url'] );
+		$this->assertTrue( $event['ticket']['is_affiliate'] );
+
+		$raw_response = wp_json_encode( $data );
+		$this->assertStringNotContainsString( 'evyy.net', $raw_response );
+		$this->assertStringNotContainsString( '1191134', $raw_response );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * Issue #818: a canonical-stored Ticketmaster URL routes through the
+	 * first-party redirect (wrapper assembled at resolve time), so the REST
+	 * payload empties `ticket.url` and flags `is_affiliate`, same as a
+	 * stored wrapper — the affiliate ID never reaches the client either way.
+	 */
+	public function test_calendar_data_response_gates_canonical_ticketmaster_url() {
+		$direct_url = 'https://www.ticketmaster.com/event/direct-123';
+		$post_id    = wp_insert_post(
+			array(
+				'post_title'   => 'Canonical Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $direct_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$event    = $response->get_data()['events'][0];
+
+		$this->assertSame( '', $event['ticket']['url'] );
+		$this->assertTrue( $event['ticket']['is_affiliate'] );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	/**
+	 * Direct URLs to vendors we do not monetize keep their URL in the REST
+	 * payload — clients render a plain href.
+	 */
+	public function test_calendar_data_response_keeps_non_monetized_direct_ticket_url() {
+		$direct_url = 'https://link.dice.fm/direct-123';
+		$post_id    = wp_insert_post(
+			array(
+				'post_title'   => 'Direct Ticket REST Test Event ' . uniqid(),
+				'post_type'    => 'data_machine_events',
+				'post_status'  => 'publish',
+				'post_content' => '<!-- wp:data-machine-events/event-details {"ticketUrl":"' . $direct_url . '"} --><div></div><!-- /wp:data-machine-events/event-details -->',
+			)
+		);
+
+		$future_datetime = current_datetime()->modify( '+1 week' )->format( 'Y-m-d H:i:s' );
+		$this->assertTrue( EventDatesTable::upsert( $post_id, $future_datetime ) );
+		CalendarCache::invalidate();
+
+		$request  = $this->calendar_request();
+		$request->set_param( 'format', 'data' );
+		$response = $this->server->dispatch( $request );
+		$event    = $response->get_data()['events'][0];
+
+		$this->assertSame( $direct_url, $event['ticket']['url'] );
+		$this->assertFalse( $event['ticket']['is_affiliate'] );
+
+		wp_delete_post( $post_id, true );
+	}
+
+	public function test_filters_endpoint_returns_taxonomies() {
+		$request  = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/filters' );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertIsArray( $data );
+	}
+
+	public function test_venues_check_duplicate_requires_auth() {
+		// Test that non-authenticated requests are rejected
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/venues/check-duplicate' );
+		$request->set_param( 'name', 'Test Venue' );
+		$response = $this->server->dispatch( $request );
+
+		// Should return 401 or 403 for unauthorized
+		$this->assertContains(
+			$response->get_status(),
+			array( 401, 403 ),
+			'Unauthenticated request should be rejected'
+		);
+	}
+
+	public function test_venues_check_duplicate_with_admin() {
+		// Create admin user
+		$admin_id = $this->factory->user->create( array( 'role' => 'administrator' ) );
+		wp_set_current_user( $admin_id );
+
+		$request = new WP_REST_Request( 'GET', '/' . API_NAMESPACE . '/events/venues/check-duplicate' );
+		$request->set_param( 'name', 'Non Existent Venue ' . uniqid() );
+		$response = $this->server->dispatch( $request );
+
+		$this->assertSame( 200, $response->get_status() );
+
+		$data = $response->get_data();
+		$this->assertTrue( $data['success'] );
+		$this->assertArrayHasKey( 'is_duplicate', $data['data'] );
+		$this->assertFalse( $data['data']['is_duplicate'] );
+
+	}
+}

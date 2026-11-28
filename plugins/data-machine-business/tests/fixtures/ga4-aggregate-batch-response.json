@@ -1,0 +1,38 @@
+{
+  "kind": "analyticsData#batchRunReports",
+  "reports": [
+    {
+      "kind": "analyticsData#runReport",
+      "dimensionHeaders": [],
+      "metricHeaders": [
+        {
+          "name": "sessions",
+          "type": "TYPE_INTEGER"
+        }
+      ],
+      "rows": [],
+      "totals": [
+        {
+          "metricValues": [
+            {
+              "value": "0"
+            }
+          ]
+        }
+      ],
+      "metadata": {
+        "emptyReason": "NO_DATA",
+        "schemaRestrictionResponse": {
+          "activeMetricRestrictions": [
+            {
+              "restrictedMetricTypes": [
+                "COST_DATA"
+              ],
+              "metricName": "sessions"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

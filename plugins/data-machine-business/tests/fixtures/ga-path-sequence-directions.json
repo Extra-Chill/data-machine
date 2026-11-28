@@ -1,0 +1,43 @@
+{
+	"cases": [
+		{
+			"name": "forward zero, reverse nonzero",
+			"hosts": ["a.example.com", "b.example.com"],
+			"transitions": {
+				"a.example.com -> b.example.com": {"entry_users": 20, "next_users": 0},
+				"b.example.com -> a.example.com": {"entry_users": 15, "next_users": 4}
+			},
+			"expected_requests": ["a.example.com -> b.example.com", "b.example.com -> a.example.com"],
+			"expected_results": [
+				{"hostName": "a.example.com", "entry_users": 20, "onward_users": 0, "next_hosts": []},
+				{"hostName": "b.example.com", "entry_users": 15, "onward_users": 4, "next_hosts": [{"next_host": "a.example.com", "users": 4}]}
+			]
+		},
+		{
+			"name": "bidirectional",
+			"hosts": ["a.example.com", "b.example.com"],
+			"transitions": {
+				"a.example.com -> b.example.com": {"entry_users": 20, "next_users": 5},
+				"b.example.com -> a.example.com": {"entry_users": 15, "next_users": 3}
+			},
+			"expected_requests": ["a.example.com -> b.example.com", "b.example.com -> a.example.com"],
+			"expected_results": [
+				{"hostName": "a.example.com", "entry_users": 20, "onward_users": 5, "next_hosts": [{"next_host": "b.example.com", "users": 5}]},
+				{"hostName": "b.example.com", "entry_users": 15, "onward_users": 3, "next_hosts": [{"next_host": "a.example.com", "users": 3}]}
+			]
+		},
+		{
+			"name": "both directions zero",
+			"hosts": ["a.example.com", "b.example.com"],
+			"transitions": {
+				"a.example.com -> b.example.com": {"entry_users": 20, "next_users": 0},
+				"b.example.com -> a.example.com": {"entry_users": 15, "next_users": 0}
+			},
+			"expected_requests": ["a.example.com -> b.example.com", "b.example.com -> a.example.com"],
+			"expected_results": [
+				{"hostName": "a.example.com", "entry_users": 20, "onward_users": 0, "next_hosts": []},
+				{"hostName": "b.example.com", "entry_users": 15, "onward_users": 0, "next_hosts": []}
+			]
+		}
+	]
+}

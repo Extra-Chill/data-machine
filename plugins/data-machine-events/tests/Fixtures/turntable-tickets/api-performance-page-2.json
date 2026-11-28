@@ -1,0 +1,59 @@
+{
+ "count": 4,
+ "pageSize": 2,
+ "results": [
+  {
+   "id": 34886,
+   "datetime": "2026-10-17T23:00:00Z",
+   "show_id": 1432,
+   "show": {
+    "id": 1432,
+    "name": "Legacy: Greatest R&B, Soul & Motown Hits of the 60's, 70's & 80's",
+    "image": "https://assets-prod.turntabletickets.com/media/forte-jazz-lounge/show-1432/2025_TURNTABLE_(8).jpg",
+    "price_per_person": [
+     "0.00",
+     "50.00"
+    ],
+    "description": "Charles Grant leads this Vocal trio through the greatest R&B and Motown Hits of the 60's, 70's & 80's such as Temptations, Smokey Robinson, Marvin Gaye, Stylistics and More!"
+   },
+   "sold": false,
+   "availability_state": "available",
+   "residencies": [
+    {
+     "id": 402,
+     "name": "Motown, R&B and Soul Series - 2026",
+     "slug": "motown-rb-and-soul-series-2026"
+    },
+    {
+     "id": 692,
+     "name": "LEGACY",
+     "slug": "legacy"
+    }
+   ]
+  },
+  {
+   "id": 45928,
+   "datetime": "2026-10-24T01:30:00Z",
+   "show_id": 12430,
+   "show": {
+    "id": 12430,
+    "name": "NIGHT & DAY - The Music of Cole Porter",
+    "image": "https://assets-prod.turntabletickets.com/media/forte-jazz-lounge/show-12430/Night_and_Day_-_Chloe_-_Alva.jpg",
+    "price_per_person": [
+     "20.00",
+     "40.00"
+    ],
+    "description": "<p>Cole Porter is a beloved composer and lyricist of the 1930's and 40's who's music has been famously performed by the likes of Frank Sinatra, Ella Fitzgerald, Nat King Cole and so many more.  This evening will feature his music as performed by Forte's owner, Joe Clarke, Jenna Bohannon, Brian Bohan"
+   },
+   "sold": false,
+   "availability_state": "available",
+   "residencies": [
+    {
+     "id": 707,
+     "name": "NIGHT & DAY",
+     "slug": "night-day"
+    }
+   ]
+  }
+ ]
+}

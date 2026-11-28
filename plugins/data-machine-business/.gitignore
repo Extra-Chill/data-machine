@@ -1,0 +1,40 @@
+# WordPress Plugin .gitignore
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Dependencies
+vendor/
+node_modules/
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Backup files
+*.bak
+*.backup
+
+# Build artifacts
+build/
+dist/
+
+# Plugin specific
+*.zip
+*.tar.gz
+
+# Composer
+composer.lock

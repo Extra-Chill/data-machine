@@ -1,0 +1,150 @@
+<?php
+/**
+* Twitter publishing handler with OAuth 1.0a and AI tool integration.
+*
+* Handles posting content to Twitter with support for:
+* - Text content (280 character limit)
+* - Media uploads (images)
+* - URL handling and link shortening
+* - Thread creation for long content
+*
+* @package DataMachineSocials\Handlers\Twitter
+*/
+
+namespace DataMachineSocials\Handlers\Twitter;
+
+use DataMachine\Core\EngineData;
+use DataMachine\Core\Steps\Publish\Handlers\PublishHandler;
+use DataMachine\Core\Steps\HandlerRegistrationTrait;
+use DataMachineSocials\Abilities\Twitter\TwitterPublishAbility;
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Twitter Publishing Handler
+ *
+ * Publishes content to Twitter via OAuth 1.0a authentication.
+ * Supports media uploads and handles URL shortening automatically.
+ */
+class Twitter extends PublishHandler {
+
+	use HandlerRegistrationTrait;
+
+	public function __construct() {
+		parent::__construct( 'twitter' );
+
+		// Self-register with filters
+		self::registerHandler(
+			'twitter_publish',
+			'publish',
+			self::class,
+			'Twitter',
+			'Post content to Twitter with media support',
+			true,
+			TwitterAuth::class,
+			TwitterSettings::class,
+			// phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Registry callback signature.
+			function ( $handler_slug, $_handler_config, $_engine_data ) {
+				return array(
+					'twitter_publish' => array(
+						'class'                   => self::class,
+						'client_context_bindings' => array( 'job_id' ),
+						'method'                  => 'handle_tool_call',
+						'handler'                 => $handler_slug,
+						'description'             => 'Post content to Twitter. Supports text (280 chars), images, and URL handling.',
+						'parameters'              => array(
+							'type'       => 'object',
+							'properties' => array(
+								'content' => array(
+									'type'        => 'string',
+									'description' => 'The text content to post to Twitter',
+								),
+							),
+							'required'   => array( 'content' ),
+						),
+					),
+				);
+			},
+			'twitter',
+			array(
+				'charLimit'          => 280,
+				'maxImages'          => 4,
+				'aspectRatios'       => array( 'any' ),
+				'defaultAspectRatio' => 'any',
+				'supportsCarousel'   => false,
+				'composer'           => array(
+					'crossPostCompatible' => true,
+					'mediaKinds'          => array( 'image', 'carousel' ),
+				),
+				'capabilities'       => array(
+					array(
+						'slug'  => 'publish',
+						'label' => 'Publish',
+					),
+				),
+				'preview'            => array(
+					'aspectRatio'     => '16:9',
+					'captionPosition' => 'above',
+					'previewSurface'  => 'feed',
+				),
+			)
+		);
+	}
+
+	/**
+	Execute Twitter publishing.
+
+	@param array $parameters Tool parameters including content and configuration
+	@param array $handler_config Handler configuration
+	@return array {
+	@type bool $success Whether the post was successful
+	@type string $error Error message if failed
+	@type string $tool_name Tool identifier
+	@type string $url Twitter post URL if successful
+	@type string $id Twitter post ID if successful
+	}
+*/
+	protected function executePublish( array $parameters, array $handler_config ): array {
+		$engine = $parameters['engine'] ?? null;
+		if ( ! $engine instanceof EngineData ) {
+			$engine = new EngineData( $parameters['engine_data'] ?? array(), $parameters['job_id'] ?? null );
+		}
+
+		// Resolve media path — prefer video over image for Twitter.
+		$media_path = $engine->getVideoPath();
+		if ( empty( $media_path ) ) {
+			$media_path = $engine->getImagePath();
+		}
+
+		$result = TwitterPublishAbility::execute_publish(
+		array(
+			'content'       => $parameters['content'] ?? '',
+			'media_path'    => $media_path,
+			'image_path'    => $engine->getImagePath(),
+			'source_url'    => $engine->getSourceUrl(),
+			'link_handling' => $handler_config['link_handling'] ?? 'append',
+		)
+		);
+
+		if ( $result['success'] ) {
+			return $this->successResponse(
+			array(
+				'tweet_id'        => $result['tweet_id'] ?? '',
+				'tweet_url'       => $result['tweet_url'] ?? '',
+				'content'         => $parameters['content'] ?? '',
+				'reply_tweet_id'  => $result['reply_tweet_id'] ?? null,
+				'reply_tweet_url' => $result['reply_tweet_url'] ?? null,
+			)
+			);
+		}
+
+		return $this->errorResponse(
+		$result['error'] ?? 'Twitter publish failed',
+		array(),
+		'critical'
+		);
+	}
+
+	public static function get_label(): string {
+		return __( 'Post to Twitter', 'data-machine-socials' );
+	}
+}

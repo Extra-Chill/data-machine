@@ -1,0 +1,66 @@
+{
+  "schema": "wp-codebox/workspace-recipe/v1",
+  "runtime": {
+    "backend": "wordpress-playground",
+    "name": "data-machine-socials-crop-modal-lab",
+    "wp": "trunk",
+    "blueprint": {
+      "steps": [
+        {
+          "step": "installTheme",
+          "themeData": {
+            "resource": "wordpress.org/themes",
+            "slug": "twentytwentyfive"
+          },
+          "options": {
+            "activate": true
+          }
+        },
+        {
+          "step": "login",
+          "username": "admin",
+          "password": "password"
+        }
+      ]
+    }
+  },
+  "inputs": {
+    "mounts": [
+      {
+        "source": "../../",
+        "target": "/wordpress/wp-content/plugins/data-machine-socials",
+        "mode": "readonly",
+        "metadata": {
+          "kind": "component",
+          "slug": "data-machine-socials",
+          "repo": "Extra-Chill/data-machine-socials",
+          "default_branch": "main",
+          "editable": false
+        }
+      }
+    ]
+  },
+  "workflow": {
+    "steps": [
+      {
+        "command": "wordpress.run-php",
+        "args": [
+          "code-file=tests/wp-codebox/crop-modal-seed.php"
+        ]
+      },
+      {
+        "command": "wordpress.browser-actions",
+        "args": [
+          "url=/wp-admin/post.php?post=4321&action=edit",
+          "step-timeout=30s",
+          "timeout=180s",
+          "capture=steps,console,errors,network,html,screenshot",
+          "steps-json=[{\"kind\":\"navigate\",\"url\":\"/wp-admin/post.php?post=4321&action=edit\",\"waitFor\":\"load\"},{\"kind\":\"waitFor\",\"selector\":\".editor-header\"},{\"kind\":\"screenshot\",\"name\":\"editor-loaded\"},{\"kind\":\"evaluate\",\"expression\":\"window.wp.data.dispatch('core/edit-post').openGeneralSidebar('data-machine-socials/data-machine-socials-sidebar'); return window.wp.data.select('core/edit-post').getActiveGeneralSidebarName();\",\"assert\":\"data-machine-socials/data-machine-socials-sidebar\"},{\"kind\":\"waitFor\",\"selector\":\".dms-social-editor\"},{\"kind\":\"screenshot\",\"name\":\"sidebar-open\"},{\"kind\":\"expect\",\"selector\":\".dms-platform-selector\",\"state\":\"visible\"},{\"kind\":\"click\",\"selector\":\".dms-platform-item:has-text(\\\"Instagram\\\") input[type=\\\"checkbox\\\"] >> nth=0\"},{\"kind\":\"waitFor\",\"selector\":\".dms-image-selector\"},{\"kind\":\"screenshot\",\"name\":\"image-selector\"},{\"kind\":\"expect\",\"selector\":\".dms-image-selector\",\"state\":\"visible\"},{\"kind\":\"click\",\"selector\":\".dms-image-selector .dms-image-item >> nth=0\"},{\"kind\":\"waitFor\",\"selector\":\".reactEasyCrop_Container\"},{\"kind\":\"expect\",\"selector\":\".dms-crop-modal\",\"state\":\"visible\"},{\"kind\":\"expect\",\"selector\":\".reactEasyCrop_Container\",\"state\":\"visible\"},{\"kind\":\"expect\",\"selector\":\".reactEasyCrop_CropArea\",\"state\":\"visible\"},{\"kind\":\"screenshot\",\"name\":\"crop-modal-open\"},{\"kind\":\"evaluate\",\"expression\":\"!!document.querySelector('.reactEasyCrop_Container img.reactEasyCrop_Image')\",\"assert\":true},{\"kind\":\"drag\",\"from\":\".reactEasyCrop_CropArea\",\"to\":{\"x\":420,\"y\":360}},{\"kind\":\"evaluate\",\"expression\":\"document.querySelector('.reactEasyCrop_Container').isConnected\",\"assert\":true},{\"kind\":\"expect\",\"selector\":\".dms-crop-actions button.is-primary >> nth=0\",\"state\":\"visible\"},{\"kind\":\"screenshot\",\"name\":\"after-crop-drag\"}]"
+        ]
+      }
+    ]
+  },
+  "artifacts": {
+    "directory": "./artifacts"
+  }
+}

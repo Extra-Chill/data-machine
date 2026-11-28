@@ -1,0 +1,274 @@
+<?php
+/**
+ * Data Machine - current schema bootstrap.
+ *
+ * Installs and deploy-in-place updates converge directly on the 1.0 schema.
+ *
+ * @package DataMachine
+ * @since 0.84.0
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Ensure current deploy-time schema additions exist for the current site.
+ *
+ * Creates or updates every Data Machine database table and runs the
+ * version-gated schema ensures. dbDelta is idempotent, so this is cheap to
+ * re-run on every DATAMACHINE_VERSION bump and safe on fresh installs whose
+ * activation hook never fired (test harness, deploy-in-place, etc).
+ *
+ * @since 0.84.0
+ * @return bool Whether schema and data-preservation convergence succeeded.
+ */
+function datamachine_ensure_current_schema(): bool {
+	return \DataMachine\Core\Bootstrap\ActivationServiceProvider::ensure_all_tables();
+}
+
+/**
+ * Install the independently versioned post identity reservation schema.
+ *
+ * Identity-backed writes fail closed until this table exists on the current
+ * site, so its rollout does not depend on the general plugin version gate.
+ */
+function datamachine_maybe_install_post_identity_reservations(): void {
+	$version = \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::SCHEMA_VERSION;
+
+	// Cheap path: the marker records a verified schema. Any reservation
+	// database error clears it (PostIdentityReservations::log_failure), so a
+	// table that disappears is revalidated and repaired on the next request
+	// while the failing write itself still fails closed.
+	if ( (int) get_option( 'datamachine_post_identity_reservations_schema', 0 ) === $version ) {
+		return;
+	}
+
+	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+	$validation = $repository->validate_schema();
+	if ( true === $validation ) {
+		update_option( 'datamachine_post_identity_reservations_schema', $version, true );
+		return;
+	}
+	update_option( 'datamachine_post_identity_reservations_schema', 0, true );
+
+	\DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations::create_table();
+	$repository = new \DataMachine\Core\Database\PostIdentityReservations\PostIdentityReservations();
+	if ( true === $repository->validate_schema() ) {
+		update_option( 'datamachine_post_identity_reservations_schema', $version, true );
+	}
+}
+
+/**
+ * Maybe ensure current schema on plugins_loaded.
+ *
+ * Reads the persisted `datamachine_db_version` option and compares it to
+ * the `DATAMACHINE_VERSION` constant. On mismatch, ensures the canonical
+ * schema and bumps the option to the new version.
+ *
+ * Cheap-path early return: when the option matches the constant (the
+ * common case on every request for a stable install), this function does
+ * one option read and exits. The chain only re-enters when a deploy has
+ * advanced the constant past the option.
+ *
+ * Network considerations: on multisite, `datamachine_db_version` is stored
+ * per-site (autoloaded `wp_options`). The hook fires per-request which is
+ * naturally per-blog, so each subsite converges independently on its own
+ * first post-deploy request. Sites with no traffic don't pay the cost
+ * until they're hit. Activation still uses the lifecycle service provider
+ * to initialize every site eagerly when the operator explicitly activates
+ * network-wide.
+ *
+ * Network-scoped agent tables don't need per-site setup because they live
+ * on `base_prefix` and are touched once by activation.
+ *
+ * @since 0.84.0
+ * @return void
+ */
+function datamachine_maybe_ensure_current_schema(): void {
+	if ( function_exists( 'wp_installing' ) && wp_installing() ) {
+		return;
+	}
+
+	// Cheap path: option matches code. Most requests on a stable install.
+	$persisted = get_option( 'datamachine_db_version', '' );
+	if ( DATAMACHINE_VERSION === $persisted ) {
+		return;
+	}
+
+	// Mismatch: a deploy bumped the constant past the persisted option, or the
+	// activation hook never fired for this install at all.
+	if ( ! datamachine_ensure_current_schema() ) {
+		return;
+	}
+	datamachine_run_deferred_site_setup();
+	if ( function_exists( 'datamachine_mark_flow_schedule_reconciliation' ) ) {
+		datamachine_mark_flow_schedule_reconciliation();
+	}
+	update_option( 'datamachine_db_version', DATAMACHINE_VERSION, true );
+}
+
+/**
+ * Run the non-schema activation work that a deploy or a never-activated install
+ * would otherwise skip.
+ *
+ * `datamachine_ensure_current_schema()` already covers every table, so an
+ * install that was deployed in place rather than activated ends up with a
+ * complete database and an incomplete site: no `datamachine_*` capabilities on
+ * any role, and no seeded settings. That is a confusing half-working state —
+ * the data is right and every capability check fails.
+ *
+ * Three ways an install reaches it:
+ *
+ * - deploy-in-place, where files are updated and activation is never toggled
+ * - a test harness that loads the plugin without activating it
+ * - a must-use plugin, for which `register_activation_hook` never fires at all
+ *
+ * Both calls below are idempotent by construction. `add_cap()` is a no-op for a
+ * capability the role already has, and `activate_defaults_for_site()`
+ * uses `add_option()`, which will not overwrite an operator's existing settings.
+ * That matters because this runs on every version bump, not only once.
+ *
+ * Deliberately NOT included: `ComposableFileGenerator::regenerate_all()`. It is
+ * expensive and activation-only by design, and the composable files have their
+ * own invalidation path. Adding it here would put a full regeneration on the
+ * first request after every deploy.
+ *
+ * @since 0.171.4
+ * @return void
+ */
+function datamachine_run_deferred_site_setup(): void {
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::register_capabilities();
+	\DataMachine\Core\Bootstrap\ActivationServiceProvider::activate_defaults_for_site();
+
+	// One-shot cleanup (Extra-Chill/data-machine#3497): the hash-gated
+	// routine backend decorator that wrote this option was removed once the
+	// Agents API Action Scheduler bridge's own register() became idempotent
+	// (wordpress/agents-api v0.11.1). delete_option() on an already-absent
+	// row is a cheap no-op, so this is safe to run on every version bump.
+	delete_option( 'datamachine_routine_schedule_hashes' );
+
+	datamachine_drop_legacy_chat_sessions();
+	datamachine_migrate_legacy_mode_models();
+}
+
+/**
+ * Move stored `chat` model overrides to the neutral `agent` model key.
+ *
+ * Data Machine no longer has a `chat` agent mode (Extra-Chill/data-machine#3973).
+ * The model override that used to be stored under `mode_models['chat']` now
+ * lives under `mode_models['agent']`, the default model for agents that Data
+ * Machine provisions. This pass rewrites the three stores that can hold
+ * `mode_models`:
+ *
+ * - the per-site `datamachine_settings` option,
+ * - the network `datamachine_network_settings` site option,
+ * - each agent's `agent_config` row in the agents table.
+ *
+ * An existing `agent` entry wins over the legacy one, so the copy never
+ * overwrites a value an operator already set. The legacy `chat` key is removed
+ * after the copy. Stores without a `chat` entry are left untouched, which makes
+ * re-running on later version bumps or on other subsites a no-op.
+ *
+ * @return void
+ */
+function datamachine_migrate_legacy_mode_models(): void {
+	$site_settings = get_option( 'datamachine_settings', array() );
+	$migrated      = datamachine_migrate_legacy_mode_models_config( is_array( $site_settings ) ? $site_settings : array() );
+	if ( null !== $migrated ) {
+		update_option( 'datamachine_settings', $migrated );
+	}
+
+	if ( function_exists( 'get_site_option' ) && function_exists( 'update_site_option' ) ) {
+		$network_settings = get_site_option( 'datamachine_network_settings', array() );
+		$migrated         = datamachine_migrate_legacy_mode_models_config( is_array( $network_settings ) ? $network_settings : array() );
+		if ( null !== $migrated ) {
+			update_site_option( 'datamachine_network_settings', $migrated );
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\Database\\Agents\\Agents' ) ) {
+		$agents_repo = new \DataMachine\Core\Database\Agents\Agents();
+		foreach ( $agents_repo->get_all() as $agent ) {
+			$config   = is_array( $agent['agent_config'] ?? null ) ? $agent['agent_config'] : array();
+			$migrated = datamachine_migrate_legacy_mode_models_config( $config );
+			if ( null !== $migrated && ! empty( $agent['agent_id'] ) ) {
+				$agents_repo->update_agent( (int) $agent['agent_id'], array( 'agent_config' => $migrated ) );
+			}
+		}
+	}
+
+	if ( class_exists( '\\DataMachine\\Core\\PluginSettings' ) ) {
+		\DataMachine\Core\PluginSettings::clearCache();
+	}
+}
+
+/**
+ * Rewrite one settings or agent-config array's legacy `chat` model override.
+ *
+ * @param array<string,mixed> $config Settings or agent config containing `mode_models`.
+ * @return array<string,mixed>|null Migrated config, or null when nothing changed.
+ */
+function datamachine_migrate_legacy_mode_models_config( array $config ): ?array {
+	$mode_models = $config['mode_models'] ?? null;
+	if ( ! is_array( $mode_models ) || ! array_key_exists( 'chat', $mode_models ) ) {
+		return null;
+	}
+
+	$legacy  = $mode_models['chat'];
+	$current = $mode_models['agent'] ?? null;
+	unset( $mode_models['chat'] );
+
+	$has_current = is_array( $current ) && ( ! empty( $current['provider'] ) || ! empty( $current['model'] ) );
+	if ( ! $has_current && is_array( $legacy ) ) {
+		$mode_models['agent'] = $legacy;
+	}
+
+	$config['mode_models'] = $mode_models;
+	return $config;
+}
+
+/**
+ * Drop the retired Data Machine chat-session storage.
+ *
+ * Chat moved to Agents API (Extra-Chill/data-machine#3973). Data Machine no
+ * longer reads or writes `datamachine_chat_sessions`, so the version-bump
+ * pass removes the canonical network table, any legacy per-site table from
+ * before the network convergence, the convergence marker, and the retired
+ * chat retention schedules. Every step is idempotent: `DROP TABLE IF EXISTS`
+ * and unscheduling absent actions are no-ops, so re-running on later version
+ * bumps or on other subsites is safe.
+ *
+ * @return void
+ */
+function datamachine_drop_legacy_chat_sessions(): void {
+	global $wpdb;
+
+	$tables = array_unique(
+		array(
+			$wpdb->base_prefix . 'datamachine_chat_sessions',
+			$wpdb->prefix . 'datamachine_chat_sessions',
+		)
+	);
+
+	foreach ( $tables as $table ) {
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.DirectDatabaseQuery.SchemaChange
+		$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $table ) );
+	}
+
+	if ( function_exists( 'delete_site_option' ) ) {
+		delete_site_option( 'datamachine_chat_sessions_network_migrated' );
+	}
+	delete_option( 'datamachine_pipeline_transcript_retention_days' );
+
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'datamachine_recurring_retention_chat_sessions' );
+		as_unschedule_all_actions( 'datamachine_cleanup_chat_sessions' );
+	}
+}
+
+// Ensure schema early in plugins_loaded (priority 5) so that
+// RuntimeServiceProvider at priority 20 — and every consumer
+// after it sees the current shape. Same hook fires for both activated
+// and upgraded installs; the option-gate inside the function avoids
+// double-running when activation already initialized this request.
+add_action( 'plugins_loaded', 'datamachine_maybe_ensure_current_schema', 5 );
+add_action( 'plugins_loaded', 'datamachine_maybe_install_post_identity_reservations', 5 );
