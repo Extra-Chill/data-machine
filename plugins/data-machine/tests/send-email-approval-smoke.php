@@ -17,6 +17,7 @@ function wp_mail( $to, $subject, $message, $headers, $attachments ) {
 	return apply_filters( 'pre_wp_mail', null, compact( 'to', 'subject', 'message', 'headers', 'attachments' ) );
 }
 require __DIR__ . '/pending-action-resolver-contract-smoke.php';
+require_once dirname( __DIR__ ) . '/inc/Abilities/Email/EmailMailboxPermission.php';
 require_once dirname( __DIR__ ) . '/inc/Abilities/Publish/SendEmailAbility.php';
 
 use DataMachine\Abilities\Publish\SendEmailAbility;

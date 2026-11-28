@@ -23,8 +23,12 @@ namespace {
 		return 507001 === $post_id && '_datamachine_event_source_url' === $key ? 'https://example.com/listings/seeded-show' : '';
 	}
 
-	function esc_url_raw( string $url, array $protocols ): string {
+	function esc_url_raw( string $url, ?array $protocols = null ): string {
 		return $url;
+	}
+
+	function wp_specialchars_decode( string $text, int $quote_style = ENT_NOQUOTES ): string {
+		return htmlspecialchars_decode( $text, $quote_style );
 	}
 
 	function wp_parse_url( string $url, int $component = -1 ): mixed {
@@ -103,8 +107,11 @@ namespace DataMachineEvents\Core {
 
 namespace DataMachineEvents\Blocks\Calendar\Taxonomy {
 	final class Badges {
-		public static function render_taxonomy_badges( int $post_id ): string {
-			return 507001 === $post_id ? '<div>presentation-only</div>' : '';
+		public static function get_display_data( int $post_id ): array {
+			return array(
+				'wrapper_classes' => 507001 === $post_id ? 'presentation-only' : '',
+				'items'           => array(),
+			);
 		}
 	}
 }

@@ -12,22 +12,8 @@
  * query per request because the underlying bucket cache was keyed
  * without geo params.
  *
- * Response envelopes
- * ------------------
- * - Default (no `format` param, or any value other than `data`):
- *   the legacy HTML-string envelope (`html`, `pagination.html`,
- *   `counter`, `navigation.html`) used by the current Calendar block
- *   frontend bundle. UNCHANGED in phase 1.
- *
- * - `?format=data`: the structured data-only envelope introduced in
- *   phase 1 of refactor #298. Returns event objects, pagination /
- *   counter / navigation metadata, gap map, and a `by_date` grouping
- *   index. Empty results include the canonical server-rendered recovery
- *   fragment. See `docs/calendar-data-schema.md`.
- *
- * Both envelopes are cached independently via
- * `CalendarCache::generate_full_response_key()`, which includes
- * `format` in its key surface as of this phase.
+ * Returns structured events, date grouping, pagination, counter and
+ * navigation data. PHP templates are used only outside this REST path.
  *
  * @package DataMachineEvents\Api\Controllers
  */
@@ -42,10 +28,8 @@ use DataMachineEvents\Api\BrowserNavigationGuard;
 use DataMachineEvents\Api\Serializers\CalendarOccurrence;
 use DataMachineEvents\Blocks\Calendar\Cache\CalendarCache;
 use DataMachineEvents\Blocks\Calendar\Display\DisplayVars;
-use DataMachineEvents\Blocks\Calendar\Display\EventRenderer;
 use DataMachineEvents\Blocks\Calendar\Query\CalendarRequest;
 use DataMachineEvents\Blocks\Calendar\Taxonomy\Badges;
-use DataMachineEvents\Blocks\Calendar\Template_Loader;
 use DataMachineEvents\Core\Event_Post_Type;
 use DataMachineEvents\Utilities\EventSourceUrl;
 use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
@@ -56,7 +40,7 @@ use function DataMachineEvents\Core\data_machine_events_is_gated_ticket_url;
 class Calendar {
 
 	/**
-	 * Schema version of the `format=data` response envelope.
+	 * Schema version of the calendar response envelope.
 	 *
 	 * Bump this whenever the data-envelope SHAPE changes in a way the client
 	 * renderer depends on. It is folded into the full-response cache key so a
@@ -64,15 +48,16 @@ class Calendar {
 	 * envelope to the newer client (and vice-versa) for the cache TTL window.
 	 *
 	 * v2 (#381): per-occurrence `display` block added to `grouping.by_date`.
-	 * v3 (#465): canonical server-rendered empty-state fragment added.
+	 * v3 (#465): server-rendered empty-state fragment added (removed in v7).
 	 * v4 (#507): complete performer, status, and venue context added.
 	 * v5 (#786): venue `tier` added to the serialized venue object.
 	 * v6 (#816): `ticket.is_affiliate` added; `ticket.url` is emptied when
 	 * the ticket URL is an affiliate/redirect wrapper (JS-gated ticket
 	 * links — the client uses `event.id` as the gated ref instead).
-	 * v7: original listing attribution in `event.source`.
+	 * v7 (#3859): data is the only envelope, with structured badges and no empty-state markup.
+	 * v8 (#4073): original listing attribution in `event.source`.
 	 */
-	const DATA_SCHEMA_VERSION = 7;
+	const DATA_SCHEMA_VERSION = 8;
 
 	/**
 	 * Calendar endpoint implementation
@@ -96,20 +81,9 @@ class Calendar {
 		$calendar_request = CalendarRequest::fromRestRequest( $request );
 		$envelope         = $calendar_request->toAbilitiesArgs();
 
-		// Thread the format selector into the cache-key envelope so the
-		// HTML and data-only response shapes never share a cache bucket.
-		// `toAbilitiesArgs()` already gates `include_html` on the format,
-		// but the cache key needs an explicit `format` field of its own
-		// (the ability-side envelope only sees the derived `include_html`).
-		$envelope['format'] = $calendar_request->format();
-		$is_data_format     = ( 'data' === $envelope['format'] );
-
-		// Fold the data-envelope schema version into the cache key (data
-		// format only) so a shape change across a deploy never serves a
-		// stale older-shape envelope to the newer client. See #381.
-		if ( $is_data_format ) {
-			$envelope['data_schema_version'] = self::DATA_SCHEMA_VERSION;
-		}
+		$envelope['include_html']        = false;
+		$envelope['progressive']         = false;
+		$envelope['data_schema_version'] = self::DATA_SCHEMA_VERSION;
 
 		// Editors with `manage_options` always bypass the cache so they
 		// see fresh data immediately after publishing / editing events.
@@ -128,9 +102,7 @@ class Calendar {
 		$abilities = new CalendarAbilities();
 		$result    = $abilities->executeGetCalendarPage( $envelope );
 
-		$response_body = $is_data_format
-			? $this->build_data_response( $result, $calendar_request )
-			: $this->build_html_response( $result, $request );
+		$response_body = $this->build_data_response( $result, $calendar_request );
 
 		if ( ! $bypass_cache ) {
 			CalendarCache::set_full_response(
@@ -144,46 +116,7 @@ class Calendar {
 	}
 
 	/**
-	 * Build the legacy HTML-string response envelope.
-	 *
-	 * Existing consumers (the Calendar block's frontend bundle as of phase 1)
-	 * receive this shape. Unchanged contract.
-	 *
-	 * @param array           $result  CalendarAbilities::executeGetCalendarPage() output with HTML strings.
-	 * @param WP_REST_Request $request REST request (used to surface the `past` flag in `navigation.show_past`).
-	 * @return array<string,mixed>
-	 */
-	private function build_html_response( array $result, WP_REST_Request $request ): array {
-		return array(
-			'success'    => true,
-			'html'       => $result['html']['events'],
-			'pagination' => array(
-				'html'         => $result['html']['pagination'],
-				'current_page' => $result['current_page'],
-				'max_pages'    => $result['max_pages'],
-				'total_events' => $result['total_event_count'],
-			),
-			'counter'    => $result['html']['counter'],
-			'navigation' => array(
-				'html'         => $result['html']['navigation'],
-				'past_count'   => $result['event_counts']['past'],
-				'future_count' => $result['event_counts']['future'],
-				'show_past'    => ! empty( $request->get_param( 'past' ) ),
-			),
-		);
-	}
-
-	/**
-	 * Build the data-only response envelope (phase 1 of refactor #298).
-	 *
-	 * Returns structured event objects, pagination / counter / navigation
-	 * metadata, gap map, and a `by_date` grouping index. The only HTML is the
-	 * canonical no-events recovery fragment when the result is empty.
-	 *
-	 * Performance note: non-empty responses never call a template loader.
-	 * `CalendarAbilities::executeGetCalendarPage()` was invoked with
-	 * `include_html: false`, so the ability skipped its full `renderHtml()`
-	 * branch. Empty responses render only the canonical recovery fragment.
+	 * Build the data-only response envelope without calling PHP templates.
 	 *
 	 * Schema: see `docs/calendar-data-schema.md`.
 	 *
@@ -247,13 +180,6 @@ class Calendar {
 			}
 		}
 
-		$events     = array_values( $events_by_id );
-		$empty_html = '';
-		if ( empty( $ordered_dates ) ) {
-			Template_Loader::init();
-			$empty_html = EventRenderer::render_date_groups( array() );
-		}
-
 		$show_past = $req->past();
 
 		return array(
@@ -269,7 +195,7 @@ class Calendar {
 				'phase'   => 1,
 				'issue'   => 298,
 			),
-			'events'     => $events,
+			'events'     => array_values( $events_by_id ),
 			'grouping'   => array(
 				'ordered_dates' => $ordered_dates,
 				'by_date'       => $grouping,
@@ -294,7 +220,6 @@ class Calendar {
 				'has_past'     => (int) ( $result['event_counts']['past'] ?? 0 ) > 0,
 				'has_future'   => (int) ( $result['event_counts']['future'] ?? 0 ) > 0,
 			),
-			'empty_html' => $empty_html,
 		);
 	}
 
@@ -343,7 +268,7 @@ class Calendar {
 	/**
 	 * Serialize the pinned, presentation-neutral occurrence contract.
 	 *
-	 * The REST producer carries additional HTML and URL presentation fields.
+	 * The REST producer carries additional display and URL fields.
 	 * This artifact surface selects only canonical event, taxonomy, venue, and
 	 * occurrence data while still deriving every value through the same
 	 * serializer used by the REST response.
@@ -363,9 +288,7 @@ class Calendar {
 	 * with permalink, post title, venue term metadata, and taxonomy term lists.
 	 *
 	 * Field choices mirror what the HTML templates render server-side so the
-	 * client can produce the same surface without a second round-trip. Anything
-	 * the server currently inlines into `data.html` should be representable
-	 * here as JSON.
+	 * client can produce the same surface without a second round-trip.
 	 *
 	 * Schema notes:
 	 * - `taxonomies` is a flat `slug => [term_summary, ...]` map, NOT a nested
@@ -375,12 +298,8 @@ class Calendar {
 	 *   it's a first-class display attribute (every event has at most one
 	 *   venue, the templates render it in a fixed slot, the geo system keys
 	 *   off it).
-	 * - `badges_html` ships the server-rendered, filter-applied badge markup
-	 *   (via `Badges::render_taxonomy_badges()`) so client-rendered cards can
-	 *   honor the badge-class filters themes hook for styling. `badges_html`
-	 *   is authoritative for badges; the raw `taxonomies` map is unfiltered
-	 *   event data (it includes taxonomies the badge filter hides, e.g. a
-	 *   lineup). See #381, #3999.
+	 * - `badges` preserves the server's badge filtering and class customization
+	 *   without sending markup. The `taxonomies` map is unfiltered event data.
 	 * - `button_classes` ships the server-filtered "More Info" button class
 	 *   list (via the `data_machine_events_more_info_button_classes` filter)
 	 *   for the same client-render parity reason. See #381.
@@ -391,7 +310,7 @@ class Calendar {
 	 */
 	private function serialize_event( int $post_id, array $event_entry ): array {
 		$event_data = $event_entry['event_data'] ?? array();
-		$title      = (string) ( $event_entry['title'] ?? get_the_title( $post_id ) );
+		$title      = wp_specialchars_decode( (string) ( $event_entry['title'] ?? get_the_title( $post_id ) ), ENT_QUOTES );
 
 		// Ticketmaster compliance (issue #816): `ticket.url` is emptied when
 		// the URL routes through the first-party redirect. Clients gate a
@@ -420,7 +339,7 @@ class Calendar {
 		return array(
 			'id'             => $post_id,
 			'title'          => $title,
-			'permalink'      => (string) get_permalink( $post_id ),
+			'permalink'      => esc_url_raw( (string) get_permalink( $post_id ) ),
 			'date'           => array(
 				'start_date'     => (string) ( $event_data['startDate'] ?? '' ),
 				'start_time'     => (string) ( $event_data['startTime'] ?? '' ),
@@ -435,7 +354,7 @@ class Calendar {
 				'name' => $source_name,
 			),
 			'ticket'         => array(
-				'url'          => $is_affiliate_ticket ? '' : $ticket_url,
+				'url'          => $is_affiliate_ticket ? '' : esc_url_raw( $ticket_url, array( 'http', 'https' ) ),
 				'is_affiliate' => $is_affiliate_ticket,
 			),
 			'performer'      => array(
@@ -445,13 +364,7 @@ class Calendar {
 			'status'         => (string) ( $event_data['eventStatus'] ?? '' ),
 			'address'        => (string) ( $event_data['address'] ?? '' ),
 			'taxonomies'     => $this->serialize_taxonomies( $post_id ),
-			// Server-filtered badge HTML so client-rendered (Load More)
-			// cards honor the `data_machine_events_badge_wrapper_classes`
-			// and `data_machine_events_badge_classes` filters that themes
-			// hook for styling. Without this, the TS renderer rebuilds
-			// badges from raw terms and drops the theme classes, leaving
-			// appended events with unstyled fallback badges. See #381.
-			'badges_html'    => Badges::render_taxonomy_badges( $post_id ),
+			'badges'         => Badges::get_display_data( $post_id ),
 			// Server-filtered "More Info" button class list so client-rendered
 			// (Load More) cards honor the
 			// `data_machine_events_more_info_button_classes` filter, mirroring
@@ -565,7 +478,7 @@ class Calendar {
 	 *
 	 * This is event data, not presentation: every taxonomy on the event post
 	 * type is included regardless of the `data_machine_events_excluded_taxonomies`
-	 * badge filter (badge markup ships separately in `badges_html`). Terms of
+	 * badge filter (filtered display data ships separately in `badges`). Terms of
 	 * sort-enabled taxonomies (core `'sort' => true`, e.g. a lineup) keep their
 	 * stored per-object order. Returns a `slug => [{term_id, name, slug, link}, ...]` map.
 	 *

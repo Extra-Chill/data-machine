@@ -2,6 +2,11 @@
 
 All notable changes to Data Machine Events will be documented in this file.
 
+## [0.92.2] - 2026-11-28
+
+### Fixed
+- render frontend updates from structured REST data
+
 ## [0.92.1] - 2026-11-26
 
 ### Fixed

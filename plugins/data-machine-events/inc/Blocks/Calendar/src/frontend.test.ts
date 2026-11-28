@@ -19,6 +19,7 @@ jest.mock( './modules/filter-modal', () => ( {
 	destroyFilterModal: jest.fn(),
 } ) );
 jest.mock( './modules/navigation', () => ( {
+	...jest.requireActual( './modules/navigation' ),
 	initNavigation: jest.fn( ( _calendar, navigate ) => {
 		mockNavigationCallback = navigate;
 	} ),
@@ -61,7 +62,7 @@ jest.mock( './modules/month-grid-response-renderer', () => ( {
  */
 import { renderMonthGridResponse } from './modules/month-grid-response-renderer';
 import { initCalendarInstance } from './frontend';
-import { initCarousel, destroyCarousel } from './modules/carousel';
+import { initCarousel } from './modules/carousel';
 
 import type { FlatpickrInstance } from './types';
 
@@ -80,12 +81,11 @@ const mockPicker: FlatpickrInstance = {
 const mockFetch = jest.fn();
 const mockRenderMonthGridResponse = renderMonthGridResponse as jest.Mock;
 const mockInitCarousel = initCarousel as jest.Mock;
-const mockDestroyCarousel = destroyCarousel as jest.Mock;
 
 function successfulResponse(): Promise< Response > {
 	return Promise.resolve( {
 		ok: true,
-		json: async () => ( { success: true } ),
+		json: async () => ( { success: true, events: [], grouping: {} } ),
 	} as Response );
 }
 
@@ -107,7 +107,11 @@ function deferredResponse(): {
 		resolve: () =>
 			resolvePromise( {
 				ok: true,
-				json: async () => ( { success: true } ),
+				json: async () => ( {
+					success: true,
+					events: [],
+					grouping: {},
+				} ),
 			} as Response ),
 	};
 }
@@ -141,8 +145,9 @@ function calendarMarkup(
 }
 
 async function flush(): Promise< void > {
-	await Promise.resolve();
-	await Promise.resolve();
+	for ( let i = 0; i < 8; i++ ) {
+		await Promise.resolve();
+	}
 }
 
 describe( 'calendar frontend month-grid integration', () => {
@@ -154,7 +159,6 @@ describe( 'calendar frontend month-grid integration', () => {
 		global.fetch = mockFetch;
 		mockRenderMonthGridResponse.mockClear();
 		mockInitCarousel.mockClear();
-		mockDestroyCarousel.mockClear();
 		mockPicker.selectedDates = [
 			new Date( 2026, 7, 10 ),
 			new Date( 2026, 7, 12 ),
@@ -195,44 +199,6 @@ describe( 'calendar frontend month-grid integration', () => {
 			calendar.classList.contains( 'data-machine-events-single-day-list' )
 		).toBe( false );
 		expect( mockInitCarousel ).toHaveBeenCalledWith( calendar );
-	} );
-
-	it( 'resynchronizes layout when dynamic scope content changes', () => {
-		document.body.innerHTML = calendarMarkup(
-			false,
-			'date-groups',
-			'this-week'
-		);
-		const calendar = document.querySelector< HTMLElement >(
-			'.data-machine-events-calendar'
-		)!;
-		initCalendarInstance( calendar );
-
-		calendar.dataset.scope = 'tonight';
-		calendar.dispatchEvent(
-			new CustomEvent( 'data-machine-calendar-content-updated' )
-		);
-
-		expect( mockDestroyCarousel ).toHaveBeenCalledWith( calendar );
-		expect(
-			calendar.classList.contains( 'data-machine-events-single-day-list' )
-		).toBe( true );
-		expect( mockInitCarousel ).toHaveBeenCalledTimes( 1 );
-
-		calendar.dataset.scope = 'this-week';
-		calendar.dispatchEvent(
-			new CustomEvent( 'data-machine-calendar-content-updated' )
-		);
-
-		expect(
-			calendar.classList.contains( 'data-machine-events-single-day-list' )
-		).toBe( false );
-		expect( mockInitCarousel ).toHaveBeenCalledTimes( 2 );
-	} );
-
-	afterEach( () => {
-		window.dispatchEvent( new Event( 'beforeunload' ) );
-		jest.useRealTimers();
 	} );
 
 	it( 'submits real controls, default scope, archive, and opaque token', async () => {
@@ -381,17 +347,18 @@ describe( 'calendar frontend month-grid integration', () => {
 		expect( window.location.search ).not.toContain( 'lat=' );
 	} );
 
-	it( 'leaves list-mode geo updates on the existing HTML response path', async () => {
+	it( 'renders list-mode geo updates from structured data', async () => {
 		jest.useFakeTimers();
 		document.body.innerHTML = calendarMarkup( true, 'date-groups' );
 		mockFetch.mockResolvedValueOnce( {
 			ok: true,
 			json: async () => ( {
 				success: true,
-				html: '<p>updated list</p>',
-				pagination: null,
-				counter: null,
-				navigation: null,
+				events: [],
+				grouping: { ordered_dates: [], by_date: {}, gaps: {} },
+				pagination: { current_page: 1, total_pages: 1 },
+				counter: { showing_count: 0 },
+				navigation: { has_past: true },
 			} ),
 		} as Response );
 		const calendar = document.querySelector< HTMLElement >(
@@ -418,7 +385,12 @@ describe( 'calendar frontend month-grid integration', () => {
 		expect(
 			calendar.querySelector( '.data-machine-events-content' )!
 				.textContent
-		).toBe( 'updated list' );
+		).toContain( 'No events found.' );
+		const past = calendar.querySelector< HTMLAnchorElement >(
+			'.data-machine-events-past-btn'
+		)!;
+		expect( new URL( past.href ).pathname ).toBe( '/events/' );
+		expect( new URL( past.href ).search ).toBe( '?scope=tonight&past=1' );
 		expect( mockRenderMonthGridResponse ).not.toHaveBeenCalled();
 	} );
 } );

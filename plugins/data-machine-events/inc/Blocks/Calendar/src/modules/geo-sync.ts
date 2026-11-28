@@ -288,14 +288,14 @@ async function fetchAndUpdate(
 	// applies it consistently. `paged` is intentionally cleared after
 	// the helper runs because a viewport change resets pagination.
 	const params = buildCalendarRequest( {
-		archiveContext,
 		geoContext: geo,
 	} );
 
 	// Reset to page 1 on geo change.
 	params.delete( 'paged' );
+	params.delete( 'scope_token' );
 
-	// Update URL via History API (so the state is shareable).
+	// Keep archive and embedded scope context on the request, not in history.
 	filterState.updateUrl( params );
 
 	// Save geo to storage for persistence.
@@ -307,15 +307,6 @@ async function fetchAndUpdate(
 		label: '',
 	} );
 
-	// Module lifecycle (lazy-render, day-loader, carousel) is driven by
-	// frontend.ts in response to the `data-machine-calendar-content-updated`
-	// event that fetchCalendarEvents fires after swapping innerHTML. This
-	// module does not destroy or re-init dynamic UI directly — single owner.
-	//
-	// Pagination ownership moved to `load-more.ts` (issue #314). Geo
-	// updates flow into Load More through the URL (pushed by
-	// `filterState.updateUrl()` above) — the next Load More click reads
-	// fresh geo via `buildCalendarRequest()`.
 	await fetchCalendarEvents( calendar, params, archiveContext, {
 		signal,
 		shouldApply: isCurrent,

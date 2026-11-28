@@ -4,19 +4,15 @@
   "extensions": {
     "wordpress": {
       "php": "8.3",
-      "node": "20",
+      "node": "24",
       "database_type": "mdi-native",
       "settings": {
         "validation_dependencies": ["../data-machine"],
         "wp_codebox_multisite": true,
         "wp_codebox_phpunit_bootstrap_mode": "managed",
         "wp_codebox_prepare_steps": [
-          {"command": "npm", "args": ["ci"], "cwd": "inc/Blocks/Calendar"},
-          {"command": "npm", "args": ["run", "build"], "cwd": "inc/Blocks/Calendar"},
-          {"command": "npm", "args": ["ci"], "cwd": "inc/Blocks/EventDetails"},
-          {"command": "npm", "args": ["run", "build"], "cwd": "inc/Blocks/EventDetails"},
-          {"command": "npm", "args": ["ci"], "cwd": "inc/Blocks/EventsMap"},
-          {"command": "npm", "args": ["run", "build"], "cwd": "inc/Blocks/EventsMap"}
+          {"command": "npm", "args": ["ci"]},
+          {"command": "npm", "args": ["run", "build"]}
         ]
       }
     }
@@ -25,9 +21,7 @@
   "scopes": {
     "release": {
       "exclude": [
-        "inc/Blocks/Calendar/webpack.config.js",
-        "inc/Blocks/EventDetails/webpack.config.js",
-        "inc/Blocks/EventsMap/webpack.config.js"
+        "webpack.config.js"
       ]
     }
   },

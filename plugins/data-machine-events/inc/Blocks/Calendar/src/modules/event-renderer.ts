@@ -8,16 +8,7 @@
  * (carousel, lazy-render, day-loader) hook onto these via class names
  * and data attributes — both paths must produce the same surface.
  *
- * Single source of truth: this renderer is a pure DOM assembler. It does
- * NOT compute any display strings. All display-ready values — the
- * formatted time range, multi-day labels, ISO start date, decoded
- * venue/performer names, show_* flags, badge markup, and the More Info
- * button class list — are computed server-side (`DisplayVars::build()`
- * and `Taxonomy\Badges::render_taxonomy_badges()`) and shipped in the
- * `format=data` envelope: per-occurrence values on `occurrence.display`,
- * per-event values (badges_html, button_classes) on the event. This is
- * what keeps server- and client-rendered cards from drifting — there is
- * exactly one place (PHP) that knows how to format an event. See #381.
+ * Display strings and badge styling are shared with the PHP renderer.
  */
 
 /**
@@ -26,7 +17,8 @@
 import type {
 	CalendarEventItem,
 	CalendarEventOccurrence,
-	CalendarEventTaxonomyTerm,
+	CalendarBadges,
+	CalendarEventDisplay,
 } from '../types';
 
 /**
@@ -40,11 +32,20 @@ export function renderEventCard(
 	event: CalendarEventItem,
 	occurrence: CalendarEventOccurrence
 ): HTMLElement {
-	const display = occurrence.display;
+	return renderEventItem( event, occurrence.display );
+}
+
+export function renderEventItem(
+	event: Pick<
+		CalendarEventItem,
+		'id' | 'title' | 'permalink' | 'ticket' | 'badges' | 'button_classes'
+	>,
+	display: Partial< CalendarEventDisplay >,
+	item: HTMLElement = document.createElement( 'div' )
+): HTMLElement {
 	const isContinuation = display.is_continuation === true;
 	const isMultiDay = display.is_multi_day === true;
 
-	const item = document.createElement( 'div' );
 	const classes = [ 'data-machine-event-item' ];
 	if ( isContinuation ) {
 		classes.push( 'data-machine-event-continuation' );
@@ -56,7 +57,7 @@ export function renderEventCard(
 
 	const venueName = display.venue_name || '';
 	const performerName = display.performer_name || '';
-	const ticketUrl = event.ticket?.url || '';
+	const ticketUrl = safeLink( event.ticket?.url );
 	// Ticketmaster compliance (issue #816): `is_affiliate` is optional so
 	// cached pre-v6 envelopes (no ticket.is_affiliate at all) degrade to
 	// "not affiliate" rather than silently dropping a real ticket link.
@@ -82,7 +83,7 @@ export function renderEventCard(
 	const link = document.createElement( 'div' );
 	link.className = 'data-machine-event-link';
 
-	const badges = renderBadges( event );
+	const badges = renderBadges( event.badges );
 	if ( badges ) {
 		link.appendChild( badges );
 	}
@@ -90,7 +91,7 @@ export function renderEventCard(
 	const title = document.createElement( 'h4' );
 	title.className = 'data-machine-event-title';
 	const titleAnchor = document.createElement( 'a' );
-	titleAnchor.href = event.permalink;
+	titleAnchor.href = safeLink( event.permalink ) || '#';
 	titleAnchor.textContent = event.title;
 	title.appendChild( titleAnchor );
 	link.appendChild( title );
@@ -142,7 +143,7 @@ export function renderEventCard(
 	}
 
 	const moreInfo = document.createElement( 'a' );
-	moreInfo.href = event.permalink;
+	moreInfo.href = titleAnchor.href;
 	// Server-filtered class list (runs `data_machine_events_more_info_button_classes`),
 	// falling back to the default class only when absent. See #381.
 	moreInfo.className =
@@ -152,102 +153,42 @@ export function renderEventCard(
 	meta.appendChild( moreInfo );
 
 	link.appendChild( meta );
-	item.appendChild( link );
+	item.replaceChildren( link );
 
 	return item;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Badge rendering — server-rendered HTML injection                   */
-/* ------------------------------------------------------------------ */
-
-function renderBadges( event: CalendarEventItem ): HTMLElement | null {
-	// Prefer the server-rendered, filter-applied badge markup when the
-	// data envelope ships it. `Badges::render_taxonomy_badges()` runs the
-	// `data_machine_events_badge_wrapper_classes` /
-	// `data_machine_events_badge_classes` filters that themes hook for
-	// styling, so injecting this keeps client-appended (Load More) cards
-	// byte-identical to server-rendered cards. The markup is built
-	// entirely server-side from escaped values (esc_html / esc_url /
-	// esc_attr), so parsing it here introduces no new injection surface.
-	// See #381.
-	// When the envelope ships `badges_html` at all, it is authoritative:
-	// an empty string means "no badges" (e.g. every assigned taxonomy is
-	// badge-excluded). `taxonomies` is unfiltered event data (#3999), so
-	// rebuilding from it is only a fallback for envelopes predating #381.
-	if ( typeof event.badges_html === 'string' ) {
-		return renderServerBadges( event.badges_html );
-	}
-
-	const taxonomies = event.taxonomies || {};
-	const taxonomySlugs = Object.keys( taxonomies );
-	if ( taxonomySlugs.length === 0 ) {
+function renderBadges( badges: CalendarBadges ): HTMLElement | null {
+	if ( ! badges?.items.length ) {
 		return null;
 	}
-
-	const venueName = ( event.venue?.name || '' ).trim().toLowerCase();
 	const wrapper = document.createElement( 'div' );
-	wrapper.className = 'data-machine-taxonomy-badges';
-
-	let badgeCount = 0;
-	taxonomySlugs.forEach( ( taxonomySlug ) => {
-		const terms = taxonomies[ taxonomySlug ] || [];
-		terms.forEach( ( term: CalendarEventTaxonomyTerm ) => {
-			// Mirror the PHP guard: promoter term names that match the
-			// venue name are suppressed to avoid duplicate badges.
-			if (
-				taxonomySlug === 'promoter' &&
-				venueName !== '' &&
-				term.name.trim().toLowerCase() === venueName
-			) {
-				return;
-			}
-
-			const badgeClasses = [
-				'data-machine-taxonomy-badge',
-				'data-machine-taxonomy-' + taxonomySlug,
-				'data-machine-term-' + term.slug,
-			];
-
-			let badge: HTMLElement;
-			if ( term.link ) {
-				const anchor = document.createElement( 'a' );
-				anchor.href = term.link;
-				badge = anchor;
-			} else {
-				badge = document.createElement( 'span' );
-			}
-			badge.className = badgeClasses.join( ' ' );
-			badge.dataset.taxonomy = taxonomySlug;
-			badge.dataset.term = term.slug;
-			badge.textContent = term.name;
-			wrapper.appendChild( badge );
-			badgeCount++;
-		} );
+	wrapper.className = badges.wrapper_classes;
+	badges.items.forEach( ( item ) => {
+		const url = safeLink( item.url );
+		const badge = url
+			? document.createElement( 'a' )
+			: document.createElement( 'span' );
+		if ( badge instanceof HTMLAnchorElement ) {
+			badge.href = url;
+		}
+		badge.className = item.classes;
+		badge.dataset.taxonomy = item.taxonomy;
+		badge.dataset.term = item.term;
+		badge.textContent = item.label;
+		wrapper.appendChild( badge );
 	} );
-
-	return badgeCount > 0 ? wrapper : null;
+	return wrapper;
 }
 
-/**
- * Parse the server-rendered badge HTML (`event.badges_html`) into a
- * detached element ready to append.
- *
- * Returns null when no markup is supplied so the caller can fall back to
- * the client-side reconstruction from raw taxonomy terms. The markup is
- * produced by `Taxonomy\Badges::render_taxonomy_badges()` — a single
- * `.data-machine-taxonomy-badges` wrapper element — so we lift that first
- * element child out of the parse container.
- * @param badgesHtml
- */
-function renderServerBadges( badgesHtml?: string ): HTMLElement | null {
-	const html = ( badgesHtml || '' ).trim();
-	if ( html === '' ) {
-		return null;
+function safeLink( value?: string ): string {
+	if ( ! value ) {
+		return '';
 	}
-
-	const template = document.createElement( 'template' );
-	template.innerHTML = html;
-	const node = template.content.firstElementChild;
-	return node instanceof HTMLElement ? node : null;
+	try {
+		const url = new URL( value, window.location.href );
+		return [ 'http:', 'https:' ].includes( url.protocol ) ? url.href : '';
+	} catch {
+		return '';
+	}
 }

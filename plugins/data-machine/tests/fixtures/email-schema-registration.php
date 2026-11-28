@@ -50,5 +50,7 @@ if ( ! function_exists( 'wp_register_ability' ) ) {
 }
 
 require_once ABSPATH . 'inc/Abilities/AbilityRegistration.php';
+require_once ABSPATH . 'inc/Abilities/Email/EmailMailboxPermission.php';
+require_once ABSPATH . 'inc/Abilities/Email/EmailAbilitiesPermissions.php';
 require_once ABSPATH . 'inc/Abilities/Email/EmailAbilities.php';
 new \DataMachine\Abilities\Email\EmailAbilities();

@@ -43,7 +43,8 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		wp_set_current_user( 0 );
 
 		global $wp_rest_server;
-		$this->server = $wp_rest_server = new WP_REST_Server();
+		$wp_rest_server = new WP_REST_Server();
+		$this->server   = $wp_rest_server;
 		do_action( 'rest_api_init' );
 
 		// Ensure post type and taxonomies are registered
@@ -119,16 +120,24 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 		$this->assertNotSame( $generation, CalendarCache::get_generation() );
 		$this->assertNotNull( EventDatesTable::get( $post_id ) );
-		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array(
+			'scope'  => 'upcoming',
+			'fields' => 'ids',
+		) );
 		$this->assertContains( $post_id, $direct['posts'] );
 		$request  = $this->calendar_request();
-		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 
 		$this->assertSame( 200, $response->get_status() );
 
 		$data = $response->get_data();
 		$this->assertSame( array( $post_id ), array_column( $data['events'], 'id' ) );
+		$this->assertArrayNotHasKey( 'html', $data );
+		$this->assertArrayNotHasKey( 'html', $data['pagination'] );
+		$this->assertArrayNotHasKey( 'html', $data['navigation'] );
+		$this->assertIsArray( $data['counter'] );
+		$this->assertArrayNotHasKey( 'badges_html', $data['events'][0] );
+		$this->assertIsArray( $data['events'][0]['badges']['items'] );
 
 		// Cleanup
 		wp_delete_post( $post_id, true );
@@ -151,12 +160,14 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 		$this->assertNotSame( $generation, CalendarCache::get_generation() );
 		$this->assertNotNull( EventDatesTable::get( $post_id ) );
-		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array( 'scope' => 'upcoming', 'fields' => 'ids' ) );
+		$direct = ( new EventDateQueryAbilities() )->executeQueryEvents( array(
+			'scope'  => 'upcoming',
+			'fields' => 'ids',
+		) );
 		$this->assertContains( $post_id, $direct['posts'] );
 
 		$request = $this->calendar_request();
 		$request->set_param( 'event_search', $unique_term );
-		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 
 		$this->assertSame( 200, $response->get_status() );
@@ -195,9 +206,8 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertIsArray( $data );
 	}
 
-	public function test_calendar_data_response_uses_canonical_empty_state(): void {
+	public function test_calendar_response_represents_empty_state_without_markup(): void {
 		$request = $this->calendar_request();
-		$request->set_param( 'format', 'data' );
 		$request->set_param( 'month', '2999-12' );
 		$response = $this->server->dispatch( $request );
 		$data     = $response->get_data();
@@ -205,12 +215,12 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertSame( 200, $response->get_status() );
 		$this->assertSame( \DataMachineEvents\Api\Controllers\Calendar::DATA_SCHEMA_VERSION, $data['schema']['version'] );
 		$this->assertSame( array(), $data['grouping']['ordered_dates'] );
-		$this->assertStringContainsString( 'data-machine-events-no-events', $data['empty_html'] );
-		$this->assertStringContainsString( 'data-machine-events-no-events-today-link', $data['empty_html'] );
+		$this->assertSame( array(), $data['events'] );
+		$this->assertArrayNotHasKey( 'empty_html', $data );
 	}
 
 	/**
-	 * Ticketmaster compliance (issue #816): `format=data` must never surface
+	 * Ticketmaster compliance (issue #816): calendar REST must never surface
 	 * the affiliate ticket URL. `ticket.url` is emptied and `ticket.is_affiliate`
 	 * is true instead; clients gate on `event.id` for the redirect ref.
 	 */
@@ -231,7 +241,6 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 
 		$request  = $this->calendar_request();
-		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 		$data     = $response->get_data();
 
@@ -271,7 +280,6 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 
 		$request  = $this->calendar_request();
-		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 		$event    = $response->get_data()['events'][0];
 
@@ -301,7 +309,6 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		CalendarCache::invalidate();
 
 		$request  = $this->calendar_request();
-		$request->set_param( 'format', 'data' );
 		$response = $this->server->dispatch( $request );
 		$event    = $response->get_data()['events'][0];
 
@@ -350,6 +357,5 @@ class EventRestControllerTest extends WP_UnitTestCase {
 		$this->assertTrue( $data['success'] );
 		$this->assertArrayHasKey( 'is_duplicate', $data['data'] );
 		$this->assertFalse( $data['data']['is_duplicate'] );
-
 	}
 }

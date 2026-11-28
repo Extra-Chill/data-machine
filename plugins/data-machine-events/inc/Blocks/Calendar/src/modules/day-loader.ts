@@ -1,324 +1,143 @@
-/**
- * Day Loader — progressive date-group loading via REST
- *
- * All deferred days start fetching immediately on page load (in display order).
- * An IntersectionObserver gates when the fetched HTML actually gets injected
- * into the DOM — if the data arrives before the user scrolls to it, it injects
- * instantly with zero perceived delay.
- *
- * This means:
- * - Day 2 starts loading right after page load (not when scrolled to)
- * - Days 3, 4, 5 start loading sequentially after day 2
- * - If the user scrolls slowly, everything is already loaded
- * - If the user scrolls fast, at most they see a brief skeleton
- */
+/** Resolve deferred day shells from the structured calendar endpoint. */
 
 /**
  * Internal dependencies
  */
-import type { ArchiveContext } from '../types';
-import { buildCalendarRequest } from './api-client';
-import { initLazyRender } from './lazy-render';
+import { buildCalendarRequest, requestCalendarData } from './api-client';
 import { initCarousel } from './carousel';
+import { renderEventCard } from './event-renderer';
 
-const ROOT_MARGIN = '200px';
-
-const observers = new Map< HTMLElement, IntersectionObserver >();
-
-/** Prefetched HTML keyed by date string, waiting for scroll to inject. */
-const prefetchCache = new Map< string, string >();
-
-/** Wrappers waiting for their prefetched data. */
-const pendingInject = new Map< string, HTMLElement >();
+const instances = new WeakMap< HTMLElement, () => void >();
 
 export function initDayLoader( calendar: HTMLElement ): void {
-	const deferredWrappers = calendar.querySelectorAll< HTMLElement >(
+	const wrappers = calendar.querySelectorAll< HTMLElement >(
 		'.data-machine-events-wrapper[data-deferred="true"]'
 	);
-
-	if ( ! deferredWrappers.length ) {
+	if ( ! wrappers.length || instances.has( calendar ) ) {
 		return;
 	}
-
-	const archiveContext = getArchiveContext( calendar );
-	const geoContext = getGeoContext( calendar );
-
-	// Set up IntersectionObserver to gate DOM injection (not fetching).
-	const observer = new IntersectionObserver(
-		function ( entries ) {
-			entries.forEach( function ( entry ) {
-				if ( ! entry.isIntersecting ) {
-					return;
-				}
-
-				const wrapper = entry.target as HTMLElement;
-				const date = getDateFromWrapper( wrapper );
-				observer.unobserve( wrapper );
-
-				if ( ! date ) {
-					return;
-				}
-
-				// If prefetch already completed, inject immediately.
-				const cached = prefetchCache.get( date );
-				if ( cached ) {
-					injectDayHtml( wrapper, cached, calendar );
-					prefetchCache.delete( date );
-				} else {
-					// Data still in flight — mark as waiting for injection.
-					pendingInject.set( date, wrapper );
-				}
-			} );
-		},
-		{
-			rootMargin: ROOT_MARGIN,
-			threshold: 0,
-		}
-	);
-
-	deferredWrappers.forEach( function ( wrapper ) {
-		observer.observe( wrapper );
+	const controller = new AbortController();
+	const reveals = new Map< Element, () => void >();
+	const observer =
+		typeof IntersectionObserver === 'undefined'
+			? null
+			: new IntersectionObserver(
+					( entries ) => {
+						for ( const entry of entries ) {
+							if ( entry.isIntersecting ) {
+								observer?.unobserve( entry.target );
+								reveals.get( entry.target )?.();
+								reveals.delete( entry.target );
+							}
+						}
+					},
+					{ rootMargin: '200px' }
+			  );
+	instances.set( calendar, () => {
+		controller.abort();
+		observer?.disconnect();
+		reveals.clear();
 	} );
 
-	observers.set( calendar, observer );
+	const params = buildCalendarRequest( {
+		archiveContext: {
+			taxonomy: calendar.dataset.archiveTaxonomy || '',
+			term_id: Number( calendar.dataset.archiveTermId ),
+		},
+		geoContext: {
+			lat: calendar.dataset.geoLat || '',
+			lng: calendar.dataset.geoLng || '',
+			radius: Number( calendar.dataset.geoRadius || 25 ),
+			radius_unit: calendar.dataset.geoRadiusUnit === 'km' ? 'km' : 'mi',
+		},
+		overrides: { scope_token: calendar.dataset.scopeToken || '' },
+	} );
+	params.delete( 'paged' );
 
-	// Start prefetching ALL deferred days immediately, in display order.
-	prefetchAllDays( deferredWrappers, calendar, archiveContext, geoContext );
+	async function prefetch(): Promise< void > {
+		for ( const wrapper of wrappers ) {
+			if ( controller.signal.aborted ) {
+				return;
+			}
+			const group = wrapper.closest< HTMLElement >(
+				'.data-machine-date-group'
+			);
+			const date = group?.dataset.date;
+			if ( ! group || ! date ) {
+				continue;
+			}
+			let visible = ! observer;
+			let apply: ( () => void ) | undefined;
+			reveals.set( wrapper, () => {
+				visible = true;
+				if ( ! controller.signal.aborted ) {
+					apply?.();
+				}
+			} );
+			observer?.observe( wrapper );
+			if ( ! observer ) {
+				reveals.delete( wrapper );
+			}
+			const dayParams = new URLSearchParams( params );
+			dayParams.set( 'date_start', date );
+			dayParams.set( 'date_end', date );
+			const load = async (): Promise< void > => {
+				try {
+					const data = await requestCalendarData(
+						dayParams,
+						controller.signal
+					);
+					apply = () => {
+						const events = new Map(
+							data.events.map( ( event ) => [ event.id, event ] )
+						);
+						const cards = (
+							data.grouping.by_date[ date ] || []
+						).flatMap( ( occurrence ) => {
+							const event = events.get( occurrence.post_id );
+							return event
+								? [ renderEventCard( event, occurrence ) ]
+								: [];
+						} );
+						wrapper.replaceChildren( ...cards );
+						delete wrapper.dataset.deferred;
+						if (
+							calendar.dataset.displayMode !== 'month-grid' &&
+							! calendar.classList.contains(
+								'data-machine-events-single-day-list'
+							)
+						) {
+							initCarousel( calendar, [ group ] );
+						}
+					};
+				} catch {
+					apply = () => {
+						const error = document.createElement( 'p' );
+						error.className = 'data-machine-events-error';
+						error.textContent = 'Unable to load events. ';
+						const retry = document.createElement( 'button' );
+						retry.type = 'button';
+						retry.className = 'data-machine-retry-btn';
+						retry.textContent = 'Retry';
+						retry.addEventListener( 'click', () => {
+							retry.disabled = true;
+							void load();
+						} );
+						error.append( retry );
+						wrapper.replaceChildren( error );
+					};
+				}
+				if ( visible && ! controller.signal.aborted ) {
+					apply();
+				}
+			};
+			await load();
+		}
+	}
+	void prefetch();
 }
 
 export function destroyDayLoader( calendar: HTMLElement ): void {
-	const observer = observers.get( calendar );
-	if ( observer ) {
-		observer.disconnect();
-		observers.delete( calendar );
-	}
-	prefetchCache.clear();
-	pendingInject.clear();
-}
-
-/**
- * Prefetch all deferred days sequentially (in display order).
- * Each fetch starts as soon as the previous one completes,
- * so we don't slam the server with concurrent requests.
- * @param wrappers
- * @param calendar
- * @param archiveContext
- * @param geoContext
- */
-async function prefetchAllDays(
-	wrappers: NodeListOf< HTMLElement >,
-	calendar: HTMLElement,
-	archiveContext: Partial< ArchiveContext >,
-	geoContext: GeoContextData
-): Promise< void > {
-	for ( const wrapper of Array.from( wrappers ) ) {
-		const date = getDateFromWrapper( wrapper );
-		if ( ! date ) {
-			continue;
-		}
-
-		// Skip if already injected (observer fired before fetch started).
-		if ( ! wrapper.hasAttribute( 'data-deferred' ) ) {
-			continue;
-		}
-
-		try {
-			const html = await fetchDayHtml( date, archiveContext, geoContext );
-
-			if ( html ) {
-				// Check if the observer already flagged this day as visible.
-				const waiting = pendingInject.get( date );
-				if ( waiting ) {
-					// User already scrolled here — inject immediately.
-					injectDayHtml( waiting, html, calendar );
-					pendingInject.delete( date );
-				} else {
-					// Not visible yet — cache for when the observer fires.
-					prefetchCache.set( date, html );
-				}
-			}
-		} catch {
-			// Fetch failed — leave skeleton, observer will show error on scroll.
-			const waiting = pendingInject.get( date );
-			if ( waiting ) {
-				showError( waiting, calendar, archiveContext, geoContext );
-				pendingInject.delete( date );
-			}
-		}
-	}
-}
-
-/**
- * Fetch a single day's events HTML from REST.
- * @param date
- * @param archiveContext
- * @param geoContext
- */
-async function fetchDayHtml(
-	date: string,
-	archiveContext: Partial< ArchiveContext >,
-	geoContext: GeoContextData
-): Promise< string | null > {
-	// Build via the shared helper so passthrough (event_search, scope,
-	// past, paged, tax_filter[*]) and archive/geo context stay consistent
-	// across all calendar REST callers. Per-day overrides win — date_start
-	// and date_end pin the request to this single day.
-	const params = buildCalendarRequest( {
-		archiveContext,
-		geoContext: {
-			lat: geoContext.lat,
-			lng: geoContext.lng,
-			// `radius` is typed as `number` on GeoContext but flows here as a
-			// wire string sourced from `data-geo-radius`. Cast at the helper
-			// boundary; the helper stringifies before writing the param.
-			radius: geoContext.radius as unknown as number,
-			radius_unit: geoContext.radius_unit as 'mi' | 'km',
-		},
-		overrides: {
-			date_start: date,
-			date_end: date,
-		},
-	} );
-
-	const response = await fetch(
-		`/wp-json/datamachine/v1/events/calendar?${ params.toString() }`,
-		{
-			method: 'GET',
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'application/json',
-				// Identifies this as an XHR/fetch call so the
-				// server-side BrowserNavigationGuard lets the JSON
-				// response through (see issue #297).
-				'X-Requested-With': 'XMLHttpRequest',
-			},
-		}
-	);
-
-	if ( ! response.ok ) {
-		throw new Error( `HTTP ${ response.status }` );
-	}
-
-	const data = await response.json();
-
-	if ( data.success && data.html ) {
-		return data.html;
-	}
-
-	return null;
-}
-
-/**
- * Inject fetched HTML into a deferred wrapper.
- * @param wrapper
- * @param html
- * @param calendar
- */
-function injectDayHtml(
-	wrapper: HTMLElement,
-	html: string,
-	calendar: HTMLElement
-): void {
-	const temp = document.createElement( 'div' );
-	temp.innerHTML = html;
-
-	// Scope the source wrapper lookup to the matching date group so we never
-	// inject the wrong day's events even if the response contains multiple
-	// date groups (defensive against backend regressions).
-	const date = getDateFromWrapper( wrapper );
-	const sourceWrapper = date
-		? temp.querySelector(
-				`.data-machine-date-group[data-date="${ date }"] .data-machine-events-wrapper`
-		  ) || temp.querySelector( '.data-machine-events-wrapper' )
-		: temp.querySelector( '.data-machine-events-wrapper' );
-
-	if ( sourceWrapper ) {
-		wrapper.innerHTML = sourceWrapper.innerHTML;
-		wrapper.removeAttribute( 'data-deferred' );
-		initLazyRender( calendar );
-		initCarousel( calendar );
-	}
-}
-
-/**
- * Show error UI in a failed wrapper with retry.
- * @param wrapper
- * @param calendar
- * @param archiveContext
- * @param geoContext
- */
-function showError(
-	wrapper: HTMLElement,
-	calendar: HTMLElement,
-	archiveContext: Partial< ArchiveContext >,
-	geoContext: GeoContextData
-): void {
-	const date = getDateFromWrapper( wrapper );
-	wrapper.innerHTML =
-		'<div class="data-machine-events-error">' +
-		'<p>Unable to load events. <button class="data-machine-retry-btn">Retry</button></p>' +
-		'</div>';
-	wrapper.removeAttribute( 'data-deferred' );
-
-	const retryBtn = wrapper.querySelector( '.data-machine-retry-btn' );
-	if ( retryBtn && date ) {
-		retryBtn.addEventListener( 'click', async function () {
-			wrapper.setAttribute( 'data-deferred', 'true' );
-			wrapper.innerHTML =
-				'<div class="data-machine-event-item data-machine-event-placeholder">' +
-				'<div class="data-machine-placeholder-skeleton">' +
-				'<div class="data-machine-skeleton-title"></div>' +
-				'<div class="data-machine-skeleton-meta"></div>' +
-				'</div></div>';
-			try {
-				const html = await fetchDayHtml(
-					date,
-					archiveContext,
-					geoContext
-				);
-				if ( html ) {
-					injectDayHtml( wrapper, html, calendar );
-				}
-			} catch {
-				showError( wrapper, calendar, archiveContext, geoContext );
-			}
-		} );
-	}
-}
-
-function getDateFromWrapper( wrapper: HTMLElement ): string | null {
-	const dateGroup = wrapper.closest< HTMLElement >(
-		'.data-machine-date-group'
-	);
-	return dateGroup?.dataset.date || null;
-}
-
-function getArchiveContext( calendar: HTMLElement ): Partial< ArchiveContext > {
-	const taxonomy = calendar.dataset.archiveTaxonomy || '';
-	const termId = calendar.dataset.archiveTermId || '';
-
-	if ( taxonomy && termId ) {
-		return {
-			taxonomy,
-			term_id: parseInt( termId, 10 ),
-		};
-	}
-
-	return {};
-}
-
-interface GeoContextData {
-	lat: string;
-	lng: string;
-	radius: string;
-	radius_unit: string;
-}
-
-function getGeoContext( calendar: HTMLElement ): GeoContextData {
-	return {
-		lat: calendar.dataset.geoLat || '',
-		lng: calendar.dataset.geoLng || '',
-		radius: calendar.dataset.geoRadius || '',
-		radius_unit: calendar.dataset.geoRadiusUnit || '',
-	};
+	instances.get( calendar )?.();
+	instances.delete( calendar );
 }

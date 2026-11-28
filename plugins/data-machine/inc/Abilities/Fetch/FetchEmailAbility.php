@@ -18,7 +18,7 @@
 
 namespace DataMachine\Abilities\Fetch;
 
-use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Abilities\Email\EmailMailboxPermission;
 use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
 use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordSearch;
 use DataMachine\Abilities\Fetch\Traits\HasApplyKeywordExclusion;
@@ -28,6 +28,7 @@ defined( 'ABSPATH' ) || exit;
 class FetchEmailAbility {
 	use HasApplyKeywordSearch;
 	use HasApplyKeywordExclusion;
+	use EmailMailboxPermission;
 
 	private const KEYWORD_SCAN_LIMIT = 500;
 
@@ -148,10 +149,23 @@ class FetchEmailAbility {
 	/**
 	 * Permission callback.
 	 *
+	 * @param mixed $input Normalized ability input.
 	 * @return bool True if user has permission.
 	 */
-	public function checkPermission(): bool {
-		return PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage();
+	public function checkPermission( $input = null ): bool {
+		$normalized = is_array( $input ) ? $input : array();
+		return $this->authorizeMailboxRef( $input, $this->mailboxOperations( $this->normalizeConfig( $normalized ) ) );
+	}
+
+	private function mailboxOperations( array $config ): array {
+		$operations = array( 'read' );
+		if ( empty( $config['uid'] ) && ! empty( $config['search_criteria'] ) ) {
+			$operations[] = 'search';
+		}
+		if ( $config['mark_as_read'] ) {
+			$operations[] = 'organize';
+		}
+		return $operations;
 	}
 
 	/**
@@ -181,14 +195,8 @@ class FetchEmailAbility {
 		}
 
 		$config     = $this->normalizeConfig( $input );
-		$operations = array( 'read' );
-		if ( empty( $config['uid'] ) && ! empty( $config['search_criteria'] ) ) {
-			$operations[] = 'search';
-		}
-		if ( $config['mark_as_read'] ) {
-			$operations[] = 'organize';
-		}
-		$auth = $this->getAuthProvider();
+		$operations = $this->mailboxOperations( $config );
+		$auth       = $this->getAuthProvider();
 		if ( ! $auth ) {
 			return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
 		}
@@ -433,7 +441,7 @@ class FetchEmailAbility {
 	 * Just From, Subject, Date, UID, and basic flags.
 	 *
 	 * @param \IMAP\Connection $connection IMAP connection.
-	 * @param int      $uid        Message UID.
+	 * @param int              $uid        Message UID.
 	 * @return array|null Header data or null on failure.
 	 */
 	private function fetchHeaders( $connection, int $uid ): ?array {
@@ -493,8 +501,8 @@ class FetchEmailAbility {
 	 * Fetch a single message with full body by UID.
 	 *
 	 * @param \IMAP\Connection $connection IMAP connection.
-	 * @param int      $uid        Message UID.
-	 * @param array    $config     Fetch configuration.
+	 * @param int              $uid        Message UID.
+	 * @param array            $config     Fetch configuration.
 	 * @return array|null Message data or null on failure.
 	 */
 	private function fetchMessage( $connection, int $uid, array $config ): ?array {
@@ -606,7 +614,7 @@ class FetchEmailAbility {
 	 * Fetch message body, preferring plain text.
 	 *
 	 * @param \IMAP\Connection $connection IMAP connection.
-	 * @param int      $uid        Message UID.
+	 * @param int              $uid        Message UID.
 	 * @return string Message body text.
 	 */
 	private function fetchBody( $connection, int $uid, bool $peek ): string {
@@ -675,7 +683,11 @@ class FetchEmailAbility {
 	/**
 	 * Decode email body based on encoding type.
 	 */
-	private function decodeBody( string $body, int $encoding ): string {
+	private function decodeBody( string|false $body, int $encoding ): string {
+		if ( false === $body ) {
+			return '';
+		}
+
 		switch ( $encoding ) {
 			case 3: // BASE64.
 				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decodes MIME transfer encoding, not executable payloads.

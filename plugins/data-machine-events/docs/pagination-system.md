@@ -98,48 +98,9 @@ echo Pagination::render_pagination($current_page, $max_pages, $show_past);
 
 ## REST API Integration
 
-### Pagination Parameters
-```javascript
-// JavaScript pagination request
-fetch('/wp-json/datamachine/v1/events/calendar?' + new URLSearchParams({
-    paged: 2,
-    event_search: searchValue,
-    date_start: startDate,
-    date_end: endDate,
-    'tax_filter[venue][]': selectedVenues
-}))
-.then(response => response.json())
-.then(data => {
-    // Update calendar content
-    document.querySelector('.data-machine-events-content').innerHTML = data.html;
-    
-    // Update pagination
-    document.querySelector('.data-machine-events-pagination').outerHTML = data.pagination.html;
-    
-    // Update results counter
-    document.querySelector('.data-machine-events-results-counter').outerHTML = data.counter;
-});
-```
+The calendar REST endpoint returns `pagination.current_page`, `pagination.total_pages`, `pagination.total_items`, and `pagination.page_items` alongside event data. The frontend requests the next page with `paged` and appends the returned date groups. Numbered links are still rendered by PHP on the initial page so pagination works without JavaScript.
 
-### Server Response
-```json
-{
-    "success": true,
-    "html": "Rendered events HTML for 5 days",
-    "pagination": {
-        "html": "Pagination controls HTML",
-        "current_page": 2,
-        "max_pages": 5,
-        "total_events": 23
-    },
-    "counter": "Results counter HTML",
-    "navigation": {
-        "html": "Past/upcoming navigation HTML",
-        "past_count": 150,
-        "future_count": 87
-    }
-}
-```
+See the [calendar REST schema](calendar-data-schema.md) for response details.
 
 ## Customization
 

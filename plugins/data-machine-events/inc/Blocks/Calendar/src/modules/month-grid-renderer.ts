@@ -2,7 +2,7 @@
  * Month-grid renderer (#318).
  *
  * Pure function: given a visible month and the data-only REST response
- * (`format=data`), produce the DOM node the server-side template would
+ * from REST, produce the DOM node the server-side template would
  * have rendered. Used to swap the grid in place after filter / month
  * changes without a full page reload.
  *
@@ -392,8 +392,7 @@ function renderNav( opts: {
 	prev.rel = 'prev';
 	prev.href = buildMonthUrl( opts.base_url, opts.prev_month );
 	prev.setAttribute( 'data-month', opts.prev_month );
-	prev.innerHTML =
-		'<span aria-hidden="true">&larr;</span><span class="screen-reader-text">Previous month</span>';
+	prev.append( navArrow( '←' ), navLabel( 'Previous month' ) );
 
 	const title = document.createElement( 'h2' );
 	title.className = 'data-machine-month-grid__title';
@@ -410,8 +409,7 @@ function renderNav( opts: {
 	next.rel = 'next';
 	next.href = buildMonthUrl( opts.base_url, opts.next_month );
 	next.setAttribute( 'data-month', opts.next_month );
-	next.innerHTML =
-		'<span class="screen-reader-text">Next month</span><span aria-hidden="true">&rarr;</span>';
+	next.append( navLabel( 'Next month' ), navArrow( '→' ) );
 
 	header.appendChild( prev );
 	header.appendChild( title );
@@ -543,4 +541,18 @@ function renderRibbon( ribbon: RibbonGeometry ): HTMLElement {
 	titleSpan.textContent = ribbon.title;
 	a.appendChild( titleSpan );
 	return a;
+}
+
+function navArrow( text: string ): HTMLElement {
+	const span = document.createElement( 'span' );
+	span.setAttribute( 'aria-hidden', 'true' );
+	span.textContent = text;
+	return span;
+}
+
+function navLabel( text: string ): HTMLElement {
+	const span = document.createElement( 'span' );
+	span.className = 'screen-reader-text';
+	span.textContent = text;
+	return span;
 }

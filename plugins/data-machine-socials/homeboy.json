@@ -3,6 +3,7 @@
   "changelog_target": "docs/CHANGELOG.md",
   "extensions": {
     "wordpress": {
+      "node": "24",
       "settings": {
         "validation_dependencies": [
           "../data-machine"
