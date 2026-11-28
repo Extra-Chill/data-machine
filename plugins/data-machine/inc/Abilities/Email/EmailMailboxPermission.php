@@ -27,6 +27,7 @@
 namespace DataMachine\Abilities\Email;
 
 use DataMachine\Abilities\PermissionHelper;
+use DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -55,21 +56,24 @@ trait EmailMailboxPermission {
 	 *
 	 * @param mixed        $input     Normalized ability input (array) or null.
 	 * @param string|array $operation Required mailbox operation(s) for this call.
+	 * @param ?EmailAuth   $auth      Explicit provider when execution uses one directly.
 	 * @return bool
 	 */
-	private function authorizeMailboxRef( $input, string|array $operation ): bool {
+	private function authorizeMailboxRef( $input, string|array $operation, ?EmailAuth $auth = null ): bool {
 		if ( ! ( PermissionHelper::can( 'use_tools' ) || PermissionHelper::can_manage() ) ) {
 			return false;
 		}
 
 		$input = is_array( $input ) ? $input : array();
-		$ref   = isset( $input['auth_ref'] ) ? trim( (string) $input['auth_ref'] ) : '';
+		$ref   = is_string( $input['auth_ref'] ?? null ) ? trim( $input['auth_ref'] ) : '';
 		if ( '' === $ref ) {
 			return true;
 		}
 
-		$providers = apply_filters( 'datamachine_auth_providers', array() );
-		$auth      = $providers['email_imap'] ?? null;
+		if ( null === $auth ) {
+			$providers = apply_filters( 'datamachine_auth_providers', array() );
+			$auth      = $providers['email_imap'] ?? null;
+		}
 		if ( ! is_object( $auth ) || ! method_exists( $auth, 'resolve_mailbox' ) ) {
 			// Not configured on this install — let execute() surface that specific error.
 			return true;

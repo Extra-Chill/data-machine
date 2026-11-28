@@ -133,11 +133,8 @@ class EmailAuth extends BaseAuthProvider {
 				? array( 'auth_ref' => 'email_imap:' . $account )
 				: new \WP_Error( 'auth_ref_unresolved', __( 'Email mailbox ref is not configured on this install.', 'data-machine' ) );
 		}
-		if ( ! empty( $context['runtime'] ) ) {
-			$context['_trusted_execution'] = true;
-		}
 		$operation = (string) ( $context['operation'] ?? 'read' );
-		$resolved  = $this->resolve_mailbox( $account, $operation, $context );
+		$resolved  = $this->resolve_mailbox_for_principal( $account, $operation, $context );
 		if ( is_wp_error( $resolved ) ) {
 			return $resolved;
 		}

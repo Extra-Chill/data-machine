@@ -5,6 +5,7 @@ defined( 'ABSPATH' ) || exit;
 
 $root = dirname( __DIR__ );
 require_once $root . '/inc/Abilities/Email/MailboxAbilities.php';
+require_once $root . '/inc/Abilities/Email/EmailMailboxPermission.php';
 require_once $root . '/inc/Abilities/Email/ForwardEmailAbility.php';
 new \DataMachine\Abilities\Email\MailboxAbilities();
 new \DataMachine\Abilities\Email\ForwardEmailAbility();

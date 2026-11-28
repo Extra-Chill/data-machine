@@ -32,11 +32,9 @@ defined( 'ABSPATH' ) || exit;
 
 class SendEmailAbility {
 
-<<<<<<< ours
-	public const PENDING_KIND = 'send_email';
-=======
 	use EmailMailboxPermission;
->>>>>>> theirs
+
+	public const PENDING_KIND = 'send_email';
 
 	private static bool $registered           = false;
 	private static bool $registration_pending = false;

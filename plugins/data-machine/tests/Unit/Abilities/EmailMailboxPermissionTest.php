@@ -7,6 +7,8 @@
 
 namespace DataMachine\Tests\Unit\Abilities;
 
+use DataMachine\Abilities\Email\EmailAbilities;
+use DataMachine\Abilities\Email\ForwardEmailAbility;
 use DataMachine\Abilities\Fetch\FetchEmailAbility;
 use DataMachine\Abilities\Publish\SendEmailAbility;
 use DataMachine\Abilities\Publish\SendEmailQueuedAbility;
@@ -117,6 +119,9 @@ class EmailMailboxPermissionTest extends WP_UnitTestCase {
 		// with no input. The capability floor alone governs; execute() still
 		// enforces the concrete ref once one is chosen.
 		$this->assertTrue( $ability->checkPermission( null ) );
+
+		wp_set_current_user( 0 );
+		$this->assertFalse( $ability->checkPermission( null ) );
 	}
 
 	public function test_unconfigured_ref_is_not_treated_as_a_permission_denial(): void {
@@ -132,16 +137,20 @@ class EmailMailboxPermissionTest extends WP_UnitTestCase {
 		$this->assertTrue( $ability->checkPermission( array( 'auth_ref' => 'email_imap:default' ) ) );
 	}
 
-	public function test_delete_ability_is_denied_for_a_mailbox_the_caller_does_not_own(): void {
+	public function test_crud_and_forward_permissions_deny_unowned_mailboxes(): void {
 		$owner_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$other_id = self::factory()->user->create( array( 'role' => 'subscriber' ) );
 		$this->grant_use_tools( $other_id );
 		$this->auth->save_named_account( 'personal', $this->credentials( 'owner@example.test' ), BaseAuthProvider::AUTH_SCOPE_USER, $owner_id );
 
 		wp_set_current_user( $other_id );
-		$ability = new \DataMachine\Abilities\Email\EmailAbilities();
-
-		$this->assertFalse( $ability->checkDeletePermission( array( 'auth_ref' => 'email_imap:personal', 'uid' => 1 ) ) );
+		$ability = new EmailAbilities();
+		$input   = array( 'auth_ref' => 'email_imap:personal', 'uid' => 1 );
+		foreach ( array( 'Reply', 'Delete', 'Move', 'Flag', 'BatchMove', 'BatchFlag', 'BatchDelete', 'Unsubscribe', 'BatchUnsubscribe', 'TestConnection' ) as $operation ) {
+			$callback = 'check' . $operation . 'Permission';
+			$this->assertFalse( $ability->$callback( $input ), $callback );
+		}
+		$this->assertFalse( ( new ForwardEmailAbility() )->checkPermission( $input ) );
 	}
 
 	public function test_send_email_denies_direct_call_against_an_unowned_ref(): void {
@@ -179,12 +188,16 @@ class EmailMailboxPermissionTest extends WP_UnitTestCase {
 		// context is empty during real Action Scheduler dispatch, so
 		// re-deriving it here would incorrectly deny a previously-authorized
 		// send. Only the capability floor applies in this branch.
-		$this->assertTrue( $ability->checkPermission( array(
+		$input = array(
 			'to'             => 'x@example.test',
 			'subject'        => 'hi',
 			'auth_ref'       => 'email_imap:personal',
 			'_mailbox_grant' => array( 'signature' => 'placeholder-unverified-here' ),
-		) ) );
+		);
+		$this->assertTrue( $ability->checkPermission( $input ) );
+		$result = $ability->execute( $input );
+		$this->assertWPError( $result );
+		$this->assertSame( 'email_queue_grant_invalid', $result->get_error_code() );
 	}
 
 	public function test_send_email_queued_gates_ownership_at_queue_time_with_no_grant_special_case(): void {

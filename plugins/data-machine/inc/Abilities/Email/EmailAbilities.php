@@ -13,13 +13,9 @@
 
 namespace DataMachine\Abilities\Email;
 
-<<<<<<< ours
-use DataMachine\Abilities\PermissionHelper;
 use DataMachine\Abilities\AbilityRegistration;
 use DataMachine\Core\Email\MailboxTransport;
 
-=======
->>>>>>> theirs
 defined( 'ABSPATH' ) || exit;
 
 class EmailAbilities {
@@ -43,6 +39,7 @@ class EmailAbilities {
 			// Reply to an email.
 			$this->registerAbility(
 				'datamachine/email-reply',
+				'checkReplyPermission',
 				array(
 					'label'            => __( 'Reply to Email', 'data-machine' ),
 					'description'      => __( 'Send a reply to an email, maintaining thread headers', 'data-machine' ),
@@ -57,7 +54,6 @@ class EmailAbilities {
 							'type'        => 'string',
 							'description' => __( 'Reply subject (typically Re: original subject)', 'data-machine' ),
 						),
-<<<<<<< ours
 						'body'         => array(
 							'type'        => 'string',
 							'description' => __( 'Reply body content', 'data-machine' ),
@@ -82,18 +78,13 @@ class EmailAbilities {
 					) ),
 					'output_schema'    => self::resultSchema( array( 'logs' => array( 'type' => 'array' ) ) ),
 					'execute_callback' => array( $this, 'executeReply' ),
-=======
-					),
-					'execute_callback'    => array( $this, 'executeReply' ),
-					'permission_callback' => array( $this, 'checkReplyPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Delete an email via IMAP.
 			$this->registerAbility(
 				'datamachine/email-delete',
+				'checkDeletePermission',
 				array(
 					'label'            => __( 'Delete Email', 'data-machine' ),
 					'description'      => __( 'Delete (expunge) an email by UID from the IMAP server', 'data-machine' ),
@@ -103,30 +94,16 @@ class EmailAbilities {
 							'type'        => 'integer',
 							'description' => __( 'Message UID to delete', 'data-machine' ),
 						),
-<<<<<<< ours
 					) ),
 					'output_schema'    => self::resultSchema(),
 					'execute_callback' => array( $this, 'executeDelete' ),
-=======
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeDelete' ),
-					'permission_callback' => array( $this, 'checkDeletePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Move an email to a different folder.
 			$this->registerAbility(
 				'datamachine/email-move',
+				'checkMovePermission',
 				array(
 					'label'            => __( 'Move Email', 'data-machine' ),
 					'description'      => __( 'Move an email to a different IMAP folder', 'data-machine' ),
@@ -140,22 +117,16 @@ class EmailAbilities {
 							'type'        => 'string',
 							'description' => __( 'Target folder (e.g., Archive, Trash, [Gmail]/All Mail)', 'data-machine' ),
 						),
-<<<<<<< ours
 					) ),
 					'output_schema'    => self::resultSchema(),
 					'execute_callback' => array( $this, 'executeMove' ),
-=======
-					),
-					'execute_callback'    => array( $this, 'executeMove' ),
-					'permission_callback' => array( $this, 'checkMovePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Flag/unflag an email.
 			$this->registerAbility(
 				'datamachine/email-flag',
+				'checkFlagPermission',
 				array(
 					'label'            => __( 'Flag Email', 'data-machine' ),
 					'description'      => __( 'Set or clear IMAP flags on an email (Seen, Flagged, etc.)', 'data-machine' ),
@@ -169,7 +140,6 @@ class EmailAbilities {
 							'type'        => 'string',
 							'description' => __( 'IMAP flag: Seen, Flagged, Answered, Deleted, Draft', 'data-machine' ),
 						),
-<<<<<<< ours
 						'action' => array(
 							'type'        => 'string',
 							'default'     => 'set',
@@ -178,18 +148,13 @@ class EmailAbilities {
 					) ),
 					'output_schema'    => self::resultSchema(),
 					'execute_callback' => array( $this, 'executeFlag' ),
-=======
-					),
-					'execute_callback'    => array( $this, 'executeFlag' ),
-					'permission_callback' => array( $this, 'checkFlagPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Batch move: search → move all matches.
 			$this->registerAbility(
 				'datamachine/email-batch-move',
+				'checkBatchMovePermission',
 				array(
 					'label'            => __( 'Batch Move Emails', 'data-machine' ),
 					'description'      => __( 'Move all emails matching a search to a destination folder', 'data-machine' ),
@@ -203,7 +168,6 @@ class EmailAbilities {
 							'type'        => 'string',
 							'description' => __( 'Target folder (e.g., [Gmail]/GitHub, Archive)', 'data-machine' ),
 						),
-<<<<<<< ours
 						'max'         => self::maximumProperty( 500, __( 'Maximum messages to move (safety limit)', 'data-machine' ) ),
 					) ),
 					'output_schema'    => self::resultSchema( array(
@@ -211,18 +175,13 @@ class EmailAbilities {
 						'total_matches' => array( 'type' => 'integer' ),
 					) ),
 					'execute_callback' => array( $this, 'executeBatchMove' ),
-=======
-					),
-					'execute_callback'    => array( $this, 'executeBatchMove' ),
-					'permission_callback' => array( $this, 'checkBatchMovePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Batch flag: search → flag/unflag all matches.
 			$this->registerAbility(
 				'datamachine/email-batch-flag',
+				'checkBatchFlagPermission',
 				array(
 					'label'            => __( 'Batch Flag Emails', 'data-machine' ),
 					'description'      => __( 'Set or clear a flag on all emails matching a search', 'data-machine' ),
@@ -238,7 +197,6 @@ class EmailAbilities {
 							'default'     => 'set',
 							'description' => __( 'set or clear', 'data-machine' ),
 						),
-<<<<<<< ours
 						'max'    => self::maximumProperty( 500 ),
 					) ),
 					'output_schema'    => self::resultSchema( array(
@@ -246,20 +204,14 @@ class EmailAbilities {
 						'total_matches' => array( 'type' => 'integer' ),
 					) ),
 					'execute_callback' => array( $this, 'executeBatchFlag' ),
-=======
-					),
-					'execute_callback'    => array( $this, 'executeBatchFlag' ),
-					'permission_callback' => array( $this, 'checkBatchFlagPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Batch delete: search → delete all matches.
 			$this->registerAbility(
 				'datamachine/email-batch-delete',
+				'checkBatchDeletePermission',
 				array(
-<<<<<<< ours
 					'label'            => __( 'Batch Delete Emails', 'data-machine' ),
 					'description'      => __( 'Delete all emails matching a search', 'data-machine' ),
 					'category'         => 'datamachine-email',
@@ -272,50 +224,13 @@ class EmailAbilities {
 						'total_matches' => array( 'type' => 'integer' ),
 					) ),
 					'execute_callback' => array( $this, 'executeBatchDelete' ),
-=======
-					'label'               => __( 'Batch Delete Emails', 'data-machine' ),
-					'description'         => __( 'Delete all emails matching a search', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'search'   => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'      => array(
-								'type'        => 'integer',
-								'default'     => 100,
-								'description' => __( 'Maximum messages to delete (safety limit, lower default)', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'       => array( 'type' => 'boolean' ),
-							'message'       => array( 'type' => 'string' ),
-							'deleted_count' => array( 'type' => 'integer' ),
-							'total_matches' => array( 'type' => 'integer' ),
-							'error'         => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchDelete' ),
-					'permission_callback' => array( $this, 'checkBatchDeletePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Unsubscribe from a mailing list.
 			$this->registerAbility(
 				'datamachine/email-unsubscribe',
+				'checkUnsubscribePermission',
 				array(
 					'label'            => __( 'Unsubscribe from Email', 'data-machine' ),
 					'description'      => __( 'Unsubscribe from a mailing list using List-Unsubscribe headers', 'data-machine' ),
@@ -325,33 +240,17 @@ class EmailAbilities {
 							'type'        => 'integer',
 							'description' => __( 'Message UID to unsubscribe from', 'data-machine' ),
 						),
-<<<<<<< ours
 					) ),
 					'output_schema'    => self::resultSchema( array( 'method' => array( 'type' => 'string' ) ) ),
 					'execute_callback' => array( $this, 'executeUnsubscribe' ),
-=======
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success' => array( 'type' => 'boolean' ),
-							'message' => array( 'type' => 'string' ),
-							'method'  => array( 'type' => 'string' ),
-							'error'   => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkUnsubscribePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Batch unsubscribe from all matching senders.
 			$this->registerAbility(
 				'datamachine/email-batch-unsubscribe',
+				'checkBatchUnsubscribePermission',
 				array(
-<<<<<<< ours
 					'label'            => __( 'Batch Unsubscribe', 'data-machine' ),
 					'description'      => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
 					'category'         => 'datamachine-email',
@@ -366,51 +265,13 @@ class EmailAbilities {
 						'no_header'    => array( 'type' => 'integer' ),
 					), false ),
 					'execute_callback' => array( $this, 'executeBatchUnsubscribe' ),
-=======
-					'label'               => __( 'Batch Unsubscribe', 'data-machine' ),
-					'description'         => __( 'Unsubscribe from all mailing lists matching a search', 'data-machine' ),
-					'category'            => 'datamachine-email',
-					'input_schema'        => array(
-						'type'       => 'object',
-						'required'   => array( 'search' ),
-						'properties' => array(
-							'auth_ref' => self::authRefProperty(),
-							'search'   => array(
-								'type'        => 'string',
-								'description' => __( 'IMAP search criteria', 'data-machine' ),
-							),
-							'folder'   => array(
-								'type'    => 'string',
-								'default' => 'INBOX',
-							),
-							'max'      => array(
-								'type'        => 'integer',
-								'default'     => 20,
-								'description' => __( 'Max unique senders to unsubscribe from (deduped by sender)', 'data-machine' ),
-							),
-						),
-					),
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'results'      => array( 'type' => 'array' ),
-							'unsubscribed' => array( 'type' => 'integer' ),
-							'failed'       => array( 'type' => 'integer' ),
-							'no_header'    => array( 'type' => 'integer' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeBatchUnsubscribe' ),
-					'permission_callback' => array( $this, 'checkBatchUnsubscribePermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 
 			// Test IMAP connection.
 			$this->registerAbility(
 				'datamachine/email-test-connection',
+				'checkTestConnectionPermission',
 				array(
 					'label'            => __( 'Test Email Connection', 'data-machine' ),
 					'description'      => __( 'Test IMAP connection with stored credentials', 'data-machine' ),
@@ -419,23 +280,8 @@ class EmailAbilities {
 						'type'       => 'object',
 						'properties' => array( 'auth_ref' => self::authRefProperty() ),
 					),
-<<<<<<< ours
 					'output_schema'    => self::resultSchema( array( 'mailbox_info' => array( 'type' => 'object' ) ) ),
 					'execute_callback' => array( $this, 'executeTestConnection' ),
-=======
-					'output_schema'       => array(
-						'type'       => 'object',
-						'properties' => array(
-							'success'      => array( 'type' => 'boolean' ),
-							'message'      => array( 'type' => 'string' ),
-							'mailbox_info' => array( 'type' => 'object' ),
-							'error'        => array( 'type' => 'string' ),
-						),
-					),
-					'execute_callback'    => array( $this, 'executeTestConnection' ),
-					'permission_callback' => array( $this, 'checkTestConnectionPermission' ),
-					'meta'                => array( 'show_in_rest' => true ),
->>>>>>> theirs
 				)
 			);
 		};
@@ -491,12 +337,12 @@ class EmailAbilities {
 		);
 	}
 
-	/** Attach the shared permission and REST visibility contract to every email ability. */
-	private function registerAbility( string $name, array $definition ): void {
+	/** Attach operation-specific permissions and shared REST visibility. */
+	private function registerAbility( string $name, string $permission_callback, array $definition ): void {
 		wp_register_ability( $name, array_merge(
 			$definition,
 			array(
-				'permission_callback' => array( $this, 'checkPermission' ),
+				'permission_callback' => array( $this, $permission_callback ),
 				'meta'                => array( 'show_in_rest' => true ),
 			)
 		) );
@@ -563,7 +409,7 @@ class EmailAbilities {
 		}
 
 		$to = array_map( 'trim', explode( ',', $input['to'] ) );
-		$to = array_filter( $to, 'is_email' );
+		$to = array_filter( $to, static fn( string $email ): bool => false !== is_email( $email ) );
 
 		if ( empty( $to ) ) {
 			return new \WP_Error( 'invalid_email_recipient', 'No valid recipient address', array( 'status' => 400 ) );
@@ -739,7 +585,8 @@ class EmailAbilities {
 		if ( is_array( $folders ) ) {
 			$prefix = $this->buildMailboxString( $credentials['imap_host'], (int) ( $credentials['imap_port'] ?? 993 ), $credentials['imap_encryption'] ?? 'ssl', '' );
 			foreach ( $folders as $folder ) {
-				$folder_list[] = str_replace( $prefix, '', imap_utf7_decode( $folder ) );
+				$decoded_folder = imap_utf7_decode( $folder );
+				$folder_list[]  = str_replace( $prefix, '', false === $decoded_folder ? $folder : $decoded_folder );
 			}
 		}
 		$info['folders'] = $folder_list;
@@ -875,7 +722,7 @@ class EmailAbilities {
 
 			// Fetch unsubscribe headers.
 			$raw    = imap_fetchheader( $connection, $uid, FT_UID );
-			$parsed = $this->parseUnsubscribeHeaders( $raw );
+			$parsed = $this->parseUnsubscribeHeaders( false === $raw ? '' : $raw );
 
 			$to_process[] = array(
 				'uid'    => $uid,
@@ -1104,7 +951,7 @@ class EmailAbilities {
 			parse_str( $parts['query'], $query );
 			$subject = $query['subject'] ?? 'unsubscribe';
 		}
-		if ( empty( $subject ) ) {
+		if ( ! is_string( $subject ) || '' === $subject ) {
 			$subject = 'unsubscribe';
 		}
 
@@ -1290,7 +1137,7 @@ class EmailAbilities {
 	 *
 	 * @param array  $input Input containing auth_ref and folder.
 	 * @param string|array $operation Required mailbox operation(s).
-	 * @return resource|\WP_Error IMAP connection or error.
+	 * @return \IMAP\Connection|\WP_Error IMAP connection or error.
 	 */
 	private function connect( array $input, string|array $operation ) {
 		if ( ! function_exists( 'imap_open' ) ) {
@@ -1323,7 +1170,7 @@ class EmailAbilities {
 	/**
 	 * Get the IMAP auth provider.
 	 *
-	 * @return \DataMachine\Core\Steps\Fetch\Handlers\Email\EmailAuth|null
+	 * @return object|null The registered provider, if present.
 	 */
 	private function getAuthProvider(): ?object {
 		$providers = apply_filters( 'datamachine_auth_providers', array() );

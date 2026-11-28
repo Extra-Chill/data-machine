@@ -133,15 +133,18 @@ class FetchEmailAbility {
 	 */
 	public function checkPermission( $input = null ): bool {
 		$normalized = is_array( $input ) ? $input : array();
+		return $this->authorizeMailboxRef( $input, $this->mailboxOperations( $this->normalizeConfig( $normalized ) ) );
+	}
+
+	private function mailboxOperations( array $config ): array {
 		$operations = array( 'read' );
-		if ( empty( $normalized['uid'] ) && ! empty( $normalized['search_criteria'] ) ) {
+		if ( empty( $config['uid'] ) && ! empty( $config['search_criteria'] ) ) {
 			$operations[] = 'search';
 		}
-		if ( ! empty( $normalized['mark_as_read'] ) ) {
+		if ( $config['mark_as_read'] ) {
 			$operations[] = 'organize';
 		}
-
-		return $this->authorizeMailboxRef( $input, $operations );
+		return $operations;
 	}
 
 	/**
@@ -171,14 +174,8 @@ class FetchEmailAbility {
 		}
 
 		$config     = $this->normalizeConfig( $input );
-		$operations = array( 'read' );
-		if ( empty( $config['uid'] ) && ! empty( $config['search_criteria'] ) ) {
-			$operations[] = 'search';
-		}
-		if ( $config['mark_as_read'] ) {
-			$operations[] = 'organize';
-		}
-		$auth = $this->getAuthProvider();
+		$operations = $this->mailboxOperations( $config );
+		$auth       = $this->getAuthProvider();
 		if ( ! $auth ) {
 			return new \WP_Error( 'email_imap_not_configured', 'Email IMAP provider is not registered.', array( 'status' => 400 ) );
 		}
@@ -320,8 +317,8 @@ class FetchEmailAbility {
 	 * No body parsing, no structure fetching, no attachment scanning.
 	 * Just From, Subject, Date, UID, and basic flags.
 	 *
-	 * @param resource $connection IMAP connection.
-	 * @param int      $uid        Message UID.
+	 * @param \IMAP\Connection $connection IMAP connection.
+	 * @param int              $uid        Message UID.
 	 * @return array|null Header data or null on failure.
 	 */
 	private function fetchHeaders( $connection, int $uid ): ?array {
@@ -380,9 +377,9 @@ class FetchEmailAbility {
 	/**
 	 * Fetch a single message with full body by UID.
 	 *
-	 * @param resource $connection IMAP connection.
-	 * @param int      $uid        Message UID.
-	 * @param array    $config     Fetch configuration.
+	 * @param \IMAP\Connection $connection IMAP connection.
+	 * @param int              $uid        Message UID.
+	 * @param array            $config     Fetch configuration.
 	 * @return array|null Message data or null on failure.
 	 */
 	private function fetchMessage( $connection, int $uid, array $config ): ?array {
@@ -493,8 +490,8 @@ class FetchEmailAbility {
 	/**
 	 * Fetch message body, preferring plain text.
 	 *
-	 * @param resource $connection IMAP connection.
-	 * @param int      $uid        Message UID.
+	 * @param \IMAP\Connection $connection IMAP connection.
+	 * @param int              $uid        Message UID.
 	 * @return string Message body text.
 	 */
 	private function fetchBody( $connection, int $uid, bool $peek ): string {
@@ -563,7 +560,11 @@ class FetchEmailAbility {
 	/**
 	 * Decode email body based on encoding type.
 	 */
-	private function decodeBody( string $body, int $encoding ): string {
+	private function decodeBody( string|false $body, int $encoding ): string {
+		if ( false === $body ) {
+			return '';
+		}
+
 		switch ( $encoding ) {
 			case 3: // BASE64.
 				// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decodes MIME transfer encoding, not executable payloads.
